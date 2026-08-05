@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs
+dist/
+build/
+out/
+
+# Environment configurations
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Editor configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swo
+
+# Application specific transient files
+uploads/
+outputs/
+client.zip
+
+# OS-specific temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

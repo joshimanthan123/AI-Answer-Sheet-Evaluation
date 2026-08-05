@@ -1,0 +1,14 @@
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\ai\hwr\azure.provider.js
+  2:37  error  'questionModelAnswer' is assigned a value but never used. Allowed unused args must match /^_/u  no-unused-vars
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\ai\hwr\providerFactory.js
+   9:1  error  Expected indentation of 4 spaces but found 6  indent
+  10:1  error  Expected indentation of 6 spaces but found 8  indent
+  11:1  error  Expected indentation of 4 spaces but found 6  indent
+  12:1  error  Expected indentation of 4 spaces but found 6  indent
+  13:1  error  Expected indentation of 6 spaces but found 8  indent
+
+Γ£û 6 problems (6 errors, 0 warnings)
+  5 errors and 0 warnings potentially fixable with the `--fix` option.
+

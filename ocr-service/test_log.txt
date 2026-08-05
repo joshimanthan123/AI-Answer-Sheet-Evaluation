@@ -1,0 +1,101 @@
+[2026-08-03 13:20:39,829] INFO [test_runner] - Setting up sample test environment...
+[2026-08-03 13:20:39,853] INFO [test_runner] - Successfully generated: tests/sample_images/clean.jpg
+[2026-08-03 13:20:39,929] INFO [test_runner] - Successfully generated: tests/sample_images/noisy.jpg
+[2026-08-03 13:20:39,943] INFO [test_runner] - Successfully generated: tests/sample_images/skewed.jpg
+[2026-08-03 13:20:39,954] INFO [test_runner] - Successfully generated: tests/sample_images/dark.jpg
+[2026-08-03 13:20:39,956] INFO [test_runner] - ============================================================
+[2026-08-03 13:20:39,956] INFO [test_runner] - STARTING PREPROCESSING PIPELINE TESTS
+[2026-08-03 13:20:39,956] INFO [test_runner] - ============================================================
+[2026-08-03 13:20:39,956] INFO [test_runner] - --------------------------------------------------
+[2026-08-03 13:20:39,956] INFO [test_runner] - Processing test case file: tests/sample_images/clean.jpg
+[2026-08-03 13:20:39,956] INFO [app.services.preprocess_service] - Loading image from provided source...
+[2026-08-03 13:20:39,967] INFO [app.services.preprocess_service] - Image loaded successfully. Dimensions: (800, 600, 3)
+[2026-08-03 13:20:39,968] INFO [app.services.preprocess_service] - Resize step completed in 0.0014s. New shape: (800, 600, 3)
+[2026-08-03 13:20:39,969] INFO [app.services.preprocess_service] - Grayscale conversion completed in 0.0007s.
+[2026-08-03 13:20:39,970] INFO [app.services.preprocess_service] - Gaussian Blur noise removal completed in 0.0010s.
+[2026-08-03 13:20:39,970] INFO [app.services.preprocess_service] - CLAHE contrast enhancement completed in 0.0000s.
+[2026-08-03 13:20:39,976] INFO [app.services.preprocess_service] - Deskew correction completed in 0.0050s. Detected angle: 0.00 degrees
+[2026-08-03 13:20:39,979] INFO [app.services.preprocess_service] - Adaptive Threshold completed in 0.0025s.
+[2026-08-03 13:20:39,979] INFO [app.services.preprocess_service] - Morphological cleanup completed in 0.0000s.
+[2026-08-03 13:20:39,979] INFO [app.services.preprocess_service] - Preprocess pipeline completed in 0.0116s. Steps: ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']. Final Output shape: (800, 600)
+[2026-08-03 13:20:39,979] INFO [test_runner] - Execution stats for clean.jpg:
+[2026-08-03 13:20:39,979] INFO [test_runner] -   Original size   : (600, 800)
+[2026-08-03 13:20:39,980] INFO [test_runner] -   Processed size  : (600, 800)
+[2026-08-03 13:20:39,980] INFO [test_runner] -   Deskew skew angle: 0.00 degrees
+[2026-08-03 13:20:39,980] INFO [test_runner] -   Processing time : 0.0116s
+[2026-08-03 13:20:39,980] INFO [test_runner] -   Steps completed : ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']
+[2026-08-03 13:20:39,980] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/clean_processed.jpg
+[2026-08-03 13:20:39,982] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:39,982] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/clean_grayscale.jpg
+[2026-08-03 13:20:39,984] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:39,985] INFO [test_runner] - Outputs written to tests/outputs/ folder.
+[2026-08-03 13:20:39,985] INFO [test_runner] - --------------------------------------------------
+[2026-08-03 13:20:39,985] INFO [test_runner] - Processing test case file: tests/sample_images/noisy.jpg
+[2026-08-03 13:20:39,985] INFO [app.services.preprocess_service] - Loading image from provided source...
+[2026-08-03 13:20:40,001] INFO [app.services.preprocess_service] - Image loaded successfully. Dimensions: (800, 600, 3)
+[2026-08-03 13:20:40,003] INFO [app.services.preprocess_service] - Resize step completed in 0.0010s. New shape: (800, 600, 3)
+[2026-08-03 13:20:40,004] INFO [app.services.preprocess_service] - Grayscale conversion completed in 0.0005s.
+[2026-08-03 13:20:40,004] INFO [app.services.preprocess_service] - Gaussian Blur noise removal completed in 0.0000s.
+[2026-08-03 13:20:40,005] INFO [app.services.preprocess_service] - CLAHE contrast enhancement completed in 0.0010s.
+[2026-08-03 13:20:40,011] INFO [app.services.preprocess_service] - Deskew correction completed in 0.0060s. Detected angle: 0.00 degrees
+[2026-08-03 13:20:40,015] INFO [app.services.preprocess_service] - Adaptive Threshold completed in 0.0036s.
+[2026-08-03 13:20:40,017] INFO [app.services.preprocess_service] - Morphological cleanup completed in 0.0010s.
+[2026-08-03 13:20:40,017] INFO [app.services.preprocess_service] - Preprocess pipeline completed in 0.0159s. Steps: ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']. Final Output shape: (800, 600)
+[2026-08-03 13:20:40,017] INFO [test_runner] - Execution stats for noisy.jpg:
+[2026-08-03 13:20:40,017] INFO [test_runner] -   Original size   : (600, 800)
+[2026-08-03 13:20:40,017] INFO [test_runner] -   Processed size  : (600, 800)
+[2026-08-03 13:20:40,017] INFO [test_runner] -   Deskew skew angle: 0.00 degrees
+[2026-08-03 13:20:40,018] INFO [test_runner] -   Processing time : 0.0159s
+[2026-08-03 13:20:40,018] INFO [test_runner] -   Steps completed : ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']
+[2026-08-03 13:20:40,018] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/noisy_processed.jpg
+[2026-08-03 13:20:40,024] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:40,024] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/noisy_grayscale.jpg
+[2026-08-03 13:20:40,028] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:40,029] INFO [test_runner] - Outputs written to tests/outputs/ folder.
+[2026-08-03 13:20:40,029] INFO [test_runner] - --------------------------------------------------
+[2026-08-03 13:20:40,029] INFO [test_runner] - Processing test case file: tests/sample_images/skewed.jpg
+[2026-08-03 13:20:40,029] INFO [app.services.preprocess_service] - Loading image from provided source...
+[2026-08-03 13:20:40,042] INFO [app.services.preprocess_service] - Image loaded successfully. Dimensions: (800, 600, 3)
+[2026-08-03 13:20:40,043] INFO [app.services.preprocess_service] - Resize step completed in 0.0000s. New shape: (800, 600, 3)
+[2026-08-03 13:20:40,045] INFO [app.services.preprocess_service] - Grayscale conversion completed in 0.0010s.
+[2026-08-03 13:20:40,046] INFO [app.services.preprocess_service] - Gaussian Blur noise removal completed in 0.0010s.
+[2026-08-03 13:20:40,047] INFO [app.services.preprocess_service] - CLAHE contrast enhancement completed in 0.0000s.
+[2026-08-03 13:20:40,061] INFO [app.services.preprocess_service] - Deskew correction completed in 0.0129s. Detected angle: 5.53 degrees
+[2026-08-03 13:20:40,063] INFO [app.services.preprocess_service] - Adaptive Threshold completed in 0.0024s.
+[2026-08-03 13:20:40,063] INFO [app.services.preprocess_service] - Morphological cleanup completed in 0.0000s.
+[2026-08-03 13:20:40,065] INFO [app.services.preprocess_service] - Preprocess pipeline completed in 0.0223s. Steps: ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']. Final Output shape: (800, 600)
+[2026-08-03 13:20:40,065] INFO [test_runner] - Execution stats for skewed.jpg:
+[2026-08-03 13:20:40,065] INFO [test_runner] -   Original size   : (600, 800)
+[2026-08-03 13:20:40,065] INFO [test_runner] -   Processed size  : (600, 800)
+[2026-08-03 13:20:40,065] INFO [test_runner] -   Deskew skew angle: 5.53 degrees
+[2026-08-03 13:20:40,065] INFO [test_runner] -   Processing time : 0.0223s
+[2026-08-03 13:20:40,065] INFO [test_runner] -   Steps completed : ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']
+[2026-08-03 13:20:40,065] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/skewed_processed.jpg
+[2026-08-03 13:20:40,069] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:40,069] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/skewed_grayscale.jpg
+[2026-08-03 13:20:40,071] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:40,071] INFO [test_runner] - Outputs written to tests/outputs/ folder.
+[2026-08-03 13:20:40,071] INFO [test_runner] - --------------------------------------------------
+[2026-08-03 13:20:40,071] INFO [test_runner] - Processing test case file: tests/sample_images/dark.jpg
+[2026-08-03 13:20:40,071] INFO [app.services.preprocess_service] - Loading image from provided source...
+[2026-08-03 13:20:40,083] INFO [app.services.preprocess_service] - Image loaded successfully. Dimensions: (800, 600, 3)
+[2026-08-03 13:20:40,087] INFO [app.services.preprocess_service] - Resize step completed in 0.0010s. New shape: (800, 600, 3)
+[2026-08-03 13:20:40,087] INFO [app.services.preprocess_service] - Grayscale conversion completed in 0.0009s.
+[2026-08-03 13:20:40,088] INFO [app.services.preprocess_service] - Gaussian Blur noise removal completed in 0.0010s.
+[2026-08-03 13:20:40,088] INFO [app.services.preprocess_service] - CLAHE contrast enhancement completed in 0.0000s.
+[2026-08-03 13:20:40,097] INFO [app.services.preprocess_service] - Deskew correction completed in 0.0081s. Detected angle: 0.00 degrees
+[2026-08-03 13:20:40,100] INFO [app.services.preprocess_service] - Adaptive Threshold completed in 0.0031s.
+[2026-08-03 13:20:40,100] INFO [app.services.preprocess_service] - Morphological cleanup completed in 0.0000s.
+[2026-08-03 13:20:40,101] INFO [app.services.preprocess_service] - Preprocess pipeline completed in 0.0168s. Steps: ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']. Final Output shape: (800, 600)
+[2026-08-03 13:20:40,101] INFO [test_runner] - Execution stats for dark.jpg:
+[2026-08-03 13:20:40,101] INFO [test_runner] -   Original size   : (600, 800)
+[2026-08-03 13:20:40,101] INFO [test_runner] -   Processed size  : (600, 800)
+[2026-08-03 13:20:40,101] INFO [test_runner] -   Deskew skew angle: 0.00 degrees
+[2026-08-03 13:20:40,101] INFO [test_runner] -   Processing time : 0.0168s
+[2026-08-03 13:20:40,101] INFO [test_runner] -   Steps completed : ['resize', 'grayscale', 'denoise', 'contrast', 'deskew', 'threshold', 'morphology']
+[2026-08-03 13:20:40,101] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/dark_processed.jpg
+[2026-08-03 13:20:40,104] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:40,104] INFO [app.services.preprocess_service] - Saving image to path: tests/outputs/dark_grayscale.jpg
+[2026-08-03 13:20:40,106] INFO [app.services.preprocess_service] - Image saved successfully.
+[2026-08-03 13:20:40,106] INFO [test_runner] - Outputs written to tests/outputs/ folder.
+[2026-08-03 13:20:40,108] INFO [test_runner] - All preprocessing test cases finished.

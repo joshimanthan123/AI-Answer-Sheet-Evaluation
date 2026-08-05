@@ -1,0 +1,25 @@
+..Provider initialization failed: OpenAI API key is missing. Set OPENAI_API_KEY environment variable.
+F....Failed to parse structured JSON from OpenAI response: Expecting value: line 1 column 1 (char 0). Response content: {'choices': [{'message': {'content': 'Not a JSON block'}}]}
+.OpenAI API returned HTTP 429: Rate Limit Exceeded
+OpenAI API returned HTTP 429: Rate Limit Exceeded
+...F..
+======================================================================
+FAIL: test_evaluation_orchestrator_fallback_on_llm_failure (tests.test_evaluation.TestEvaluationEngine.test_evaluation_orchestrator_fallback_on_llm_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\CE\sem5\SGP\Ai based evaluation sheet\ocr-service\tests\test_evaluation.py", line 346, in test_evaluation_orchestrator_fallback_on_llm_failure
+    self.assertTrue(res.evaluated_answers[0].provider_metadata.get("fallback", False))
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_prompt_builder_formatting (tests.test_evaluation.TestEvaluationEngine.test_prompt_builder_formatting)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\CE\sem5\SGP\Ai based evaluation sheet\ocr-service\tests\test_evaluation.py", line 110, in test_prompt_builder_formatting
+    self.assertIn("passing_marks: 2.0", prompt)
+AssertionError: 'passing_marks: 2.0' not found in 'You are an expert academic evaluator. Your task is to evaluate a student\'s answer against a reference answer.\nEvaluate the answer based on correctness, completeness, and matching key components/concepts.\n\nContext:\n- Question: What is NLP?\n- Maximum Marks: 5.0\n- Reference Answer: NLP is natural language processing.\n- Student Answer: Natural Language Processing\n- Evaluation Criteria Detail:\n  * Keyword Weight: 0.3\n  * Semantic Weight: 0.4\n  * Completeness Weight: 0.3\n  * Passing Marks: 2.0\n\nInstructions:\n1. Provide qualitative feedback explaining how well the student addressed the request.\n2. Estimate the awarded marks out of 5.0 based on correctness and the evaluation criteria. Be fair, objective, and support partial marking. If the student answer is completely incorrect or empty, award 0.0 marks.\n3. List specific key strengths of the student\'s answer.\n4. List areas of improvement or weaknesses.\n5. Provide clear reasoning explaining how the score was calculated.\n6. Return a valid JSON object only. Do NOT wrap the JSON in markdown code blocks like ```json ... ``` or include any text outside the JSON.\n\nExpected JSON format:\n{\n  "awarded_marks": <float>,\n  "reasoning": "Detailed justification of marks",\n  "feedback": "Overall constructive feedback",\n  "strengths": ["strength1", "strength2"],\n  "improvements": ["improvement1", "improvement2"]\n}'
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.547s
+
+FAILED (failures=2)
