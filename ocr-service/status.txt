@@ -1,0 +1,41 @@
+ M ocr-service/app/config.py
+ M ocr-service/app/dependencies.py
+ M ocr-service/app/main.py
+ M ocr-service/app/models/evaluation_models.py
+ M ocr-service/app/prompts/evaluation_prompt.txt
+ M ocr-service/app/providers/base_provider.py
+ M ocr-service/app/providers/mock_provider.py
+ M ocr-service/app/providers/openai_provider.py
+ M ocr-service/app/services/evaluation_service.py
+ M ocr-service/app/services/keyword_service.py
+ M ocr-service/app/services/prompt_builder.py
+ M ocr-service/requirements.txt
+ M ocr-service/tests/test_evaluation.py
+?? git_diff_output.txt
+?? ocr-service/app/api/__init__.py
+?? ocr-service/app/api/routes/__init__.py
+?? ocr-service/app/api/routes/evaluation.py
+?? ocr-service/app/api/routes/llm.py
+?? ocr-service/app/api/routes/prompt.py
+?? ocr-service/app/models/evaluation_llm_models.py
+?? ocr-service/app/models/llm_models.py
+?? ocr-service/app/models/prompt_models.py
+?? ocr-service/app/prompts/feedback_prompt.txt
+?? ocr-service/app/prompts/keyword_prompt.txt
+?? ocr-service/app/prompts/system_prompt.txt
+?? ocr-service/app/providers/factory.py
+?? ocr-service/app/providers/gemini_provider.py
+?? ocr-service/app/services/evaluation_response_parser.py
+?? ocr-service/app/services/prompt_service.py
+?? ocr-service/status.txt
+?? ocr-service/tests/test_evaluation_models.py
+?? ocr-service/tests/test_evaluation_response_parser.py
+?? ocr-service/tests/test_evaluation_routes.py
+?? ocr-service/tests/test_evaluation_service.py
+?? ocr-service/tests/test_keyword_service.py
+?? ocr-service/tests/test_llm_dependencies.py
+?? ocr-service/tests/test_llm_factory.py
+?? ocr-service/tests/test_llm_models.py
+?? ocr-service/tests/test_llm_routes.py
+?? ocr-service/tests/test_mock_provider.py
+?? ocr-service/tests/test_prompt_service.py

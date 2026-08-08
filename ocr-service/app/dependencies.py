@@ -6,8 +6,8 @@ from app.services.segmentation_service import AnswerSegmentationService
 from app.repositories.answer_key_repository import IAnswerKeyRepository, MemoryAnswerKeyRepository
 from app.services.answer_key_service import AnswerKeyService
 from app.services.prompt_service import PromptService
-from app.providers.base_provider import ILLMProvider
-from app.providers.factory import LLMProviderFactory
+
+
 
 def get_settings() -> Settings:
     """Dependency injector for Microservice global settings."""
@@ -49,6 +49,12 @@ def get_prompt_service() -> PromptService:
     return _prompt_service
 
 
+from app.providers.base_provider import ILLMProvider
+from app.providers.factory import LLMProviderFactory
+from app.services.evaluation_service import EvaluationService
+from app.services.evaluation_response_parser import EvaluationResponseParser
+from app.services.keyword_service import KeywordService
+
 _llm_providers: dict[str, ILLMProvider] = {}
 
 def get_llm_provider() -> ILLMProvider:
@@ -60,3 +66,27 @@ def get_llm_provider() -> ILLMProvider:
     if provider_name not in _llm_providers:
         _llm_providers[provider_name] = LLMProviderFactory.create_provider(provider_name)
     return _llm_providers[provider_name]
+
+
+_evaluation_service: EvaluationService | None = None
+
+def get_evaluation_service(
+    answer_key_service: AnswerKeyService = Depends(get_answer_key_service),
+    prompt_service: PromptService = Depends(get_prompt_service),
+    llm_provider: ILLMProvider = Depends(get_llm_provider)
+) -> EvaluationService:
+    """Dependency injector for EvaluationService."""
+    global _evaluation_service
+    if _evaluation_service is None:
+        _evaluation_service = EvaluationService(
+            answer_key_service=answer_key_service,
+            prompt_service=prompt_service,
+            llm_provider=llm_provider,
+            response_parser=EvaluationResponseParser(),
+            keyword_service=KeywordService()
+        )
+    return _evaluation_service
+
+
+
+

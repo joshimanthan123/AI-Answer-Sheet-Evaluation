@@ -10,7 +10,7 @@ import httpx
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.config import settings
-from app.models.evaluation_models import EvaluationCriteria, EvaluatedAnswer, EvaluationResult
+from app.models.evaluation_models import EvaluationCriteria, EvaluatedAnswer, AnswerEvaluationResult as EvaluationResult
 from app.services.keyword_service import KeywordService
 from app.services.similarity_service import SimilarityService
 from app.services.prompt_builder import PromptBuilder

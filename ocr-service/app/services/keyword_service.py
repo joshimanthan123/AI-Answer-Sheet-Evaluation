@@ -1,93 +1,149 @@
 import re
-from typing import List, Set
+import logging
+from typing import List
 
-# Standard small helper set of English stop words to filter out
-STOP_WORDS: Set[str] = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", 
-    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", 
-    "by", "can", "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from", 
-    "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself", "him", 
-    "himself", "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "me", "more", 
-    "most", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", 
-    "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should", "so", "some", 
-    "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there", 
-    "these", "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", 
-    "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom", "why", 
-    "with", "you", "your", "yours", "yourself", "yourselves"
-}
+logger = logging.getLogger("app.services.keyword_service")
 
 class KeywordService:
     """
-    Service responsible for matching expected key terms and concepts within
-    student answers to compute a keyword match score.
+    Keyword analyzer service which handles match and missing checks.
+    Uses normalized phrase matching and safe boundary checks.
     """
 
     @staticmethod
-    def clean_text(text: str) -> str:
+    def _normalize_text(text: str) -> str:
         """
-        Normalizes text by lowercasing, stripping punctuation/special chars, and trimming.
+        Lowercases, strips, and normalizes consecutive whitespaces into a single space.
         """
         if not text:
             return ""
-        # Lowercase
-        text = text.lower()
-        # Remove punctuation, keep alphanumeric and spaces
-        text = re.sub(r"[^\w\s-]", "", text)
-        # Collapse multiple spaces
-        text = re.sub(r"\s+", " ", text).strip()
-        return text
-
-    @staticmethod
-    def get_tokens(text: str) -> Set[str]:
-        """
-        Tokenizes text and removes standard stop words.
-        """
-        cleaned = KeywordService.clean_text(text)
-        tokens = cleaned.split()
-        return {token for token in tokens if token not in STOP_WORDS}
+        return " ".join(text.lower().strip().split())
 
     @classmethod
-    def evaluate_keywords(cls, student_answer: str, expected_keywords: List[str]) -> float:
+    def _is_keyword_matched(cls, student_normalized: str, keyword: str) -> bool:
         """
-        Calculates the ratio of matched keywords in the student's answer.
-        
-        Args:
-            student_answer: Transcription of the student's answer.
-            expected_keywords: List of key phrases or words expected.
-            
-        Returns:
-            float: Score between 0.0 (no match) and 1.0 (all matched).
+        Checks if the keyword exists in normalized student text using non-alphanumeric boundaries.
+        """
+        kw_norm = cls._normalize_text(keyword)
+        if not kw_norm:
+            return False
+
+        # Find all occurrences of kw_norm in student_normalized
+        start = 0
+        while True:
+            pos = student_normalized.find(kw_norm, start)
+            if pos == -1:
+                break
+
+            # Safe boundary checks:
+            # Match is invalid if character before is alphanumeric,
+            # or character after is alphanumeric.
+            # (Allows punctuation like + in C++ or / in TCP/IP)
+            char_before_ok = True
+            if pos > 0:
+                char_before = student_normalized[pos - 1]
+                if char_before.isalnum():
+                    char_before_ok = False
+
+            char_after_ok = True
+            end_pos = pos + len(kw_norm)
+            if end_pos < len(student_normalized):
+                char_after = student_normalized[end_pos]
+                if char_after.isalnum():
+                    char_after_ok = False
+
+            if char_before_ok and char_after_ok:
+                return True
+
+            start = pos + 1
+
+        return False
+
+    @classmethod
+    def extract_matched_keywords(cls, student_answer: str, expected_keywords: List[str]) -> List[str]:
+        """
+        Returns expectation elements matched in student answer.
+        Deduplicates results while preserving original keyword representation/casing.
         """
         if not expected_keywords:
-            return 1.0  # if no keywords are expected, default to full marks for keywords
-            
-        if not student_answer or not student_answer.strip():
-            return 0.0
+            return []
 
-        student_clean = cls.clean_text(student_answer)
-        student_tokens = cls.get_tokens(student_answer)
+        student_norm = cls._normalize_text(student_answer)
+        matched = []
+        seen = set()
 
-        matched_count = 0
         for kw in expected_keywords:
-            kw_clean = cls.clean_text(kw)
-            if not kw_clean:
+            if not kw:
                 continue
+            kw_norm = cls._normalize_text(kw)
+            # Ensure we only check uniqueness by normalized representation
+            if kw_norm not in seen:
+                if cls._is_keyword_matched(student_norm, kw):
+                    matched.append(kw)
+                    seen.add(kw_norm)
 
-            # Multi-word phrase check (e.g. "machine learning") - check as substring in normalized text
-            if len(kw_clean.split()) > 1:
-                if kw_clean in student_clean:
-                    matched_count += 1
-                else:
-                    # Fallback synonym/fuzzy support: check if all tokens of the phrase appear
-                    kw_tokens = set(kw_clean.split())
-                    if kw_tokens.issubset(student_tokens):
-                        matched_count += 1
-            else:
-                # Single word keyword check: must exist in set of tokens (avoids sub-word matches like 'learning' matching 'learn')
-                if kw_clean in student_tokens:
-                    matched_count += 1
-                # Fallback: substring match just in case
-                elif kw_clean in student_clean:
-                    matched_count += 1
+        return matched
 
-        return round(matched_count / len(expected_keywords), 4)
+    @classmethod
+    def extract_missing_keywords(cls, student_answer: str, expected_keywords: List[str]) -> List[str]:
+        """
+        Returns expectation elements missing from student answer.
+        Deduplicates results while preserving original keyword representation/casing.
+        """
+        if not expected_keywords:
+            return []
+
+        student_norm = cls._normalize_text(student_answer)
+        missing = []
+        seen = set()
+
+        for kw in expected_keywords:
+            if not kw:
+                continue
+            kw_norm = cls._normalize_text(kw)
+            if kw_norm not in seen:
+                if not cls._is_keyword_matched(student_norm, kw):
+                    missing.append(kw)
+                    seen.add(kw_norm)
+
+        return missing
+
+    # =========================================================================
+    # Legacy Support for Phase 3B AnswerEvaluationService compatibility
+    # =========================================================================
+
+    @classmethod
+    def evaluate_keywords(cls, student_text: str, expected_keywords: List[str]) -> float:
+        """
+        Legacy keyword matching computation yielding a score between 0.0 and 1.0.
+        """
+        if not expected_keywords:
+            return 1.0
+
+        matched = cls.extract_matched_keywords(student_text, expected_keywords)
+        # Deduplicated unique expected keyword set count:
+        unique_expected = len(set(cls._normalize_text(k) for k in expected_keywords if k))
+        if unique_expected == 0:
+            return 1.0
+
+        return round(len(matched) / unique_expected, 4)
+
+    @classmethod
+    def clean_text(cls, text: str) -> str:
+        """
+        Cleans text for similarity calculations. Lowercases, strips punctuation.
+        """
+        if not text:
+            return ""
+        cleaned = text.lower().strip()
+        cleaned = re.sub(r'[\r\n\t]+', ' ', cleaned)
+        cleaned = re.sub(r'[^\w\s]', '', cleaned)
+        return " ".join(cleaned.split())
+
+    @classmethod
+    def get_tokens(cls, text: str) -> set[str]:
+        """
+        Splits cleaned text into tokens.
+        """
+        cleaned = cls.clean_text(text)
+        return set(cleaned.split())

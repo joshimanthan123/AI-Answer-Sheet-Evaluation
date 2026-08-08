@@ -1,30 +1,33 @@
-You are an expert academic evaluator. Your task is to evaluate a student's answer against a reference answer.
-Evaluate the answer based on correctness, completeness, and matching key components/concepts.
+Question
+${question}
 
-Context:
-- Question: {question}
-- Maximum Marks: {maximum_marks}
-- Reference Answer: {reference_answer}
-- Student Answer: {student_answer}
-- Evaluation Criteria Detail:
-  * Keyword Weight: {keyword_weight}
-  * Semantic Weight: {semantic_weight}
-  * Completeness Weight: {completeness_weight}
-  * Passing Marks: {passing_marks}
+Maximum Marks
+${maximum_marks}
 
-Instructions:
-1. Provide qualitative feedback explaining how well the student addressed the request.
-2. Estimate the awarded marks out of {maximum_marks} based on correctness and the evaluation criteria. Be fair, objective, and support partial marking. If the student answer is completely incorrect or empty, award 0.0 marks.
-3. List specific key strengths of the student's answer.
-4. List areas of improvement or weaknesses.
-5. Provide clear reasoning explaining how the score was calculated.
-6. Return a valid JSON object only. Do NOT wrap the JSON in markdown code blocks like ```json ... ``` or include any text outside the JSON.
+Expected Answer
+${model_answer}
 
-Expected JSON format:
-{{
-  "awarded_marks": <float>,
-  "reasoning": "Detailed justification of marks",
-  "feedback": "Overall constructive feedback",
-  "strengths": ["strength1", "strength2"],
-  "improvements": ["improvement1", "improvement2"]
-}}
+Keywords
+${keywords}
+
+Rubric
+${rubric}
+
+Student Answer
+${student_answer}
+
+Instructions
+Evaluate according to the provided answer key.
+Award partial marks.
+Mention missing concepts.
+Mention strengths.
+Return ONLY valid JSON.
+
+Required JSON format
+{
+  "marks": number,
+  "feedback": "",
+  "missing_points": [],
+  "strengths": [],
+  "confidence": 0.0
+}

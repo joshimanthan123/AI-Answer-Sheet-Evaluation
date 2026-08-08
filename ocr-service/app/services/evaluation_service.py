@@ -2,7 +2,7 @@ import time
 import logging
 from typing import List, Dict, Any, Optional
 from app.config import settings
-from app.models.evaluation_models import EvaluationCriteria, EvaluatedAnswer, EvaluationResult
+from app.models.evaluation_models import EvaluationCriteria, EvaluatedAnswer, AnswerEvaluationResult as EvaluationResult
 from app.providers.base_llm_provider import ILLMProvider
 from app.services.keyword_service import KeywordService
 from app.services.similarity_service import SimilarityService
@@ -258,4 +258,212 @@ class AnswerEvaluationService:
             average_keyword_score=round(avg_kw_score, 4),
             processing_provider=settings.LLM_PROVIDER,
             processing_model=settings.LLM_MODEL
+        )
+
+
+# =========================================================================
+# Phase 3D EvaluationService (Modular & Provider-Independent)
+# =========================================================================
+
+from uuid import UUID
+from datetime import datetime, timezone
+from app.models.evaluation_models import EvaluationRequest, EvaluationResult as NewEvaluationResult, EvaluationSummary
+from app.models.prompt_models import EvaluationPromptRequest
+from app.providers.base_provider import ILLMProvider
+from app.services.evaluation_response_parser import EvaluationResponseParser
+from app.services.keyword_service import KeywordService
+from app.services.answer_key_service import AnswerKeyService
+from app.services.prompt_service import PromptService
+from app.core.exceptions import (
+    AnswerKeyNotFound,
+    EvaluationAnswerKeyNotFound,
+    EvaluationQuestionNotFound,
+    MarksOutOfRange,
+    EmptyStudentAnswer,
+    EvaluationFailed,
+    LLMProviderError,
+)
+
+class EvaluationService:
+    """
+    Modular AI Evaluation Service orchestrating parsing, prompts, LLMs, and keywords checks.
+    """
+    def __init__(
+        self,
+        answer_key_service: AnswerKeyService,
+        prompt_service: PromptService,
+        llm_provider: ILLMProvider,
+        response_parser: EvaluationResponseParser,
+        keyword_service: KeywordService
+    ) -> None:
+        self._answer_key_service = answer_key_service
+        self._prompt_service = prompt_service
+        self._llm_provider = llm_provider
+        self._response_parser = response_parser
+        self._keyword_service = keyword_service
+
+    async def evaluate(self, request: EvaluationRequest) -> NewEvaluationResult:
+        """
+        Executes structural end-to-end question evaluation.
+        """
+        logger.info(
+            "Evaluation started for answer_key_id: %s, question_number: %s",
+            request.answer_key_id, request.question_number
+        )
+
+        # 1. Resolve UUID
+        try:
+            key_uuid = UUID(request.answer_key_id)
+        except ValueError as e:
+            logger.error("Invalid UUID string for answer_key_id: '%s'", request.answer_key_id)
+            raise EvaluationAnswerKeyNotFound(f"Invalid UUID string for answer_key_id: '{request.answer_key_id}'") from e
+
+        # 2. Get AnswerKey
+        try:
+            answer_key = await self._answer_key_service.get_answer_key(key_uuid)
+        except AnswerKeyNotFound as e:
+            logger.error("AnswerKey %s not found: %s", request.answer_key_id, str(e))
+            raise EvaluationAnswerKeyNotFound(str(e)) from e
+
+        # 3. Find target Question
+        target_question = None
+        normalized_qnum = request.question_number.strip().upper()
+        for q in answer_key.questions:
+            if q.question_number.strip().upper() == normalized_qnum:
+                target_question = q
+                break
+
+        if not target_question:
+            logger.error("Question %s not found in AnswerKey %s", request.question_number, request.answer_key_id)
+            raise EvaluationQuestionNotFound(f"Question '{request.question_number}' not found in answer key.")
+
+        expected_keywords = [k.keyword for k in target_question.keywords]
+        maximum_marks = target_question.maximum_marks
+
+        # 4. Handle Empty/Whitespace Student answers separately (deterministic 0 marks)
+        cleaned_answer = request.student_answer.strip()
+        if not cleaned_answer:
+            logger.info("Empty student answer provided. Creating deterministic evaluation.")
+            
+            # Map all expected keywords as missing keywords
+            # Deduplicate expected keywords preserving original casings
+            missing_kws = []
+            seen = set()
+            for kw in expected_keywords:
+                if kw:
+                    norm = kw.lower().strip()
+                    if norm not in seen:
+                        missing_kws.append(kw)
+                        seen.add(norm)
+
+            return NewEvaluationResult(
+                answer_key_id=request.answer_key_id,
+                question_number=request.question_number,
+                student_answer=request.student_answer,
+                marks_awarded=0.0,
+                maximum_marks=maximum_marks,
+                feedback="No answer was provided.",
+                strengths=[],
+                missing_points=["Answer is empty."],
+                matched_keywords=[],
+                missing_keywords=missing_kws,
+                confidence=1.0,
+                evaluated_by="system",
+                provider="none",
+                model="none",
+                created_at=datetime.now(timezone.utc)
+            )
+
+        # 5. Build prompt
+        prompt_req = EvaluationPromptRequest(
+            question=target_question.question_text,
+            student_answer=request.student_answer,
+            model_answer=target_question.model_answer,
+            maximum_marks=maximum_marks,
+            keywords=expected_keywords,
+            rubric=target_question.rubric
+        )
+        prompt_res = self._prompt_service.build_evaluation_prompt(prompt_req)
+
+        # 6. Interact with ILLMProvider
+        from app.models.llm_models import LLMRequest
+        llm_req = LLMRequest(
+            system_prompt=prompt_res.system_prompt,
+            prompt=prompt_res.prompt,
+            temperature=settings.LLM_TEMPERATURE,
+            max_output_tokens=settings.LLM_MAX_OUTPUT_TOKENS
+        )
+
+        try:
+            llm_res = await self._llm_provider.generate(llm_req)
+        except Exception as e:
+            logger.error("LLM Provider call failed: %s", str(e))
+            raise EvaluationFailed(f"Evaluation failed due to LLM provider error: {str(e)}") from e
+
+        # 7. Parse response
+        parsed_res = self._response_parser.parse_response(llm_res.content)
+
+        # 8. Validate marks (must not exceed maximum_marks or be negative)
+        if parsed_res.marks < 0.0 or parsed_res.marks > maximum_marks:
+            logger.error("Awarded marks %s out of range [0.0 - %s]", parsed_res.marks, maximum_marks)
+            raise MarksOutOfRange(f"Awarded marks {parsed_res.marks} must be between 0.0 and maximum marks {maximum_marks}.")
+
+        # 9. Normalize marks
+        marks_awarded = parsed_res.marks
+        if not settings.ENABLE_PARTIAL_MARKS:
+            marks_awarded = float(round(marks_awarded))
+
+        # 10. Analyze keywords
+        matched_kws = self._keyword_service.extract_matched_keywords(request.student_answer, expected_keywords)
+        missing_kws = self._keyword_service.extract_missing_keywords(request.student_answer, expected_keywords)
+
+        # 11. Clamp Confidence
+        confidence = max(0.0, min(1.0, parsed_res.confidence))
+
+        # Safe logging of metadata
+        logger.info(
+            "Evaluation completed. answer_key_id: %s, question_number: %s, marks: %s/%s, provider: %s, model: %s",
+            request.answer_key_id, request.question_number, marks_awarded, maximum_marks,
+            llm_res.provider, llm_res.model
+        )
+
+        feedback_content = parsed_res.feedback
+        if len(feedback_content) > settings.EVALUATION_MAX_FEEDBACK_LENGTH:
+            feedback_content = feedback_content[:settings.EVALUATION_MAX_FEEDBACK_LENGTH]
+
+        return NewEvaluationResult(
+            answer_key_id=request.answer_key_id,
+            question_number=request.question_number,
+            student_answer=request.student_answer,
+            marks_awarded=marks_awarded,
+            maximum_marks=maximum_marks,
+            feedback=feedback_content,
+            strengths=parsed_res.strengths,
+            missing_points=parsed_res.missing_points,
+            matched_keywords=matched_kws,
+            missing_keywords=missing_kws,
+            confidence=confidence,
+            evaluated_by="llm",
+            provider=llm_res.provider,
+            model=llm_res.model,
+            created_at=datetime.now(timezone.utc)
+        )
+
+    def calculate_summary(self, results: list[dict[str, float]]) -> EvaluationSummary:
+        """
+        Computes summary metrics for a list of evaluation outcomes.
+        """
+        total_awarded = 0.0
+        total_max = 0.0
+        for res in results:
+            total_awarded += res.get("marks_awarded", 0.0)
+            total_max += res.get("maximum_marks", 0.0)
+
+        percentage = (total_awarded / total_max * 100.0) if total_max > 0.0 else 0.0
+
+        return EvaluationSummary(
+            total_marks_awarded=round(total_awarded, 2),
+            total_maximum_marks=round(total_max, 2),
+            percentage=round(percentage, 2),
+            question_count=len(results)
         )

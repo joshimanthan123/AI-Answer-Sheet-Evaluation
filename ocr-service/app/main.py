@@ -13,6 +13,9 @@ from app.routers.pipeline_router import router as pipeline_router
 from app.api.routes.answer_key import router as answer_key_router
 from app.api.routes.prompt import router as prompt_router
 from app.api.routes.llm import router as llm_router
+from app.api.routes.evaluation import router as evaluation_router
+
+
 
 def setup_logging() -> None:
     """
@@ -81,6 +84,9 @@ app.add_middleware(RequestContextMiddleware)
 # Route registrations
 app.include_router(health_router)
 app.include_router(pipeline_router)
-    app.include_router(answer_key_router)
-    app.include_router(prompt_router)
-    app.include_router(llm_router)
+app.include_router(answer_key_router)
+app.include_router(prompt_router)
+app.include_router(llm_router)
+app.include_router(evaluation_router)
+
+
