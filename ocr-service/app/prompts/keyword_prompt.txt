@@ -1,0 +1,7 @@
+Extract important keywords from the following model answer.
+${model_answer}
+
+Return JSON
+{
+  "keywords":[]
+}

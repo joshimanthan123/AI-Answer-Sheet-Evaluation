@@ -18,6 +18,12 @@ class Settings(BaseModel):
     MAX_MODEL_ANSWER_LENGTH: int = int(os.getenv("MAX_MODEL_ANSWER_LENGTH", "10000"))
     MAX_KEYWORDS: int = int(os.getenv("MAX_KEYWORDS", "50"))
     MAX_QUESTION_MARKS: float = float(os.getenv("MAX_QUESTION_MARKS", "100.0"))
+
+    # Prompt Builder Module Configurations
+    PROMPT_TEMPLATE_DIR: str = os.getenv("PROMPT_TEMPLATE_DIR", "app/prompts")
+    PROMPT_LANGUAGE: str = os.getenv("PROMPT_LANGUAGE", "en")
+    PROMPT_STRICT_JSON: bool = os.getenv("PROMPT_STRICT_JSON", "True").lower() in ("true", "1", "t", "yes")
+    PROMPT_MAX_OUTPUT_TOKENS: int = int(os.getenv("PROMPT_MAX_OUTPUT_TOKENS", "2048"))
     HOST: str = os.getenv("HOST", "127.0.0.1")
     PORT: int = int(os.getenv("PORT", 8000))
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "t", "yes")

@@ -60,9 +60,13 @@ class PromptBuilder:
         if PROMPT_FILE.exists():
             try:
                 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
-                    cls._template_cache = f.read().strip()
-                logger.info("Loaded evaluation prompt template from: %s", PROMPT_FILE)
-                return cls._template_cache
+                    content = f.read().strip()
+                if "${question}" in content or "${model_answer}" in content:
+                    logger.info("evaluation_prompt.txt uses string.Template. PromptBuilder falling back to default format.")
+                else:
+                    cls._template_cache = content
+                    logger.info("Loaded evaluation prompt template from: %s", PROMPT_FILE)
+                    return cls._template_cache
             except Exception as e:
                 logger.error("Error reading prompt template file: %s. Using default.", str(e))
         else:
@@ -70,6 +74,7 @@ class PromptBuilder:
 
         cls._template_cache = DEFAULT_TEMPLATE
         return cls._template_cache
+
 
     @classmethod
     def build_user_prompt(

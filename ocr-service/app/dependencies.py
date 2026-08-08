@@ -5,6 +5,7 @@ from app.services.hwr_service import HandwritingRecognitionService
 from app.services.segmentation_service import AnswerSegmentationService
 from app.repositories.answer_key_repository import IAnswerKeyRepository, MemoryAnswerKeyRepository
 from app.services.answer_key_service import AnswerKeyService
+from app.services.prompt_service import PromptService
 
 def get_settings() -> Settings:
     """Dependency injector for Microservice global settings."""
@@ -36,3 +37,11 @@ def get_answer_key_service(
 ) -> AnswerKeyService:
     """Dependency injector for AnswerKeyService."""
     return AnswerKeyService(repo)
+
+
+# Singleton PromptService instance
+_prompt_service = PromptService()
+
+def get_prompt_service() -> PromptService:
+    """Dependency injector for PromptService (singleton)."""
+    return _prompt_service

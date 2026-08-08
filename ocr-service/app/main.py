@@ -11,6 +11,7 @@ from app.exception_handlers import register_exception_handlers
 from app.routers.health_router import router as health_router
 from app.routers.pipeline_router import router as pipeline_router
 from app.api.routes.answer_key import router as answer_key_router
+from app.api.routes.prompt import router as prompt_router
 
 def setup_logging() -> None:
     """
@@ -80,3 +81,4 @@ app.add_middleware(RequestContextMiddleware)
 app.include_router(health_router)
 app.include_router(pipeline_router)
     app.include_router(answer_key_router)
+    app.include_router(prompt_router)
