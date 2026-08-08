@@ -73,20 +73,40 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         # Re-pack errors nicely
         errs = []
+        cleaned_details = []
         for e in exc.errors():
-            loc = ".".join(str(x) for x in e["loc"])
-            errs.append(f"{loc}: {e['msg']}")
+            loc = ".".join(str(x) for x in e.get("loc", []))
+            errs.append(f"{loc}: {e.get('msg', '')}")
+            
+            # Clean non-serializable exception objects from ctx dictionary elements
+            cleaned_e = dict(e)
+            if "ctx" in cleaned_e and isinstance(cleaned_e["ctx"], dict):
+                cleaned_ctx = {}
+                for ck, cv in cleaned_e["ctx"].items():
+                    if isinstance(cv, Exception):
+                        cleaned_ctx[ck] = str(cv)
+                    else:
+                        try:
+                            import json
+                            json.dumps(cv)
+                            cleaned_ctx[ck] = cv
+                        except Exception:
+                            cleaned_ctx[ck] = str(cv)
+                cleaned_e["ctx"] = cleaned_ctx
+            cleaned_details.append(cleaned_e)
         
         message = "; ".join(errs)
         response_data = ApiResponse(
             success=False,
             message=f"Validation failed: {message}",
-            data={"error_code": "VALIDATION_ERROR", "details": exc.errors()}
+            data={"error_code": "VALIDATION_ERROR", "details": cleaned_details}
         )
         return JSONResponse(
             status_code=400,
             content=response_data.model_dump()
         )
+
+
 
     @app.exception_handler(Exception)
     async def generic_error_handler(request: Request, exc: Exception):

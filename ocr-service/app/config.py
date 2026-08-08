@@ -12,6 +12,12 @@ class Settings(BaseModel):
     """
     SERVICE_NAME: str = "OCR Service"
     VERSION: str = "1.0.0"
+    
+    # Answer Key Management Settings
+    ANSWER_KEY_STORAGE: str = os.getenv("ANSWER_KEY_STORAGE", "memory")
+    MAX_MODEL_ANSWER_LENGTH: int = int(os.getenv("MAX_MODEL_ANSWER_LENGTH", "10000"))
+    MAX_KEYWORDS: int = int(os.getenv("MAX_KEYWORDS", "50"))
+    MAX_QUESTION_MARKS: float = float(os.getenv("MAX_QUESTION_MARKS", "100.0"))
     HOST: str = os.getenv("HOST", "127.0.0.1")
     PORT: int = int(os.getenv("PORT", 8000))
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "t", "yes")
