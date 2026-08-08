@@ -6,6 +6,8 @@ from app.services.segmentation_service import AnswerSegmentationService
 from app.repositories.answer_key_repository import IAnswerKeyRepository, MemoryAnswerKeyRepository
 from app.services.answer_key_service import AnswerKeyService
 from app.services.prompt_service import PromptService
+from app.providers.base_provider import ILLMProvider
+from app.providers.factory import LLMProviderFactory
 
 def get_settings() -> Settings:
     """Dependency injector for Microservice global settings."""
@@ -45,3 +47,16 @@ _prompt_service = PromptService()
 def get_prompt_service() -> PromptService:
     """Dependency injector for PromptService (singleton)."""
     return _prompt_service
+
+
+_llm_providers: dict[str, ILLMProvider] = {}
+
+def get_llm_provider() -> ILLMProvider:
+    """
+    Dependency injector for ILLMProvider.
+    Resolves the configured provider according to settings and caches provider singletons.
+    """
+    provider_name = settings.LLM_PROVIDER
+    if provider_name not in _llm_providers:
+        _llm_providers[provider_name] = LLMProviderFactory.create_provider(provider_name)
+    return _llm_providers[provider_name]

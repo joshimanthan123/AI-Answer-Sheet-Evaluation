@@ -60,3 +60,46 @@ class MockProvider(IHWRProvider):
             provider="mock",
             execution_time=round(elapsed_time, 4)
         )
+
+
+import json
+from app.providers.base_provider import ILLMProvider
+from app.models.llm_models import LLMRequest, LLMResponse, ProviderHealthResponse
+
+class MockLLMProvider(ILLMProvider):
+    """
+    Mock LLM Provider for offline local testing and development.
+    Requires no API credentials or internet connections.
+    """
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        mock_data = {
+            "marks": 4,
+            "feedback": "The answer correctly explains the main concepts but misses one important point.",
+            "missing_points": [
+                "Important concept"
+            ],
+            "strengths": [
+                "Correct definition",
+                "Good explanation"
+            ],
+            "confidence": 0.92
+        }
+        return LLMResponse(
+            content=json.dumps(mock_data),
+            provider="mock",
+            model="mock-model",
+            finish_reason="stop",
+            input_tokens=15,
+            output_tokens=35,
+            total_tokens=50,
+            latency_ms=5.0
+        )
+
+    async def health_check(self) -> ProviderHealthResponse:
+        return ProviderHealthResponse(
+            provider="mock",
+            available=True,
+            model="mock-model",
+            message="Mock LLM provider is online and healthy."
+        )
+

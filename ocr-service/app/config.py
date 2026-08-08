@@ -19,6 +19,31 @@ class Settings(BaseModel):
     MAX_KEYWORDS: int = int(os.getenv("MAX_KEYWORDS", "50"))
     MAX_QUESTION_MARKS: float = float(os.getenv("MAX_QUESTION_MARKS", "100.0"))
 
+    # LLM Settings
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "mock")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4.1")
+    LLM_TIMEOUT: float = float(os.getenv("LLM_TIMEOUT", "60.0"))
+    LLM_MAX_RETRIES: int = int(os.getenv("LLM_MAX_RETRIES", "3"))
+    SIMILARITY_THRESHOLD: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.75"))
+    ENABLE_KEYWORD_SCORING: bool = os.getenv("ENABLE_KEYWORD_SCORING", "True").lower() in ("true", "1", "t", "yes")
+    ENABLE_PARTIAL_MARKING: bool = os.getenv("ENABLE_PARTIAL_MARKING", "True").lower() in ("true", "1", "t", "yes")
+    ENABLE_FEEDBACK_GENERATION: bool = os.getenv("ENABLE_FEEDBACK_GENERATION", "True").lower() in ("true", "1", "t", "yes")
+    ENABLE_REASONING: bool = os.getenv("ENABLE_REASONING", "True").lower() in ("true", "1", "t", "yes")
+    MAX_PROMPT_TOKENS: int = int(os.getenv("MAX_PROMPT_TOKENS", "6000"))
+    PROMPT_VERSION: str = os.getenv("PROMPT_VERSION", "v1")
+
+    # OpenAI / Azure OpenAI / Gemini Credentials & Settings
+    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY", None)
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    OPENAI_BASE_URL: str | None = os.getenv("OPENAI_BASE_URL", None)
+
+    GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY", None)
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
+    LLM_TIMEOUT_SECONDS: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
+    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.0"))
+    LLM_MAX_OUTPUT_TOKENS: int = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "2048"))
+
     # Prompt Builder Module Configurations
     PROMPT_TEMPLATE_DIR: str = os.getenv("PROMPT_TEMPLATE_DIR", "app/prompts")
     PROMPT_LANGUAGE: str = os.getenv("PROMPT_LANGUAGE", "en")
@@ -85,9 +110,16 @@ class Settings(BaseModel):
     @classmethod
     def validate_llm_provider(cls, v: str) -> str:
         prov = v.lower().strip()
-        if prov not in ("mock", "openai", "azure"):
-            raise ValueError(f"Unsupported LLM provider: {v}. Must be 'mock', 'openai', or 'azure'")
+        if prov not in ("mock", "openai", "azure", "gemini"):
+            raise ValueError(f"Unsupported LLM provider: {v}. Must be 'mock', 'openai', 'azure', or 'gemini'")
         return prov
+
+    @field_validator("SIMILARITY_THRESHOLD")
+    @classmethod
+    def validate_similarity_threshold(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("SIMILARITY_THRESHOLD must be between 0.0 and 1.0")
+        return v
 
     class Config:
         arbitrary_types_allowed = True

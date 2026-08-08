@@ -12,6 +12,7 @@ from app.routers.health_router import router as health_router
 from app.routers.pipeline_router import router as pipeline_router
 from app.api.routes.answer_key import router as answer_key_router
 from app.api.routes.prompt import router as prompt_router
+from app.api.routes.llm import router as llm_router
 
 def setup_logging() -> None:
     """
@@ -82,3 +83,4 @@ app.include_router(health_router)
 app.include_router(pipeline_router)
     app.include_router(answer_key_router)
     app.include_router(prompt_router)
+    app.include_router(llm_router)
