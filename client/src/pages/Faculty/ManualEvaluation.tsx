@@ -7,6 +7,7 @@ import { AnswerSheet, Evaluation, EvaluationDetail } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import { AnswerSheetViewer } from '../../components/AnswerSheetViewer';
 
 export const FacultyManualEvaluation: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,10 +19,6 @@ export const FacultyManualEvaluation: React.FC = () => {
   const [details, setDetails] = useState<EvaluationDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // Zoom level state for scanned answer sheet viewer
-  const [zoom, setZoom] = useState(100);
-  const [currentPage, setCurrentPage] = useState(1);
 
   // Accordion active index
   const [activeQuestionIdx, setActiveQuestionIdx] = useState<number | null>(0);
@@ -122,92 +119,9 @@ export const FacultyManualEvaluation: React.FC = () => {
       {/* Flagship Split Workspace Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow overflow-hidden min-h-0">
         
-        {/* Left Panel: Scrollable mock scanned answer script parser */}
-        <div className="lg:col-span-6 flex flex-col border border-outline-variant/30 rounded-2xl bg-surface-container overflow-hidden h-full">
-          {/* Controls Bar */}
-          <div className="px-4 py-2 border-b border-outline-variant/30 bg-surface-container-low flex justify-between items-center text-xs shrink-0 select-none">
-            <span className="font-semibold text-on-surface-variant flex items-center gap-1">
-              <span className="material-symbols-outlined text-base">pageview</span> scanned_reply_script.pdf
-            </span>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setZoom(prev => Math.max(50, prev - 10))}
-                className="text-on-surface hover:text-primary material-symbols-outlined text-base cursor-pointer"
-              >
-                zoom_out
-              </button>
-              <span className="font-bold text-[10px] uppercase">{zoom}%</span>
-              <button 
-                onClick={() => setZoom(prev => Math.min(200, prev + 10))}
-                className="text-on-surface hover:text-primary material-symbols-outlined text-base cursor-pointer"
-              >
-                zoom_in
-              </button>
-              <div className="border-l border-outline-variant/30 h-4 mx-2" />
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="text-on-surface hover:text-primary material-symbols-outlined text-base cursor-pointer disabled:opacity-30"
-              >
-                arrow_back_ios
-              </button>
-              <span className="font-bold">Page {currentPage} of 3</span>
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(3, prev + 1))}
-                disabled={currentPage === 3}
-                className="text-on-surface hover:text-primary material-symbols-outlined text-base cursor-pointer disabled:opacity-30"
-              >
-                arrow_forward_ios
-              </button>
-            </div>
-          </div>
-
-          {/* Visual Scanned Sheet Mockup Viewport */}
-          <div className="flex-grow p-6 overflow-auto custom-scrollbar flex justify-center items-start bg-[#525659]">
-            <div 
-              className="bg-white p-12 shadow-2xl rounded-sm text-black relative select-none transition-all duration-300 font-serif leading-loose"
-              style={{ 
-                width: `${zoom * 5.2}px`, 
-                minHeight: `${zoom * 7}px`,
-                fontSize: `${zoom * 0.12}px` 
-              }}
-            >
-              <div className="absolute top-4 right-4 text-xs text-rose-500 font-semibold uppercase tracking-wider font-sans border-2 border-rose-500/30 p-1 rotating-badge opacity-80">
-                AI SCAN: 96% ACCURACY
-              </div>
-
-              {currentPage === 1 && (
-                <div className="text-left space-y-6">
-                  <h3 className="text-sm font-bold font-sans border-b border-black/20 pb-2">CS101: Midterm - Answer Script</h3>
-                  <p className="font-semibold mt-4">Q1: Explain Binary Search Tree structure and search runtime.</p>
-                  <p className="text-blue-900 italic pl-4 border-l-2 border-blue-900/10">
-                    "A Binary Search Tree (BST) is a hierarchical node-based data structure. Every parent node is organized such that: 1. The left subtree contains only node values less than the parent node key. 2. The right subtree contains only node values greater than the parent key. 
-                    Search time complexity is O(log n) because during every iteration, we bifurcate the search space. In the worst case (skewed tree), it can grow to O(n)."
-                  </p>
-                  <p className="mt-8 text-black/40 text-xs italic font-sans">(Handwritten signatures, margins, scanned grids simulated)</p>
-                </div>
-              )}
-
-              {currentPage === 2 && (
-                <div className="text-left space-y-6">
-                  <p className="font-semibold pt-4">Q2: Analyze benefits of using Adjacency List over Matrix for sparse graphs.</p>
-                  <p className="text-blue-900 italic pl-4 border-l-2 border-blue-900/10">
-                    "Adjacency lists are highly space-efficient for sparse graphs. A graph is sparse when the number of edges |E| is far less than |V|^2. 
-                    Space complexity is O(V + E) for lists compared to O(V^2) for Matrix. Checking if edge (u, v) exists takes O(degree(u)) in list, whereas O(1) in matrix."
-                  </p>
-                </div>
-              )}
-
-              {currentPage === 3 && (
-                <div className="text-left space-y-6">
-                  <p className="font-semibold pt-4">Q3: Outline properties of Red-Black self-balancing trees.</p>
-                  <p className="text-blue-900 italic pl-4 border-l-2 border-blue-900/10">
-                    "Red-black tree properties: 1. Each node is either Red or Black. 2. Root is always black. 3. Leaves (NIL) are black. 4. Red node cannot have Red children. 5. Crucially, every path from root to NIL must contain the same number of black nodes, maintaining balance."
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Left Panel: Scanned Answer Sheet Viewer */}
+        <div className="lg:col-span-6 flex flex-col h-full overflow-hidden">
+          <AnswerSheetViewer sheetId={id || ''} isFaculty={true} />
         </div>
 
         {/* Right Panel: Interactive evaluation form accordions */}

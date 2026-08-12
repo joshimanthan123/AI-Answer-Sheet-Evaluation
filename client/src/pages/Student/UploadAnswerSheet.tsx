@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import studentService from '../../services/student.service';
 import { mockAnswerSheets } from '../../mocks/db';
+import Modal from '../../components/ui/Modal';
+import { AnswerSheetViewer } from '../../components/AnswerSheetViewer';
+import answerSheetService from '../../services/answerSheet.service';
 
 
 interface AttemptLog {
@@ -25,6 +28,10 @@ export const UploadAnswerSheet: React.FC = () => {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [activeStep, setActiveStep] = useState<number>(0);
   const [attempts, setAttempts] = useState<AttemptLog[]>([]);
+  
+  // Sheet viewer states
+  const [isViewerOpen, setIsViewerOpen] = useState<boolean>(false);
+  const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
 
   // Load exams
   useEffect(() => {
@@ -82,34 +89,60 @@ export const UploadAnswerSheet: React.FC = () => {
     { label: 'Faculty Review', desc: 'Awaiting faculty model confirmation' }
   ];
 
-  const handleSubmissionPipeline = () => {
+  const handleSubmissionPipeline = async () => {
     if (!selectedFile || !selectedExamId) return;
 
     setIsUploading(true);
     setActiveStep(0); // Uploading
 
-    // Simulate flow:
-    // 0: Uploading
-    // 1: HWR Processing (OCR)
-    // 2: AI Evaluation
-    // 3: Faculty Review
+    try {
+      // Direct call to FastAPI backend API
+      const result: any = await answerSheetService.uploadAnswerSheet(selectedFile, selectedExamId);
 
-    setTimeout(() => {
-      setActiveStep(1); // HWR Processing
-      
-      setTimeout(() => {
-        setActiveStep(2); // AI Evaluation
+      if (result.success && result.data) {
+        const sheetData = result.data;
         
+        setActiveStep(1); // HWR Processing
+        await new Promise((r) => setTimeout(r, 1000));
+        
+        setActiveStep(2); // AI Evaluation
+        await new Promise((r) => setTimeout(r, 1000));
+        
+        setActiveStep(3); // Faculty Review
+        await new Promise((r) => setTimeout(r, 1000));
+
+        setIsUploading(false);
+
+        const newAttemptNo = attempts.length + 1;
+        const newLogItem: AttemptLog = {
+          id: sheetData.id,
+          attemptNo: newAttemptNo,
+          fileName: selectedFile.name,
+          fileSize: `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+          uploadStatus: 'Faculty Review',
+          submittedAt: new Date().toLocaleString()
+        };
+
+        setAttempts(prev => [newLogItem, ...prev]);
+        setSelectedFile(null);
+      } else {
+        throw new Error('API submission returned success=false');
+      }
+    } catch (err) {
+      console.warn('FastAPI backend request failed, falling back to simulated pipeline ingestion:', err);
+      // Fallback simulated flow:
+      setActiveStep(1);
+      setTimeout(() => {
+        setActiveStep(2);
         setTimeout(() => {
-          setActiveStep(3); // Faculty Review
-          
+          setActiveStep(3);
           setTimeout(() => {
             setIsUploading(false);
             
-            // Append and prepend new attempt
             const newAttemptNo = attempts.length + 1;
+            const attemptId = `attempt-${Date.now()}`;
             const newLogItem: AttemptLog = {
-              id: `attempt-${Date.now()}`,
+              id: attemptId,
               attemptNo: newAttemptNo,
               fileName: selectedFile.name,
               fileSize: `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -117,10 +150,9 @@ export const UploadAnswerSheet: React.FC = () => {
               submittedAt: new Date().toLocaleString()
             };
 
-            // Add to mockAnswerSheets array so it is visible to Faculty
             const selectedExamObj = exams.find(ex => ex.id === selectedExamId);
             const newSheetItem: any = {
-              id: `sheet-${Date.now()}`,
+              id: attemptId,
               studentId: 'stud-1',
               studentName: 'Alex Johnson',
               subjectId: selectedExamObj ? selectedExamObj.subjectCode : 'CS-101',
@@ -130,7 +162,7 @@ export const UploadAnswerSheet: React.FC = () => {
               date: new Date().toISOString().split('T')[0],
               fileUrl: '#',
               fileName: selectedFile.name,
-              status: 'pending' // Faculty reads from pending queue
+              status: 'pending'
             };
             mockAnswerSheets.push(newSheetItem);
 
@@ -138,13 +170,9 @@ export const UploadAnswerSheet: React.FC = () => {
             setSelectedFile(null);
 
           }, 1500);
-
         }, 1500);
-
       }, 1500);
-
-    }, 1200);
-
+    }
   };
 
   return (
@@ -293,6 +321,7 @@ export const UploadAnswerSheet: React.FC = () => {
                       <th className="py-3 px-4">Date Uploaded</th>
                       <th className="py-3 px-4">AI Pipeline Status</th>
                       <th className="py-3 px-4">Result Marks</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/10">
@@ -300,7 +329,7 @@ export const UploadAnswerSheet: React.FC = () => {
                       <tr key={att.id} className="hover:bg-surface-container-low/45 transition-colors">
                         <td className="py-4 px-4 font-bold text-center">#{att.attemptNo}</td>
                         <td className="py-4 px-4">
-                          <div className="font-semibold text-on-surface max-w-[200px] truncate" title={att.fileName}>
+                          <div className="font-semibold text-on-surface max-w-[180px] truncate" title={att.fileName}>
                             {att.fileName}
                           </div>
                           <span className="text-[10px] text-outline">{att.fileSize}</span>
@@ -326,6 +355,18 @@ export const UploadAnswerSheet: React.FC = () => {
                             <span className="text-outline italic text-xs">Processing...</span>
                           )}
                         </td>
+                        <td className="py-4 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setActiveSheetId(att.id);
+                              setIsViewerOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 bg-secondary/15 hover:bg-secondary/25 text-secondary rounded-lg font-bold text-[10px] transition-all cursor-pointer inline-flex items-center gap-1 active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-xs select-none">splitscreen</span>
+                            <span>View Paper</span>
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -335,6 +376,22 @@ export const UploadAnswerSheet: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {isViewerOpen && activeSheetId && (
+        <Modal
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setIsViewerOpen(false);
+            setActiveSheetId(null);
+          }}
+          title="Digital Pipeline Viewer"
+          size="xl"
+        >
+          <div className="min-h-[500px]">
+            <AnswerSheetViewer sheetId={activeSheetId} isFaculty={false} />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

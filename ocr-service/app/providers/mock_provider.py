@@ -13,12 +13,13 @@ class MockProvider(IHWRProvider):
     representing typical student answer sheets.
     """
     
-    def recognize(self, image: np.ndarray) -> HWRResult:
+    def recognize(self, image: np.ndarray, page_num: int = 1) -> HWRResult:
         """
         Transcribes handwriting from the input image (simulated).
         
         Args:
             image: Preprocessed image.
+            page_num: Page number to simulate handwriting context for.
             
         Returns:
             HWRResult: Mock structured transcription result containing specific text.
@@ -31,17 +32,32 @@ class MockProvider(IHWRProvider):
         delay = random.uniform(0.05, 0.10)
         time.sleep(delay)
         
-        # 3. Formulate deterministic line outputs
-        lines = [
-            HWRLine(text="Q1.", confidence=1.00),
-            HWRLine(text="", confidence=1.00),
-            HWRLine(text="Artificial Intelligence is the simulation", confidence=0.96),
-            HWRLine(text="of human intelligence performed by machines.", confidence=0.94),
-            HWRLine(text="", confidence=1.00),
-            HWRLine(text="Q2.", confidence=1.00),
-            HWRLine(text="", confidence=1.00),
-            HWRLine(text="Machine Learning is a subset of AI.", confidence=0.95),
-        ]
+        # 3. Formulate page-specific deterministic line outputs
+        if page_num == 1:
+            lines = [
+                HWRLine(text="Q1.", confidence=1.00),
+                HWRLine(text="", confidence=1.00),
+                HWRLine(text="Artificial Intelligence is the simulation", confidence=0.96),
+                HWRLine(text="of human intelligence performed by machines.", confidence=0.94),
+            ]
+        elif page_num == 2:
+            lines = [
+                HWRLine(text="Q2.", confidence=1.00),
+                HWRLine(text="", confidence=1.00),
+                HWRLine(text="Machine Learning is a subset of AI.", confidence=0.95),
+            ]
+        elif page_num == 3:
+            lines = [
+                HWRLine(text="Q3.", confidence=1.00),
+                HWRLine(text="", confidence=1.00),
+                HWRLine(text="Deep Learning mimics the human brain structure.", confidence=0.97),
+            ]
+        else:
+            lines = [
+                HWRLine(text=f"Q{page_num}.", confidence=1.00),
+                HWRLine(text="", confidence=1.00),
+                HWRLine(text=f"Sample handwritten text block for page {page_num}.", confidence=0.90),
+            ]
         
         # Reconstruct complete text block
         text_lines = [line.text for line in lines]

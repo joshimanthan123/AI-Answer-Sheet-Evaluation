@@ -36,10 +36,17 @@ class Settings(BaseModel):
     LOG_DIR: Path = BASE_DIR / "logs"
 
     # Handwriting Recognition Settings
-    HWR_PROVIDER: str = os.getenv("HWR_PROVIDER", "mock")
+    HWR_PROVIDER: str = os.getenv("HWR_PROVIDER", "azure")
+
+    # Legacy Azure AI Vision Read (v3.2) settings — retained for backward compatibility.
     AZURE_ENDPOINT: str | None = os.getenv("AZURE_ENDPOINT", None)
     AZURE_API_KEY: str | None = os.getenv("AZURE_API_KEY", None)
     AZURE_TIMEOUT: float = float(os.getenv("AZURE_TIMEOUT", "10.0"))
+
+    # Azure AI Document Intelligence settings (prebuilt-read model) used by AzureProvider.
+    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: str | None = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", None)
+    AZURE_DOCUMENT_INTELLIGENCE_KEY: str | None = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY", None)
+    AZURE_DOCUMENT_INTELLIGENCE_MODEL: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_MODEL", "prebuilt-read")
 
     # AI Evaluation Settings
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "mock")
@@ -92,12 +99,26 @@ class Settings(BaseModel):
     OCR_REQUEST_TIMEOUT: float = float(os.getenv("OCR_REQUEST_TIMEOUT", "60.0"))
     ENABLE_PIPELINE_METRICS: bool = os.getenv("ENABLE_PIPELINE_METRICS", "True").lower() in ("true", "1", "t", "yes")
 
+    # Phase 4A Settings
+    ANSWER_SHEET_STORAGE: str = os.getenv("ANSWER_SHEET_STORAGE", "local")
+    ANSWER_SHEET_STORAGE_DIR: Path = BASE_DIR / "storage" / "answer-sheets"
+    ANSWER_SHEET_MAX_UPLOAD_SIZE_MB: int = int(os.getenv("ANSWER_SHEET_MAX_UPLOAD_SIZE_MB", "20"))
+    ANSWER_SHEET_ALLOWED_EXTENSIONS: list[str] = [
+        ".pdf",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".tif",
+        ".tiff",
+    ]
+
     @field_validator("HWR_PROVIDER")
     @classmethod
     def validate_provider(cls, v: str) -> str:
         prov = v.lower().strip()
-        if prov not in ("mock", "azure"):
-            raise ValueError(f"Unsupported OCR provider: {v}. Must be 'mock' or 'azure'")
+        if prov not in ("mock", "azure", "paddle"):
+            raise ValueError(f"Unsupported OCR provider: {v}. Must be 'mock', 'azure', or 'paddle'")
         return prov
 
     @field_validator("LLM_PROVIDER")
@@ -138,3 +159,4 @@ settings = Settings()
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
+settings.ANSWER_SHEET_STORAGE_DIR.mkdir(parents=True, exist_ok=True)

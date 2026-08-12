@@ -134,3 +134,51 @@ class EvaluationFailed(EvaluationError):
         super().__init__(message, "EVALUATION_FAILED", 500)
 
 
+# =========================================================================
+# Phase 4A Answer Sheet Exception Classes
+# =========================================================================
+
+class AnswerSheetNotFound(OCRServiceException):
+    """Exception raised when an answer sheet is not found."""
+    def __init__(self, message: str = "Answer sheet not found."):
+        super().__init__(message, "ANSWER_SHEET_NOT_FOUND", 404)
+
+
+class UnsupportedAnswerSheetFormat(OCRServiceException):
+    """Exception raised when the file format or MIME type is not supported."""
+    def __init__(self, message: str = "Unsupported answer sheet file format."):
+        super().__init__(message, "UNSUPPORTED_ANSWER_SHEET_FORMAT", 415)
+
+
+class AnswerSheetTooLarge(OCRServiceException):
+    """Exception raised when the file size exceeds allowed limits."""
+    def __init__(self, message: str = "Answer sheet size exceeds the limit."):
+        super().__init__(message, "ANSWER_SHEET_TOO_LARGE", 413)
+
+
+class AnswerSheetProcessingError(OCRServiceException):
+    """Exception raised when any error occurs over the PDF segmentation pipelines."""
+    def __init__(self, message: str = "Error occurred while processing answer sheet."):
+        super().__init__(message, "ANSWER_SHEET_PROCESSING_ERROR", 500)
+
+
+class AnswerSheetAccessDenied(OCRServiceException):
+    """Exception raised when student/faculty access checks fail."""
+    def __init__(self, message: str = "Access denied to the requested answer sheet."):
+        super().__init__(message, "ANSWER_SHEET_ACCESS_DENIED", 403)
+
+
+class AnswerSheetPageNotFound(OCRServiceException):
+    """Exception raised when specific page indices are missing/out of bounds."""
+    def __init__(self, message: str = "Target page not found in answer sheet."):
+        super().__init__(message, "ANSWER_SHEET_PAGE_NOT_FOUND", 404)
+
+
+class InvalidAnswerSheetFile(OCRServiceException):
+    """Exception raised when the file upload stream itself is corrupted or malformed."""
+    def __init__(self, message: str = "Invalid answer sheet file."):
+        super().__init__(message, "INVALID_ANSWER_SHEET_FILE", 400)
+
+
+
+

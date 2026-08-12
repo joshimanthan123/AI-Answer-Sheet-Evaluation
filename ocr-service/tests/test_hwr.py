@@ -13,185 +13,133 @@ from app.providers.mock_provider import MockProvider
 from app.providers.azure_provider import AzureProvider, AzureProviderError
 from app.services.hwr_service import HandwritingRecognitionService, HWRServiceError
 
+try:
+    from tests.azure_fakes import make_analyze_result, make_poller
+except ImportError:  # when discovered with tests/ as top-level dir
+    from azure_fakes import make_analyze_result, make_poller
+
 
 class TestHWRModule(unittest.TestCase):
     """
-    Suite containing unit tests for testing:
-    - Mock Recognition Provider
-    - Azure AI Vision client with mocked API responses (unauthorized, timeout, failed, succeeded)
-    - Handwriting Recognition Service selector and Exception mapping
+    Unit tests for:
+    - MockProvider (offline deterministic HWR)
+    - AzureProvider (Azure AI Document Intelligence, fully mocked — no network)
+    - HandwritingRecognitionService selector + exception mapping + config validation
     """
 
     def setUp(self):
-        # Create a tiny mock image (100x100 grayscale) for testing inputs
+        # Tiny grayscale image (100x100) as a stand-in for a preprocessed page.
         self.mock_image = np.ones((100, 100), dtype=np.uint8) * 255
 
     # -------------------------------------------------------------
-    # 1. Mock Provider Tests
+    # 1. Mock Provider Tests (must keep passing unchanged)
     # -------------------------------------------------------------
     def test_mock_provider_success(self):
         provider = MockProvider()
-        result = provider.recognize(self.mock_image)
-        
-        self.assertIsInstance(result, HWRResult)
-        self.assertEqual(result.provider, "mock")
-        self.assertGreater(result.confidence, 0.90)
-        self.assertGreater(result.execution_time, 0.0)
-        self.assertIn("Q1.", result.text)
-        self.assertIn("Machine Learning", result.text)
-        self.assertEqual(len(result.lines), 8)
+
+        result_p1 = provider.recognize(self.mock_image)
+        self.assertIsInstance(result_p1, HWRResult)
+        self.assertEqual(result_p1.provider, "mock")
+        self.assertGreater(result_p1.confidence, 0.90)
+        self.assertIn("Q1.", result_p1.text)
+        self.assertIn("Artificial Intelligence", result_p1.text)
+        self.assertEqual(len(result_p1.lines), 4)
+
+        result_p2 = provider.recognize(self.mock_image, page_num=2)
+        self.assertIn("Q2.", result_p2.text)
+        self.assertIn("Machine Learning", result_p2.text)
+        self.assertEqual(len(result_p2.lines), 3)
+
+        result_p3 = provider.recognize(self.mock_image, page_num=3)
+        self.assertIn("Q3.", result_p3.text)
+        self.assertIn("Deep Learning", result_p3.text)
+        self.assertEqual(len(result_p3.lines), 3)
 
     def test_mock_provider_invalid_image(self):
         provider = MockProvider()
         with self.assertRaises(ValueError):
             provider.recognize(None)
-
         with self.assertRaises(ValueError):
-            # empty dimension
             provider.recognize(np.array([]))
 
     # -------------------------------------------------------------
-    # 2. Azure Provider Initialization & Setup Tests
+    # 2. Azure Provider Initialization & Config Tests
     # -------------------------------------------------------------
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", None)
     @patch("app.config.settings.AZURE_ENDPOINT", None)
-    @patch("app.config.settings.AZURE_API_KEY", None)
-    def test_azure_provider_missing_config(self):
-        with self.assertRaises(AzureProviderError) as context:
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", "k")
+    def test_azure_provider_missing_endpoint(self):
+        with self.assertRaises(AzureProviderError) as ctx:
             AzureProvider()
-        self.assertIn("Azure endpoint is not configured", str(context.exception))
+        self.assertIn("endpoint is not configured", str(ctx.exception))
 
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", None)
     @patch("app.config.settings.AZURE_API_KEY", None)
     def test_azure_provider_missing_key(self):
-        with self.assertRaises(AzureProviderError) as context:
+        with self.assertRaises(AzureProviderError) as ctx:
             AzureProvider()
-        self.assertIn("Azure API key is not configured", str(context.exception))
+        self.assertIn("key is not configured", str(ctx.exception))
 
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
-    @patch("app.config.settings.AZURE_API_KEY", "secret-key")
-    def test_azure_provider_api_url_formatting(self):
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", "secret-key")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_MODEL", "prebuilt-read")
+    def test_azure_provider_init_ok(self):
         provider = AzureProvider()
-        self.assertEqual(provider.api_url, "https://mock.cognitiveservices.azure.com/vision/v3.2/read/analyze")
+        self.assertEqual(provider.endpoint, "https://mock.cognitiveservices.azure.com")
+        self.assertEqual(provider.model, "prebuilt-read")
 
     # -------------------------------------------------------------
-    # 3. Azure Provider Network Polling & Mapping Tests
+    # 3. Azure Provider Result Mapping Tests (mocked SDK)
     # -------------------------------------------------------------
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
-    @patch("app.config.settings.AZURE_API_KEY", "secret-key")
-    @patch("requests.post")
-    def test_azure_provider_unauthorized(self, mock_post):
-        # Mock 401 Unauthorized from Azure submission
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_response.text = "Access denied due to invalid subscription key"
-        mock_post.return_value = mock_response
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", "secret-key")
+    @patch("app.providers.azure_provider._build_client")
+    def test_azure_provider_maps_result(self, mock_build_client):
+        # "Hello world" line built from two words with confidences 0.90 and 0.94.
+        result = make_analyze_result([
+            ("Hello world", [("Hello", 0.90, 0, 5), ("world", 0.94, 6, 5)]),
+        ])
+        client = MagicMock()
+        client.begin_analyze_document.return_value = make_poller(result)
+        mock_build_client.return_value = client
 
         provider = AzureProvider()
-        with self.assertRaises(AzureProviderError) as context:
-            provider.recognize(self.mock_image)
-        self.assertIn("API Authentication failed", str(context.exception))
+        hwr = provider.recognize(self.mock_image, page_num=2)
 
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
-    @patch("app.config.settings.AZURE_API_KEY", "secret-key")
-    @patch("requests.post")
-    def test_azure_provider_server_error(self, mock_post):
-        # Mock 500 Internal Server Error
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.text = "Internal Server Error"
-        mock_post.return_value = mock_response
+        self.assertEqual(hwr.provider, "azure")
+        self.assertEqual(len(hwr.lines), 1)
+        self.assertEqual(hwr.lines[0].text, "Hello world")
+        # Line confidence = mean of word confidences within the line span.
+        self.assertAlmostEqual(hwr.lines[0].confidence, 0.92, places=4)
+        self.assertAlmostEqual(hwr.confidence, 0.92, places=4)
+        # begin_analyze_document called exactly once for the page (one call per page).
+        client.begin_analyze_document.assert_called_once()
+        _, kwargs = client.begin_analyze_document.call_args
+        self.assertEqual(kwargs.get("model_id"), "prebuilt-read")
 
-        provider = AzureProvider()
-        with self.assertRaises(AzureProviderError) as context:
-            provider.recognize(self.mock_image)
-        self.assertIn("submission failed with HTTP status 500", str(context.exception))
-
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
-    @patch("app.config.settings.AZURE_API_KEY", "secret-key")
-    @patch("requests.post")
-    def test_azure_provider_missing_operation_location(self, mock_post):
-        # Mock 202 Accepted but missing the Header
-        mock_response = MagicMock()
-        mock_response.status_code = 202
-        mock_response.headers = {}
-        mock_post.return_value = mock_response
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", "secret-key")
+    @patch("app.providers.azure_provider._build_client")
+    def test_azure_provider_preserves_line_order(self, mock_build_client):
+        result = make_analyze_result([
+            ("Q1.", [("Q1.", 0.99, 0, 3)]),
+            ("Artificial Intelligence is the", [("Artificial", 0.95, 4, 10)]),
+            ("simulation of human intelligence", [("simulation", 0.93, 15, 10)]),
+        ])
+        client = MagicMock()
+        client.begin_analyze_document.return_value = make_poller(result)
+        mock_build_client.return_value = client
 
         provider = AzureProvider()
-        with self.assertRaises(AzureProviderError) as context:
-            provider.recognize(self.mock_image)
-        self.assertIn("did not contain 'Operation-Location'", str(context.exception))
+        hwr = provider.recognize(self.mock_image, page_num=1)
 
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
-    @patch("app.config.settings.AZURE_API_KEY", "secret-key")
-    @patch("requests.post")
-    @patch("requests.get")
-    def test_azure_provider_polling_timeout(self, mock_get, mock_post):
-        # Mock successful submission
-        mock_submit = MagicMock()
-        mock_submit.status_code = 202
-        mock_submit.headers = {"Operation-Location": "https://mock.operation.url"}
-        mock_post.return_value = mock_submit
-
-        # Mock continuous running state
-        mock_poll = MagicMock()
-        mock_poll.status_code = 200
-        mock_poll.json.return_value = {"status": "running"}
-        mock_get.return_value = mock_poll
-
-        provider = AzureProvider()
-        # Set a very low provider timeout to trigger the timeout check
-        provider.timeout = 0.05
-        
-        with self.assertRaises(AzureProviderError) as context:
-            provider.recognize(self.mock_image)
-        self.assertIn("exceeded total timeout limit", str(context.exception))
-
-    @patch("app.config.settings.AZURE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
-    @patch("app.config.settings.AZURE_API_KEY", "secret-key")
-    @patch("requests.post")
-    @patch("requests.get")
-    def test_azure_provider_polling_success(self, mock_get, mock_post):
-        # Mock submit
-        mock_submit = MagicMock()
-        mock_submit.status_code = 202
-        mock_submit.headers = {"Operation-Location": "https://mock.operation.url"}
-        mock_post.return_value = mock_submit
-
-        # Mock successful polling outcome
-        mock_poll = MagicMock()
-        mock_poll.status_code = 200
-        mock_poll.json.return_value = {
-            "status": "succeeded",
-            "analyzeResult": {
-                "readResults": [
-                    {
-                        "lines": [
-                            {
-                                "text": "Hello World",
-                                "confidence": 0.98
-                            },
-                            {
-                                "text": "Azure Read API Test",
-                                "words": [{"text": "Azure", "confidence": 0.90}, {"text": "Test", "confidence": 0.94}]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-        mock_get.return_value = mock_poll
-
-        provider = AzureProvider()
-        result = provider.recognize(self.mock_image)
-        
-        self.assertEqual(result.provider, "azure")
-        self.assertEqual(len(result.lines), 2)
-        self.assertEqual(result.lines[0].text, "Hello World")
-        self.assertEqual(result.lines[0].confidence, 0.98)
-        # Verify fallback average word confidence calculation (0.90 + 0.94)/2 = 0.92
-        self.assertAlmostEqual(result.lines[1].confidence, 0.92)
-        # Average overall confidence (0.98 + 0.92)/2 = 0.95
-        self.assertAlmostEqual(result.confidence, 0.95)
+        self.assertEqual([l.text for l in hwr.lines], [
+            "Q1.",
+            "Artificial Intelligence is the",
+            "simulation of human intelligence",
+        ])
+        self.assertTrue(hwr.text.startswith("Q1.\n"))
 
     # -------------------------------------------------------------
     # 4. Service Layer orchestrator Tests
@@ -204,18 +152,51 @@ class TestHWRModule(unittest.TestCase):
 
     @patch("app.config.settings.HWR_PROVIDER", "invalid-provider")
     def test_hwr_service_unsupported_provider(self):
-        with self.assertRaises(HWRServiceError) as context:
+        with self.assertRaises(HWRServiceError) as ctx:
             HandwritingRecognitionService.recognize_handwriting(self.mock_image)
-        self.assertIn("Unsupported HWR provider", str(context.exception))
+        self.assertIn("Unsupported HWR provider", str(ctx.exception))
 
     def test_hwr_service_explicit_provider(self):
-        # Override settings using parameters
         result = HandwritingRecognitionService.recognize_handwriting(self.mock_image, provider_name="mock")
         self.assertEqual(result.provider, "mock")
+
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "https://mock.cognitiveservices.azure.com")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", "secret-key")
+    def test_hwr_service_provider_selection(self):
+        provider_mock = HandwritingRecognitionService.get_provider("mock")
+        self.assertIsInstance(provider_mock, MockProvider)
+
+        provider_azure = HandwritingRecognitionService.get_provider("azure")
+        self.assertIsInstance(provider_azure, AzureProvider)
 
     def test_hwr_service_invalid_image(self):
         with self.assertRaises(HWRServiceError):
             HandwritingRecognitionService.recognize_handwriting(None)
+
+    # No silent fallback: azure selected + missing config must raise, not use mock.
+    @patch("app.config.settings.HWR_PROVIDER", "azure")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", None)
+    @patch("app.config.settings.AZURE_ENDPOINT", None)
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", None)
+    @patch("app.config.settings.AZURE_API_KEY", None)
+    def test_hwr_service_azure_missing_config_no_fallback(self):
+        with self.assertRaises(HWRServiceError) as ctx:
+            HandwritingRecognitionService.recognize_handwriting(self.mock_image)
+        self.assertIn("Azure configuration error", str(ctx.exception))
+
+    @patch("app.config.settings.HWR_PROVIDER", "mock")
+    def test_validate_configuration_mock_ok(self):
+        # Should not raise for mock.
+        HandwritingRecognitionService.validate_configuration()
+
+    @patch("app.config.settings.HWR_PROVIDER", "azure")
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", None)
+    @patch("app.config.settings.AZURE_ENDPOINT", None)
+    @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", None)
+    @patch("app.config.settings.AZURE_API_KEY", None)
+    def test_validate_configuration_azure_missing_raises(self):
+        with self.assertRaises(HWRServiceError):
+            HandwritingRecognitionService.validate_configuration()
 
 
 if __name__ == "__main__":

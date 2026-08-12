@@ -41,6 +41,7 @@ logs/
 uploads/
 outputs/
 client.zip
+test_3page.pdf
 
 # OS-specific temporary files
 .DS_Store

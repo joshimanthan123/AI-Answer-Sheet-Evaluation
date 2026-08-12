@@ -23,7 +23,7 @@ class IHWRProvider(ABC):
     """
     
     @abstractmethod
-    def recognize(self, image: np.ndarray) -> HWRResult:
+    def recognize(self, image: np.ndarray, page_num: int = 1) -> HWRResult:
         pass
 
 

@@ -24,24 +24,51 @@ class HandwritingRecognitionService:
     """
 
     @staticmethod
+    def validate_configuration() -> None:
+        """
+        Fail-fast startup validation for the configured HWR provider.
+
+        When HWR_PROVIDER=azure, this instantiates the provider so that a missing
+        endpoint/key (or missing SDK) surfaces immediately as a clear
+        configuration error at boot -- never a silent fallback to MockProvider.
+        The API key itself is never logged.
+
+        Raises:
+            HWRServiceError: If the configured provider cannot be initialized.
+        """
+        name = (settings.HWR_PROVIDER or "mock").lower().strip()
+        logger.info("Validating HWR configuration for provider '%s'...", name)
+        # Instantiating validates config for azure; mock is always valid.
+        HandwritingRecognitionService.get_provider(name)
+        logger.info("HWR provider '%s' configuration is valid.", name)
+
+    @staticmethod
     def get_provider(provider_name: str) -> IHWRProvider:
         """
         Factory method to instantiate the requested handwriting recognition provider.
-        
+
         Args:
             provider_name: Case-insensitive name of the provider ("mock" or "azure").
-            
+
         Returns:
             IHWRProvider: An initialized instance of the selected provider.
-            
+
         Raises:
             HWRServiceError: For unsupported or misconfigured providers.
         """
         name = provider_name.lower().strip()
         logger.info("Initializing HWR provider factory. Selected: '%s'", name)
-        
+
         if name == "mock":
             return MockProvider()
+        elif name == "paddle":
+            try:
+                from app.providers.paddle_provider import PaddleHWRProvider, PaddleProviderError
+                return PaddleHWRProvider()
+            except PaddleProviderError as ppe:
+                raise HWRServiceError(f"PaddleOCR configuration error: {str(ppe)}") from ppe
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate PaddleOCR provider: {str(e)}") from e
         elif name == "azure":
             try:
                 return AzureProvider()
@@ -51,14 +78,15 @@ class HandwritingRecognitionService:
                 raise HWRServiceError(f"Failed to instantiate Azure provider: {str(e)}") from e
         else:
             raise HWRServiceError(
-                f"Unsupported HWR provider '{provider_name}'. Supported elements are: 'mock', 'azure'."
+                f"Unsupported HWR provider '{provider_name}'. Supported elements are: 'mock', 'azure', 'paddle'."
             )
 
     @classmethod
     def recognize_handwriting(
         cls, 
         image: np.ndarray, 
-        provider_name: str = None
+        provider_name: str = None,
+        page_num: int = 1
     ) -> HWRResult:
         """
         Transcribes handwritten text from an image using the selected provider.
@@ -89,7 +117,7 @@ class HandwritingRecognitionService:
         start_time = time.time()
         
         try:
-            result = provider.recognize(image)
+            result = provider.recognize(image, page_num=page_num)
         except AzureProviderError as ape:
             # Map specific provider exceptions to service exceptions
             raise HWRServiceError(f"Azure HWR Engine failure: {str(ape)}") from ape

@@ -107,8 +107,16 @@ env/
 # Environment variables
 .env
 .env.*
+# ...but keep the committed template
+!.env.example
 
 # Application local storage directories
 uploads/
 outputs/
 logs/
+storage/
+app/storage/
+scripts/
+# Temp local ocr results and logs
+*.txt
+*.json

@@ -14,6 +14,8 @@ from app.api.routes.answer_key import router as answer_key_router
 from app.api.routes.prompt import router as prompt_router
 from app.api.routes.llm import router as llm_router
 from app.api.routes.evaluation import router as evaluation_router
+from app.api.routes.answer_sheet import student_router, faculty_router
+
 
 
 
@@ -88,5 +90,25 @@ app.include_router(answer_key_router)
 app.include_router(prompt_router)
 app.include_router(llm_router)
 app.include_router(evaluation_router)
+app.include_router(student_router)
+app.include_router(faculty_router)
+
+
+@app.on_event("startup")
+async def validate_hwr_configuration() -> None:
+    """
+    Fail-fast on boot if HWR_PROVIDER=azure but the Document Intelligence
+    endpoint/key are missing or the SDK is unavailable. This prevents the
+    service from silently appearing to do real OCR while it cannot. The mock
+    provider always passes. The API key is never logged.
+    """
+    from app.services.hwr_service import HandwritingRecognitionService, HWRServiceError
+
+    try:
+        HandwritingRecognitionService.validate_configuration()
+    except HWRServiceError as exc:
+        logging.error("HWR provider configuration is invalid: %s", exc)
+        raise
+
 
 

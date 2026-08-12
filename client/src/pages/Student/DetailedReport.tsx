@@ -6,6 +6,8 @@ import { useNotifications } from '../../context/NotificationContext';
 import { Evaluation, EvaluationDetail } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import ProgressRing from '../../components/charts/ProgressRing';
+import Modal from '../../components/ui/Modal';
+import { AnswerSheetViewer } from '../../components/AnswerSheetViewer';
 
 export const StudentDetailedReport: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +17,7 @@ export const StudentDetailedReport: React.FC = () => {
   const [details, setDetails] = useState<EvaluationDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestingReeval, setRequestingReeval] = useState(false);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,6 +73,12 @@ export const StudentDetailedReport: React.FC = () => {
           <p className="text-xs text-on-surface-variant mt-1">Student: Alex Johnson | ID: #88294-B | Submitted: {evaluation.date}</p>
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={() => setIsViewerOpen(true)}
+            className="px-4 py-2 bg-primary hover:bg-primary/95 text-on-primary rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+          >
+            <span className="material-symbols-outlined text-sm">splitscreen</span> View Digital Paper
+          </button>
           <button className="px-4 py-2 bg-white dark:bg-surface-container border border-outline-variant hover:bg-surface-container-high text-primary hover:text-primary-container rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all active:scale-95">
             <span className="material-symbols-outlined text-sm">download</span> Download PDF
           </button>
@@ -235,6 +244,18 @@ export const StudentDetailedReport: React.FC = () => {
           </button>
         )}
       </section>
+      {isViewerOpen && (
+        <Modal
+          isOpen={isViewerOpen}
+          onClose={() => setIsViewerOpen(false)}
+          title="Digital Pipeline Viewer"
+          size="xl"
+        >
+          <div className="min-h-[500px]">
+            <AnswerSheetViewer sheetId={evaluation.answerSheetId || 'attempt-1'} isFaculty={false} />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

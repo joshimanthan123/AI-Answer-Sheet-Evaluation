@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import path from "path";
 import fs from "fs";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 import { env, corsOptions, databaseState } from "./src/config/index.js";
 import authRoutes from "./src/routes/auth.routes.js";
@@ -68,6 +69,29 @@ app.use(globalLimiter);
 // 5. Response compression
 app.use(compression());
 
+// OCR Service Proxy configuration to Python FastAPI backend running at port 8000
+app.use(
+  createProxyMiddleware({
+    target: "http://127.0.0.1:8000",
+    changeOrigin: true,
+    pathFilter: [
+      "/api/student/answer-sheets",
+      "/api/v1/student/answer-sheets",
+      "/api/faculty/answer-sheets",
+      "/api/v1/faculty/answer-sheets"
+    ],
+    pathRewrite: (path) => {
+      if (path.startsWith("/api/student/answer-sheets")) {
+        return path.replace("/api/student/answer-sheets", "/api/v1/student/answer-sheets");
+      }
+      if (path.startsWith("/api/faculty/answer-sheets")) {
+        return path.replace("/api/faculty/answer-sheets", "/api/v1/faculty/answer-sheets");
+      }
+      return path;
+    },
+  })
+);
+
 // 6. Built-in Parsers
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
@@ -104,6 +128,7 @@ app.use(["/api/answer-sheets", "/api/v1/answer-sheets"], answerSheetRoutes);
 app.use(["/api/evaluations", "/api/v1/evaluations"], evaluationRoutes);
 app.use(["/api/feedback", "/api/v1/feedback"], feedbackRoutes);
 app.use(["/api/notifications", "/api/v1/notifications"], notificationRoutes);
+
 app.use(["/api/student", "/api/v1/student"], studentRoutes);
 app.use(["/api/faculty", "/api/v1/faculty"], facultyRoutes);
 app.use(["/api/admin", "/api/v1/admin"], adminRoutes);

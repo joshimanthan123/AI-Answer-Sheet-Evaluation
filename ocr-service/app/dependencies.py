@@ -1,4 +1,4 @@
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException
 from app.config import Settings, settings
 from app.services.preprocess_service import ImagePreprocessor
 from app.services.hwr_service import HandwritingRecognitionService
@@ -7,7 +7,10 @@ from app.repositories.answer_key_repository import IAnswerKeyRepository, MemoryA
 from app.services.answer_key_service import AnswerKeyService
 from app.services.prompt_service import PromptService
 
-
+# Phase 4A Imports
+from app.storage.local_storage import LocalStorage
+from app.repositories.answer_sheet_repository import IAnswerSheetRepository, MemoryAnswerSheetRepository
+from app.services.answer_sheet_service import AnswerSheetService
 
 def get_settings() -> Settings:
     """Dependency injector for Microservice global settings."""
@@ -86,6 +89,43 @@ def get_evaluation_service(
             keyword_service=KeywordService()
         )
     return _evaluation_service
+
+
+# Phase 4A singletons & DI hooks
+_storage = LocalStorage()
+_answer_sheet_repository = MemoryAnswerSheetRepository()
+
+def get_storage() -> LocalStorage:
+    return _storage
+
+def get_answer_sheet_repository() -> IAnswerSheetRepository:
+    return _answer_sheet_repository
+
+def get_answer_sheet_service(
+    storage: LocalStorage = Depends(get_storage),
+    repo: IAnswerSheetRepository = Depends(get_answer_sheet_repository),
+    preprocessor: ImagePreprocessor = Depends(get_preprocessor),
+    hwr_service: HandwritingRecognitionService = Depends(get_hwr_service),
+    segmentation_service: AnswerSegmentationService = Depends(get_segmentation_service),
+) -> AnswerSheetService:
+    return AnswerSheetService(
+        storage=storage,
+        repository=repo,
+        preprocessor=preprocessor,
+        hwr_service=hwr_service,
+        segmentation_service=segmentation_service,
+    )
+
+def get_current_user_id(x_user_id: str = Header(default=None)) -> str:
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="Header X-User-Id is missing")
+    return x_user_id
+
+def get_current_user_role(x_user_role: str = Header(default=None)) -> str:
+    if not x_user_role:
+        raise HTTPException(status_code=401, detail="Header X-User-Role is missing")
+    return x_user_role
+
 
 
 
