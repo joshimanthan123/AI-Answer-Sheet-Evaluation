@@ -18,6 +18,21 @@ export class MockLlmProvider {
         "Include more context about structural dynamics and reference key terms from the prompt rubric.",
       justification:
         "Student response overlaps with core criteria, deserving partial marks of 75%.",
+      confidence: 0.88,
+      criteriaScores: [
+        {
+          criterion: "Conceptual Understanding",
+          marksAwarded: Math.round(maxMarks * 0.4 * 10) / 10,
+          maxMarks: Math.round(maxMarks * 0.5 * 10) / 10,
+        },
+        {
+          criterion: "Correctness",
+          marksAwarded: Math.round(maxMarks * 0.35 * 10) / 10,
+          maxMarks: Math.round(maxMarks * 0.5 * 10) / 10,
+        },
+      ],
+      matchedKeywords: ["concept"],
+      missingKeywords: ["vocabulary", "dynamics"],
       tokensUsed: {
         promptTokens: 250,
         completionTokens: 80,

@@ -84,4 +84,13 @@ function mongooseConnectionReadyState() {
   }
 }
 
+export const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, MESSAGES.AUTH.FORBIDDEN);
+    }
+    next();
+  };
+};
+
 export default auth;

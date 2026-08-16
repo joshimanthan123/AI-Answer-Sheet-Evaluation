@@ -122,7 +122,8 @@ class AnswerSheetService:
         exam_id: str,
         filename: str,
         content: bytes,
-        content_type: str | None = None
+        content_type: str | None = None,
+        sheet_id: str | None = None
     ) -> AnswerSheetResponse:
         """Executes full files ingestion: renders pdf pages, runs image preprocess, HWR, and splits text blocks."""
         # Sanitize path keys against traversal payloads
@@ -134,7 +135,11 @@ class AnswerSheetService:
             raise InvalidAnswerSheetFile("Invalid fields provided for answer sheet.")
             
         ext = self.validate_file(safe_filename, content, content_type)
-        sheet_id = uuid.uuid4()
+        
+        if not sheet_id:
+            sheet_id = str(uuid.uuid4())
+        else:
+            sheet_id = str(sheet_id)
         now = datetime.now(timezone.utc)
 
         # Build target file path paths
@@ -306,7 +311,7 @@ class AnswerSheetService:
             })
             raise AnswerSheetProcessingError(f"Answer sheet processing pipeline failed: {str(e)}")
 
-    async def get_answer_sheet(self, sheet_id: UUID) -> AnswerSheetResponse:
+    async def get_answer_sheet(self, sheet_id: str) -> AnswerSheetResponse:
         sheet = await self.repository.get(sheet_id)
         if not sheet:
             raise AnswerSheetNotFound(f"Answer sheet '{sheet_id}' not found.")
@@ -320,7 +325,7 @@ class AnswerSheetService:
             sheets = [s for s in sheets if s.exam_id == exam_id]
         return sheets
 
-    async def delete_answer_sheet(self, sheet_id: UUID) -> bool:
+    async def delete_answer_sheet(self, sheet_id: str) -> bool:
         sheet = await self.repository.get(sheet_id)
         if not sheet:
             raise AnswerSheetNotFound(f"Answer sheet '{sheet_id}' was not found.")

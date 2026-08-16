@@ -6,8 +6,17 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, role: 'student' | 'faculty' | 'admin') => Promise<User>;
+  register: (
+    name: string,
+    email: string,
+    role: 'student' | 'faculty' | 'admin',
+    password?: string,
+    confirmPassword?: string,
+    lecturerId?: string,
+    studentId?: string
+  ) => Promise<any>;
   logout: () => Promise<void>;
+  updateProfile: (data: FormData | { name: string; email?: string }) => Promise<User>;
   isAuthenticated: boolean;
 }
 
@@ -45,14 +54,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, role: 'student' | 'faculty' | 'admin'): Promise<User> => {
+  const register = async (
+    name: string,
+    email: string,
+    role: 'student' | 'faculty' | 'admin',
+    password?: string,
+    confirmPassword?: string,
+    lecturerId?: string,
+    studentId?: string
+  ): Promise<any> => {
     setLoading(true);
     try {
-      const response = await authService.register(name, email, role);
-      setUser(response.user);
-      return response.user;
+      const response = await authService.register(name, email, role, password, confirmPassword, lecturerId, studentId);
+      return response;
     } catch (error) {
-      setUser(null);
       throw error;
     } finally {
       setLoading(false);
@@ -69,8 +84,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateProfile = async (data: FormData | { name: string; email?: string }): Promise<User> => {
+    setLoading(true);
+    try {
+      const updatedUser = await authService.updateProfile(data);
+      setUser(updatedUser);
+      return updatedUser;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

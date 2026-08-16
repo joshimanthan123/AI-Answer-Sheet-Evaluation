@@ -1,10 +1,12 @@
 import express from "express";
 import answerSheetController from "../controllers/answerSheet.controller.js";
+import evaluationController from "../controllers/evaluation.controller.js";
 import { answerSheetValidator } from "../validators/answerSheet.validator.js";
 import validate from "../middleware/validation.middleware.js";
 import authMiddleware from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/role.middleware.js";
 import { ROLES } from "../constants/roles.js";
+import upload from "../config/multer.js";
 
 const router = express.Router();
 
@@ -13,10 +15,22 @@ router.use(authMiddleware);
 router
   .route("/")
   .post(
-    authorize(ROLES.STUDENT, ROLES.ADMIN),
-    answerSheetValidator,
-    validate,
-    answerSheetController.createAnswerSheet
+    (req, res, next) => {
+      if (
+        req.headers["content-type"] &&
+        req.headers["content-type"].includes("multipart/form-data")
+      ) {
+        return upload.array("files")(req, res, next);
+      }
+      next();
+    },
+    authorize(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN),
+    (req, res, next) => {
+      if (req.files && req.files.length > 0) {
+        return answerSheetController.uploadAnswerSheets(req, res, next);
+      }
+      return answerSheetController.createAnswerSheet(req, res, next);
+    }
   )
   .get(answerSheetController.getAllAnswerSheets);
 
@@ -40,6 +54,10 @@ router
   );
 
 router
+  .route("/:id/retry")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), answerSheetController.retryAnswerSheet);
+
+router
   .route("/:id")
   .get(answerSheetController.getAnswerSheetById)
   .put(
@@ -48,6 +66,14 @@ router
     validate,
     answerSheetController.updateAnswerSheet
   )
-  .delete(authorize(ROLES.ADMIN), answerSheetController.deleteAnswerSheet);
+  .delete(authorize(ROLES.FACULTY, ROLES.ADMIN), answerSheetController.deleteAnswerSheet);
+
+router
+  .route("/:id/evaluate")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.startEvaluation);
+
+router
+  .route("/:id/re-evaluate")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.reEvaluateAnswerSheet);
 
 export default router;

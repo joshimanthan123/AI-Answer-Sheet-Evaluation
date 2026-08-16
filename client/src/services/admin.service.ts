@@ -1,4 +1,5 @@
 import { User, Department, Course, Subject, AuditLog } from '../types';
+import apiClient from '../api/axios';
 import { 
   mockUsers, 
   mockDepartments, 
@@ -69,11 +70,13 @@ export const adminService = {
 
   // Course Management
   getCourses: async (): Promise<Course[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockCourses);
-      }, 300);
-    });
+    const response = await apiClient.get<any, any>('/courses');
+    const list = response.data || response;
+    const courses = Array.isArray(list) ? list : (list.data || []);
+    return courses.map((c: any) => ({
+      ...c,
+      id: c._id || c.id
+    }));
   },
 
   createCourse: async (course: Omit<Course, 'id'>): Promise<Course> => {

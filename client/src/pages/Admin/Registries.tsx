@@ -32,7 +32,8 @@ export const AdminRegistries: React.FC = () => {
         name: newSubName,
         code: newSubCode,
         credits: 4,
-        courseId: 'course-btech-cse'
+        courseId: 'course-btech-cse',
+        semester: 1
       });
       setSubjects(prev => [...prev, sub]);
       addToast('Course subject successfully registered in system database.', 'success');

@@ -24,7 +24,7 @@ const authLimiter = rateLimit({
 // Configure stricter limiter for sensitive endpoints
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests
+  max: 100, // 100 requests (temporarily increased for testing/setup)
   message: {
     success: false,
     message: "Too many authorization attempts from this IP, please try again after 15 minutes",

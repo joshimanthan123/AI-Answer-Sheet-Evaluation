@@ -1,7 +1,8 @@
 import express from "express";
 import examController from "../controllers/exam.controller.js";
 import answerSheetController from "../controllers/answerSheet.controller.js";
-import { examValidator } from "../validators/exam.validator.js";
+import evaluationController from "../controllers/evaluation.controller.js";
+import { examValidator, answerKeyValidator } from "../validators/exam.validator.js";
 import {
   startExamValidator,
   autoSaveValidator,
@@ -67,6 +68,10 @@ router
   .route("/:examId/review")
   .get(authorize(ROLES.STUDENT, ROLES.ADMIN), answerSheetController.getReviewAnswers);
 
+router
+  .route("/:examId/answer-sheets")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), answerSheetController.getExamAnswerSheets);
+
 // Faculty Question Bank CRUD routes
 router
   .route("/:examId/questions")
@@ -97,9 +102,48 @@ router
   .delete(authorize(ROLES.FACULTY, ROLES.ADMIN), examController.deleteQuestion);
 
 router
+  .route("/:examId/questions/:questionId/answer-key")
+  .put(
+    authorize(ROLES.FACULTY, ROLES.ADMIN),
+    answerKeyValidator,
+    validate,
+    examController.updateQuestionAnswerKey
+  );
+
+router
+  .route("/:examId/answer-key/finalize")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), examController.finalizeAnswerKey);
+
+router
+  .route("/:examId/answer-key/unlock")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), examController.unlockAnswerKey);
+
+router
   .route("/:id")
   .get(examController.getExamById)
   .put(authorize(ROLES.ADMIN, ROLES.FACULTY), examValidator, validate, examController.updateExam)
   .delete(authorize(ROLES.ADMIN, ROLES.FACULTY), examController.deleteExam);
+
+router
+  .route("/:examId/evaluate")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.bulkEvaluate);
+
+import * as resultsController from "../controllers/results.controller.js";
+
+router
+  .route("/:examId/results")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.getResultsForExam);
+
+router
+  .route("/:examId/analytics")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.getExamAnalytics);
+
+router
+  .route("/:examId/results/export")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.exportExamResultsCSV);
+
+router
+  .route("/:examId/results/report")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.downloadExamSummaryReport);
 
 export default router;

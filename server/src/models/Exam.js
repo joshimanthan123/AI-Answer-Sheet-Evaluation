@@ -49,6 +49,24 @@ const questionSchema = new mongoose.Schema({
     },
     default: "Descriptive",
   },
+  evaluationCriteria: {
+    conceptualUnderstanding: { type: Number, default: 0 },
+    keywordAccuracy: { type: Number, default: 0 },
+    completeness: { type: Number, default: 0 },
+    correctness: { type: Number, default: 0 },
+  },
+  partialMarkingRules: [
+    {
+      criterion: { type: String, required: true },
+      description: { type: String, default: "" },
+      marks: { type: Number, required: true },
+    },
+  ],
+  expectedAnswerLength: {
+    type: String,
+    enum: ["short", "medium", "long"],
+    default: "medium",
+  },
 });
 
 const examSchema = new mongoose.Schema(
@@ -96,6 +114,11 @@ const examSchema = new mongoose.Schema(
         message: "Invalid exam status",
       },
       default: "Draft",
+    },
+    answerKeyStatus: {
+      type: String,
+      enum: ["draft", "complete", "locked"],
+      default: "draft",
     },
     isPublished: {
       type: Boolean,

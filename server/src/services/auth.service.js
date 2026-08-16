@@ -8,10 +8,46 @@ import { generateAccessToken, generateRefreshToken } from "../utils/generateToke
 
 // Keep a local in-memory storage of users during local dev Mock Mode
 // to support local verification even if MongoDB is not running locally.
-const mockUsersDb = [];
+const mockUsersDb = [
+  {
+    _id: "mock-student-id",
+    id: "mock-student-id",
+    name: "Demo Student",
+    email: "student@university.edu",
+    password: "password",
+    role: "student",
+    rollNo: "STU-001",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    _id: "mock-faculty-id",
+    id: "mock-faculty-id",
+    name: "Demo Faculty",
+    email: "faculty@university.edu",
+    password: "password",
+    role: "faculty",
+    employeeId: "FAC-001",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    _id: "mock-admin-id",
+    id: "mock-admin-id",
+    name: "Demo Admin",
+    email: "admin@university.edu",
+    password: "password",
+    role: "admin",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
 
 export const registerUser = async (userData) => {
-  const { email } = userData;
+  const { email, role, lecturerId, studentId } = userData;
 
   // Check if we are running in mock DB mode
   const isMock = isDatabaseMockMode();
@@ -20,6 +56,22 @@ export const registerUser = async (userData) => {
     const existing = mockUsersDb.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
       throw new ApiError(STATUS_CODES.CONFLICT, MESSAGES.AUTH.EMAIL_ALREADY_EXISTS);
+    }
+    if (role === "faculty" && lecturerId) {
+      const existingLec = mockUsersDb.find(
+        (u) => u.lecturerId === lecturerId || u.employeeId === lecturerId
+      );
+      if (existingLec) {
+        throw new ApiError(STATUS_CODES.CONFLICT, "Lecturer ID is already registered.");
+      }
+    }
+    if (role === "student" && studentId) {
+      const existingStu = mockUsersDb.find(
+        (u) => u.studentId === studentId || u.rollNo === studentId
+      );
+      if (existingStu) {
+        throw new ApiError(STATUS_CODES.CONFLICT, "Student ID is already registered.");
+      }
     }
 
     // Simulate mongoose pre-save and build the virtual object
@@ -30,8 +82,10 @@ export const registerUser = async (userData) => {
       email: userData.email,
       role: userData.role || "student",
       department: userData.department || "",
-      rollNo: userData.rollNo || "",
-      employeeId: userData.employeeId || "",
+      lecturerId: userData.lecturerId || "",
+      studentId: userData.studentId || "",
+      rollNo: userData.studentId || "",
+      employeeId: userData.lecturerId || "",
       semester: userData.semester || null,
       isActive: true,
       createdAt: new Date(),
@@ -45,6 +99,25 @@ export const registerUser = async (userData) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new ApiError(STATUS_CODES.CONFLICT, MESSAGES.AUTH.EMAIL_ALREADY_EXISTS);
+  }
+
+  if (role === "faculty" && lecturerId) {
+    const existingLecturer = await User.findOne({ lecturerId });
+    if (existingLecturer) {
+      throw new ApiError(STATUS_CODES.CONFLICT, "Lecturer ID is already registered.");
+    }
+    userData.employeeId = lecturerId;
+  }
+
+  if (role === "student" && studentId) {
+    const existingStudent = await User.findOne({ studentId });
+    if (existingStudent) {
+      throw new ApiError(
+        STATUS_CODES.CONFLICT,
+        "Student ID/Enrollment Number is already registered."
+      );
+    }
+    userData.rollNo = studentId;
   }
 
   const user = await User.create(userData);

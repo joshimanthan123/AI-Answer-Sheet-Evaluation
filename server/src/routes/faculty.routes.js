@@ -24,4 +24,7 @@ router.post(
   facultyController.publishResults
 );
 
+router.put("/profile", facultyController.updateFacultyProfile);
+router.put("/change-password", facultyController.changeFacultyPassword);
+
 export default router;

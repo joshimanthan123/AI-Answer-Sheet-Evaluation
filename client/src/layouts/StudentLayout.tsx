@@ -15,6 +15,15 @@ export const StudentLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
 
+  const getFullPhotoUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    const host = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+    return `${host}${url}`;
+  };
+
   const menuItems = [
     { name: 'Dashboard', path: '/student', icon: 'home' },
     { name: 'My Exams', path: '/student/exams', icon: 'assignment' },
@@ -58,7 +67,7 @@ export const StudentLayout: React.FC = () => {
           {/* User Profile Card */}
           <div className="flex items-center gap-3 p-2 bg-background dark:bg-surface-container-low rounded-xl">
             <div className="w-9 h-9 rounded-full bg-primary-light/50 flex items-center justify-center font-bold text-primary select-none overflow-hidden">
-              {user?.avatar ? <img src={user.avatar} className="object-cover w-full h-full" /> : user?.name.charAt(0)}
+              {user?.profilePhoto || user?.avatar ? <img src={getFullPhotoUrl(user.profilePhoto || user.avatar)} className="object-cover w-full h-full" /> : user?.name.charAt(0)}
             </div>
             <div className="truncate flex-grow text-left">
               <p className="text-xs font-bold text-on-surface truncate">{user?.name}</p>

@@ -69,6 +69,43 @@ export const getReviewAnswers = asyncHandler(async (req, res) => {
   );
 });
 
+export const getExamAnswerSheets = asyncHandler(async (req, res) => {
+  const { examId } = req.params;
+  const result = await answerSheetService.getExamAnswerSheets(examId, req.user._id, req.user.role);
+  return sendSuccess(
+    res,
+    STATUS_CODES.OK,
+    "Exam answer sheets list retrieved successfully",
+    result
+  );
+});
+
+export const uploadAnswerSheets = asyncHandler(async (req, res) => {
+  const { examId, studentIdentifier } = req.body;
+
+  if (!examId) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Exam ID is required");
+  }
+
+  const files = req.files || (req.file ? [req.file] : []);
+  if (files.length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "No files uploaded");
+  }
+
+  const result = await answerSheetService.uploadAnswerSheets(
+    examId,
+    files,
+    studentIdentifier,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.CREATED, "Upload process initiated", result);
+});
+
+export const retryAnswerSheet = asyncHandler(async (req, res) => {
+  const result = await answerSheetService.retryAnswerSheet(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Retry process initiated", result);
+});
+
 export default {
   createAnswerSheet,
   getAnswerSheetById,
@@ -80,4 +117,7 @@ export default {
   submitExam,
   getSubmissionStatus,
   getReviewAnswers,
+  getExamAnswerSheets,
+  uploadAnswerSheets,
+  retryAnswerSheet,
 };

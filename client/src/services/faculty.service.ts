@@ -1,4 +1,5 @@
 import { Faculty, AnswerSheet, Evaluation, EvaluationDetail, User, Report } from '../types';
+import apiClient from '../api/axios';
 import { 
   mockFacultyProfile, 
   mockAnswerSheets, 
@@ -9,6 +10,11 @@ import {
 } from '../mocks/db';
 
 export const facultyService = {
+  getDashboardData: async (): Promise<any> => {
+    const response = await apiClient.get<any, any>('/faculty/dashboard');
+    return response.data?.data || response.data;
+  },
+
   getProfile: async (facultyId: string = 'fac-1'): Promise<Faculty> => {
     return new Promise((resolve) => {
       setTimeout(() => {

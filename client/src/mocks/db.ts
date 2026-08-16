@@ -22,11 +22,11 @@ export const mockCourses: Course[] = [
 
 // 3. Subjects Mock
 export const mockSubjects: Subject[] = [
-  { id: 'sub-math2', name: 'Advanced Mathematics II', code: 'MA-201', credits: 4, courseId: 'course-btech-cse' },
-  { id: 'sub-ds', name: 'Data Structures and Algorithms', code: 'CS-101', credits: 4, courseId: 'course-btech-cse' },
-  { id: 'sub-aml', name: 'Advanced Machine Learning', code: 'CS-402-AI', credits: 3, courseId: 'course-btech-cse' },
-  { id: 'sub-phy', name: 'Molecular and Quantum Physics', code: 'PH-202', credits: 4, courseId: 'course-bsc-physics' },
-  { id: 'sub-ethics', name: 'Ethics and Safety in AI Systems', code: 'CS-302', credits: 2, courseId: 'course-btech-cse' }
+  { id: 'sub-math2', name: 'Advanced Mathematics II', code: 'MA-201', credits: 4, courseId: 'course-btech-cse', semester: 1 },
+  { id: 'sub-ds', name: 'Data Structures and Algorithms', code: 'CS-101', credits: 4, courseId: 'course-btech-cse', semester: 1 },
+  { id: 'sub-aml', name: 'Advanced Machine Learning', code: 'CS-402-AI', credits: 3, courseId: 'course-btech-cse', semester: 1 },
+  { id: 'sub-phy', name: 'Molecular and Quantum Physics', code: 'PH-202', credits: 4, courseId: 'course-bsc-physics', semester: 1 },
+  { id: 'sub-ethics', name: 'Ethics and Safety in AI Systems', code: 'CS-302', credits: 2, courseId: 'course-btech-cse', semester: 1 }
 ];
 
 // 4. Users Mock (Base Users)

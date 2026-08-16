@@ -23,6 +23,7 @@ faculty_router = APIRouter(prefix="/api/v1", tags=["Faculty Answer Sheets"])
 async def upload_answer_sheet(
     exam_id: str = Form(...),
     file: UploadFile = File(...),
+    sheet_id: str = Form(None),
     user_id: str = Depends(get_current_user_id),
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
@@ -36,7 +37,8 @@ async def upload_answer_sheet(
         exam_id=exam_id,
         filename=file.filename,
         content_type=file.content_type,
-        content=file_bytes
+        content=file_bytes,
+        sheet_id=sheet_id
     )
     return ApiResponse(
         success=True,
@@ -61,7 +63,7 @@ async def list_student_sheets(
 
 @student_router.get("/student/answer-sheets/{id}", response_model=ApiResponse)
 async def get_student_sheet(
-    id: UUID,
+    id: str,
     user_id: str = Depends(get_current_user_id),
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
@@ -81,7 +83,7 @@ async def get_student_sheet(
 
 @student_router.get("/student/answer-sheets/{id}/original")
 async def get_student_original_file(
-    id: UUID,
+    id: str,
     user_id: str = Depends(get_current_user_id),
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
@@ -105,7 +107,7 @@ async def get_student_original_file(
 
 @student_router.get("/student/answer-sheets/{id}/digital", response_model=ApiResponse)
 async def get_student_digital_data(
-    id: UUID,
+    id: str,
     user_id: str = Depends(get_current_user_id),
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
@@ -125,7 +127,7 @@ async def get_student_digital_data(
 
 @student_router.get("/student/answer-sheets/{id}/pages/{page_number}")
 async def get_student_page_image(
-    id: UUID,
+    id: str,
     page_number: int,
     type: str = Query("processed", pattern="^(original|processed)$"),
     user_id: str = Depends(get_current_user_id),
@@ -163,7 +165,7 @@ async def list_faculty_sheets(
 
 @faculty_router.get("/faculty/answer-sheets/{id}", response_model=ApiResponse)
 async def get_faculty_sheet(
-    id: UUID,
+    id: str,
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
 ):
@@ -178,7 +180,7 @@ async def get_faculty_sheet(
 
 @faculty_router.get("/faculty/answer-sheets/{id}/original")
 async def get_faculty_original_file(
-    id: UUID,
+    id: str,
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
 ):
@@ -198,7 +200,7 @@ async def get_faculty_original_file(
 
 @faculty_router.get("/faculty/answer-sheets/{id}/digital", response_model=ApiResponse)
 async def get_faculty_digital_data(
-    id: UUID,
+    id: str,
     role: str = Depends(get_current_user_role),
     service: AnswerSheetService = Depends(get_answer_sheet_service)
 ):
@@ -214,7 +216,7 @@ async def get_faculty_digital_data(
 
 @faculty_router.get("/faculty/answer-sheets/{id}/pages/{page_number}")
 async def get_faculty_sheet_page(
-    id: UUID,
+    id: str,
     page_number: int,
     type: str = Query("processed", pattern="^(original|processed)$"),
     role: str = Depends(get_current_user_role),

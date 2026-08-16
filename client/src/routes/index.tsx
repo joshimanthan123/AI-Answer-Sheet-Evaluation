@@ -27,10 +27,15 @@ import StudentAnalytics from '../pages/Student/Analytics';
 import StudentSettings from '../pages/Student/Settings';
 import StudentDetailedReport from '../pages/Student/DetailedReport';
 import StudentUploadAnswerSheet from '../pages/Student/UploadAnswerSheet';
+import ExamSubmissionStatus from '../pages/Student/ExamSubmissionStatus';
+import ExamResult from '../pages/Student/ExamResult';
 
 // Faculty Pages
 import FacultyDashboard from '../pages/Faculty/Dashboard';
 import FacultyCreateExam from '../pages/Faculty/CreateExam';
+import FacultyExams from '../pages/Faculty/Exams';
+import FacultyExamDetails from '../pages/Faculty/ExamDetails';
+import FacultyAnswerKey from '../pages/Faculty/AnswerKey';
 import FacultyQuestionBank from '../pages/Faculty/QuestionBank';
 import FacultyModelAnswers from '../pages/Faculty/ModelAnswers';
 import FacultyUploadAnswerKey from '../pages/Faculty/UploadAnswerKey';
@@ -40,6 +45,11 @@ import FacultyManualEvaluation from '../pages/Faculty/ManualEvaluation';
 import FacultyStudents from '../pages/Faculty/Students';
 import FacultyReports from '../pages/Faculty/Reports';
 import FacultySettings from '../pages/Faculty/Settings';
+import FacultySubjects from '../pages/Faculty/Subjects';
+import AnswerSheets from '../pages/Faculty/AnswerSheets';
+import FacultyAnswerSheetViewerPage from '../pages/Faculty/AnswerSheetViewerPage';
+import ResultsDashboard from '../pages/Faculty/ResultsDashboard';
+import IndividualResult from '../pages/Faculty/IndividualResult';
 
 // Admin Pages
 import AdminDashboard from '../pages/Admin/Dashboard';
@@ -72,6 +82,8 @@ export const AppRoutes: React.FC = () => {
           <Route path="exams/:id/instructions" element={<StudentInstructions />} />
           <Route path="exam-workspace" element={<StudentExamWorkspace />} />
           <Route path="exams/:id/workspace" element={<StudentExamWorkspace />} />
+          <Route path="exams/:id/submission-status" element={<ExamSubmissionStatus />} />
+          <Route path="exams/:id/result" element={<ExamResult />} />
           <Route path="upload-answer-sheet" element={<StudentUploadAnswerSheet />} />
           <Route path="success" element={<StudentSuccess />} />
           <Route path="evaluations/:id" element={<StudentDetailedReport />} />
@@ -86,6 +98,15 @@ export const AppRoutes: React.FC = () => {
         <Route path="/faculty" element={<FacultyLayout />}>
           <Route index element={<FacultyDashboard />} />
           <Route path="create-exam" element={<FacultyCreateExam />} />
+          <Route path="exams" element={<FacultyExams />} />
+          <Route path="exams/create" element={<FacultyCreateExam />} />
+          <Route path="exams/:id" element={<FacultyExamDetails />} />
+          <Route path="exams/:examId/results" element={<ResultsDashboard />} />
+          <Route path="results/:evaluationId" element={<IndividualResult />} />
+          <Route path="exams/:id/edit" element={<FacultyCreateExam />} />
+          <Route path="exams/:id/answer-key" element={<FacultyAnswerKey />} />
+          <Route path="exams/:id/answer-sheets" element={<AnswerSheets />} />
+          <Route path="answer-sheets/:id" element={<FacultyAnswerSheetViewerPage />} />
           <Route path="question-bank" element={<FacultyQuestionBank />} />
           <Route path="model-answers" element={<FacultyModelAnswers />} />
           <Route path="upload-answer-key" element={<FacultyUploadAnswerKey />} />
@@ -95,6 +116,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="students" element={<FacultyStudents />} />
           <Route path="reports" element={<FacultyReports />} />
           <Route path="settings" element={<FacultySettings />} />
+          <Route path="subjects" element={<FacultySubjects />} />
         </Route>
       </Route>
 

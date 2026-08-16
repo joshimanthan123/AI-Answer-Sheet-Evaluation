@@ -27,9 +27,9 @@ class DigitalAnswer(BaseModel):
     confidence: float
 
 class AnswerSheetResponse(BaseModel):
-    id: UUID
-    student_id: str
-    exam_id: str
+    id: UUID | str
+    student_id: UUID | str
+    exam_id: UUID | str
     original_filename: str
     original_format: str
     file_size: int

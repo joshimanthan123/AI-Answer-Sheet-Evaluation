@@ -120,12 +120,54 @@ variable:
 
 | `HWR_PROVIDER` | Provider | Use |
 | --- | --- | --- |
-| `azure` (default) | `AzureProvider` | Real OCR via **Azure AI Document Intelligence** (`prebuilt-read`). Extracts printed and handwritten text with line/word confidence. |
+| `google_vision` (default) | `GoogleVisionHWRProvider` | Real OCR via **Google Cloud Vision** (`DOCUMENT_TEXT_DETECTION`). Extracts printed and handwritten text with line/word confidence. |
+| `azure` | `AzureProvider` | Real OCR via **Azure AI Document Intelligence** (`prebuilt-read`). Extracts printed and handwritten text with line/word confidence. |
+| `paddle` | `PaddleHWRProvider` | Offline local OCR via **PaddleOCR**. |
 | `mock` | `MockProvider` | Offline, deterministic text for local dev and tests. No network, no credentials. |
 
-There is **no silent fallback**: if `HWR_PROVIDER=azure` but the endpoint/key
+There is **no silent fallback**: if `HWR_PROVIDER=google_vision` (or `azure`) but the configurations/credentials
 are missing, the service fails fast at startup with a clear configuration error
 rather than quietly returning mock text.
+
+### Google Cloud Vision Setup
+
+Google Cloud Vision is the default HWR provider, leveraging Google's dense `DOCUMENT_TEXT_DETECTION` (Document Text OCR) optimized for structured documents and handwriting processing.
+
+**1. Create a Google Cloud Project & Enable API**
+- Log in to the [Google Cloud Console](https://console.cloud.google.com).
+- Create a new project or select an existing one.
+- Go to the **API Library** and search for and enable the **Cloud Vision API**.
+
+**2. Generate a Service Account Key File**
+- Navigate to **IAM & Admin** > **Service Accounts**.
+- Click **Create Service Account**, set its name, and grant the **Cloud Vision API User** role (or similar authorization).
+- Click on the created Service Account, navigate to the **Keys** tab, click **Add Key** > **Create new key**, and select **JSON** format.
+- Download the generated JSON key. Treat this file as sensitive: **never commit it to Git and never print its contents.**
+
+**3. Configure Environment Variables**
+Copy `.env.example` to `.env` and fill in the values:
+
+```bash
+HWR_PROVIDER=google_vision
+GOOGLE_CLOUD_PROJECT_ID=your-gcp-project-id
+GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\credentials\google-vision-service-account.json
+# Optional language hints (e.g. "en-t-i0-handwrit" for English handwriting, leave blank by default)
+GOOGLE_VISION_LANGUAGE_HINT=
+GOOGLE_VISION_TIMEOUT_SECONDS=30
+```
+
+Windows example:
+```cmd
+set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\credentials\google-vision-service-account.json
+```
+
+**4. Install dependency**
+The `google-cloud-vision` client library is declared in `requirements.txt`. Build the active virtual environment dependencies:
+```bash
+.venv\Scripts\python.exe -m pip install google-cloud-vision
+```
+
+---
 
 ### Azure AI Document Intelligence setup
 
@@ -249,10 +291,9 @@ are made) from the `ocr-service/` directory:
 .venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 
-- `tests/test_hwr.py` — Mock provider, service selector/validation, and Azure
-  result mapping (mocked SDK).
-- `tests/test_azure_provider.py` — Azure config validation, numpy→PNG encoding,
-  result→`HWRResult` mapping, confidence fallback, `page_num`, and error
-  handling (auth/rate-limit/network), all with a mocked `DocumentIntelligenceClient`.
+- `tests/test_hwr.py` — Mock provider, service selector/validation, Azure and Google Vision result mapping and factory loading.
+- `tests/test_google_vision_provider.py` — Google Vision config validation, numpy→PNG encoding, layout annotation→`HWRResult` mapping, confidence mapping, credentials file check, and API exception handling (auth/rate-limit/network), with mocked `ImageAnnotatorClient`.
+- `tests/test_azure_provider.py` — Azure config validation, numpy→PNG encoding, result→`HWRResult` mapping, confidence fallback, `page_num`, and error handling (auth/rate-limit/network), all with a mocked `DocumentIntelligenceClient`.
+- `tests/integration/test_google_vision_integration.py` — optional live integration test with a sample image, skipped gracefully if no credentials configured.
 - `tests/azure_fakes.py` — helpers that build fake Azure result objects.
 

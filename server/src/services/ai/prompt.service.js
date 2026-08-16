@@ -9,7 +9,12 @@ export class PromptService {
   }) {
     const rubricText =
       rubric.length > 0
-        ? rubric.map((r, i) => `${i + 1}. Criteria: "${r.criteria}", Marks: ${r.marks}`).join("\n")
+        ? rubric
+            .map(
+              (r, i) =>
+                `${i + 1}. Criteria: "${r.criteria || r.criterion}", Marks: ${r.marks || r.maxMarks}${r.description ? `, Description: ${r.description}` : ""}`
+            )
+            .join("\n")
         : "No detailed grading rubric provided. Grade based on correct facts matching model answer.";
 
     const keywordsText =
@@ -22,7 +27,7 @@ QUESTION:
 "${questionText}"
 
 STUDENT ANSWER:
-"${studentAnswer}"
+"${studentAnswer || "[No student answer provided or detected]"}"
 
 MODEL ANSWER:
 "${modelAnswer}"
@@ -35,12 +40,27 @@ ${rubricText}
 Provide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (${maximumMarks}).
 Return your assessment strictly in the following JSON structure:
 {
-  "marks": <float_value>,
+  "marks": <float_value_awarded>,
   "similarity": <float_value_from_0_to_1>,
   "strengths": <string_summarizing_good_details>,
   "weaknesses": <string_summarizing_missing_details>,
   "suggestions": <string_improvement_tips_or_comments>,
-  "justification": <string_reasoning_for_awarded_marks>
+  "justification": <string_reasoning_for_awarded_marks>,
+  "confidence": <float_value_from_0_to_1>,
+  "criteriaScores": [
+    {
+      "criterion": "<criterion_name_from_guidelines>",
+      "marksAwarded": <float_marks_awarded>,
+      "maxMarks": <float_max_marks>
+    }
+  ],
+  "matchedKeywords": [
+    "<matching_keyword_1>",
+    "<matching_keyword_2>"
+  ],
+  "missingKeywords": [
+    "<missing_keyword_1>"
+  ]
 }
 `;
   }

@@ -7,6 +7,14 @@ export interface User {
   status: 'online' | 'offline';
   departmentId?: string;
   token?: string;
+  lecturerId?: string;
+  studentId?: string;
+  employeeId?: string;
+  rollNo?: string;
+  createdAt?: string;
+  profilePhoto?: string;
+  department?: string;
+  semester?: number;
 }
 
 export interface Student {
@@ -36,10 +44,19 @@ export interface Admin {
 
 export interface Subject {
   id: string;
+  _id?: string;
   name: string;
   code: string;
   credits: number;
-  courseId: string;
+  courseId?: string;
+  course?: any;
+  semester: number;
+  faculty?: any;
+  description?: string;
+  isActive?: boolean;
+  isDeleted?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Course {
@@ -59,20 +76,48 @@ export interface Department {
 
 export interface Exam {
   id: string;
+  _id?: string;
   name: string;
+  title?: string;
   date: string;
   code: string;
   totalMarks: number;
-  duration: string; // e.g. "3 Hours"
+  duration: string | number; // e.g. "3 Hours" or 180 (minutes)
   subjectId: string;
+  subject?: any;
+  subjectName?: string;
+  subjectCode?: string;
+  allowedMaterials?: string | string[];
+  instructions?: string | string[];
+  questions?: Question[];
+  answerKeyStatus?: 'draft' | 'complete' | 'locked';
+  examStatus?: string;
 }
 
 export interface Question {
   id: string;
+  _id?: string;
   number: number;
   text: string;
   weight: number;
   expectedConcept: string;
+  modelAnswer?: string;
+  keywords?: string[];
+  bloomsLevel?: string;
+  difficulty?: string;
+  evaluationCriteria?: {
+    conceptualUnderstanding: number;
+    keywordAccuracy: number;
+    completeness: number;
+    correctness: number;
+  };
+  partialMarkingRules?: Array<{
+    _id?: string;
+    criterion: string;
+    description?: string;
+    marks: number;
+  }>;
+  expectedAnswerLength?: 'short' | 'medium' | 'long';
 }
 
 export interface AnswerSheet {

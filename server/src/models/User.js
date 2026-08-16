@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters"],
+      minlength: [8, "Password must be at least 8 characters"],
     },
     role: {
       type: String,
@@ -35,6 +35,18 @@ const userSchema = new mongoose.Schema(
     department: {
       type: String,
       trim: true,
+    },
+    lecturerId: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true, // Allows multiple null/undefined values for students
+    },
+    studentId: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true, // Allows multiple null/undefined values for faculty
     },
     employeeId: {
       type: String,
@@ -83,6 +95,7 @@ userSchema.pre("save", async function (next) {
 
 // Compare password helper method
 userSchema.methods.comparePassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

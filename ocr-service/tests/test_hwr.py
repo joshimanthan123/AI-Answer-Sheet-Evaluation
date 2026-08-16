@@ -169,6 +169,10 @@ class TestHWRModule(unittest.TestCase):
         provider_azure = HandwritingRecognitionService.get_provider("azure")
         self.assertIsInstance(provider_azure, AzureProvider)
 
+        provider_gv = HandwritingRecognitionService.get_provider("google_vision")
+        from app.providers.google_vision_provider import GoogleVisionHWRProvider
+        self.assertIsInstance(provider_gv, GoogleVisionHWRProvider)
+
     def test_hwr_service_invalid_image(self):
         with self.assertRaises(HWRServiceError):
             HandwritingRecognitionService.recognize_handwriting(None)
@@ -195,6 +199,18 @@ class TestHWRModule(unittest.TestCase):
     @patch("app.config.settings.AZURE_DOCUMENT_INTELLIGENCE_KEY", None)
     @patch("app.config.settings.AZURE_API_KEY", None)
     def test_validate_configuration_azure_missing_raises(self):
+        with self.assertRaises(HWRServiceError):
+            HandwritingRecognitionService.validate_configuration()
+
+    @patch("app.config.settings.HWR_PROVIDER", "google_vision")
+    @patch("app.config.settings.GOOGLE_APPLICATION_CREDENTIALS", None)
+    def test_validate_configuration_google_vision_ok(self):
+        # Should not raise when credentials are not configured (falls back to ambient ADC)
+        HandwritingRecognitionService.validate_configuration()
+
+    @patch("app.config.settings.HWR_PROVIDER", "google_vision")
+    @patch("app.config.settings.GOOGLE_APPLICATION_CREDENTIALS", "/nonexistent/gv-creds.json")
+    def test_validate_configuration_google_vision_missing_raises(self):
         with self.assertRaises(HWRServiceError):
             HandwritingRecognitionService.validate_configuration()
 

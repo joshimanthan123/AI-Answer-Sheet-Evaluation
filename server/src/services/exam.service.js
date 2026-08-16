@@ -1,7 +1,9 @@
 import Exam from "../models/Exam.js";
 import Subject from "../models/Subject.js";
+import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import { STATUS_CODES } from "../constants/statusCodes.js";
+import { ROLES } from "../constants/roles.js";
 import logger from "../utils/logger.js";
 
 export const calculateTotalMarks = (questions) => {
@@ -44,13 +46,38 @@ export const checkDuplicateTexts = (questions) => {
 };
 
 export const createExamWithQuestions = async (data, userId) => {
-  const subject = await Subject.findOne({ _id: data.subject, isDeleted: false });
+  const subject = await Subject.findOne({ _id: data.subject, isDeleted: { $ne: true } });
   if (!subject) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Subject reference not found or is inactive");
   }
 
+  // Verify subject belongs to the creating faculty
+  const creatorUser = await User.findById(userId);
+  if (
+    creatorUser &&
+    creatorUser.role === ROLES.FACULTY &&
+    subject.faculty.toString() !== userId.toString()
+  ) {
+    throw new ApiError(
+      STATUS_CODES.FORBIDDEN,
+      "Access denied. The specified subject does not belong to your account."
+    );
+  }
+
   const { questions = [], ...examData } = data;
   const isDraft = data.examStatus === "Draft";
+
+  // Prevent duplicate examCode for the same faculty creator
+  if (data.examCode) {
+    const duplicateCode = await Exam.findOne({
+      createdBy: userId,
+      examCode: data.examCode.toUpperCase(),
+      isDeleted: { $ne: true },
+    });
+    if (duplicateCode) {
+      throw new ApiError(STATUS_CODES.CONFLICT, "An exam with this exam code already exists.");
+    }
+  }
 
   validateQuestionNumbers(questions);
   checkDuplicateTexts(questions);
@@ -65,6 +92,7 @@ export const createExamWithQuestions = async (data, userId) => {
 
   const exam = await Exam.create({
     ...examData,
+    examCode: data.examCode ? data.examCode.toUpperCase() : undefined,
     questions: parsedQuestions,
     createdBy: userId,
     updatedBy: userId,
@@ -104,18 +132,29 @@ export const createExam = async (data, userId) => {
   return createExamWithQuestions(data, userId);
 };
 
-export const getExamById = async (id) => {
-  const exam = await Exam.findOne({ _id: id, isDeleted: false })
-    .populate("subject", "name code semester")
+export const getExamById = async (id, userId, userRole) => {
+  const exam = await Exam.findOne({ _id: id, isDeleted: { $ne: true } })
+    .populate("subject", "name code semester faculty")
     .populate("createdBy", "name email")
     .populate("updatedBy", "name email");
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
   }
+
+  // Verify ownership if faculty
+  const createdByUserId = exam.createdBy && (exam.createdBy._id || exam.createdBy);
+  if (
+    userRole === ROLES.FACULTY &&
+    createdByUserId &&
+    createdByUserId.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
   return exam;
 };
 
-export const getAllExams = async (query = {}) => {
+export const getAllExams = async (query = {}, userId, userRole) => {
   const {
     page = 1,
     limit = 10,
@@ -126,7 +165,12 @@ export const getAllExams = async (query = {}) => {
     ...filters
   } = query;
 
-  const mongoQuery = { isDeleted: false };
+  const mongoQuery = { isDeleted: { $ne: true } };
+
+  // Faculty only sees their own exams
+  if (userRole === ROLES.FACULTY) {
+    mongoQuery.createdBy = userId;
+  }
 
   if (search) {
     mongoQuery.title = { $regex: search, $options: "i" };
@@ -166,15 +210,56 @@ export const getAllExams = async (query = {}) => {
 };
 
 export const updateExam = async (id, data, userId) => {
-  const exam = await Exam.findOne({ _id: id, isDeleted: false });
+  const exam = await Exam.findOne({ _id: id, isDeleted: { $ne: true } });
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
   }
 
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked" && userId.toString() === exam.createdBy.toString()) {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
+  }
+
   if (data.subject) {
-    const subject = await Subject.findOne({ _id: data.subject, isDeleted: false });
+    const subject = await Subject.findOne({ _id: data.subject, isDeleted: { $ne: true } });
     if (!subject) {
       throw new ApiError(STATUS_CODES.NOT_FOUND, "Subject reference not found or is inactive");
+    }
+    if (
+      currentUser &&
+      currentUser.role === ROLES.FACULTY &&
+      subject.faculty.toString() !== userId.toString()
+    ) {
+      throw new ApiError(
+        STATUS_CODES.FORBIDDEN,
+        "Access denied. The specified subject does not belong to your account."
+      );
+    }
+  }
+
+  // Prevent duplicate examCode for the same creator
+  if (data.examCode && data.examCode.toUpperCase() !== exam.examCode) {
+    const duplicateCode = await Exam.findOne({
+      createdBy: userId,
+      examCode: data.examCode.toUpperCase(),
+      isDeleted: { $ne: true },
+      _id: { $ne: id },
+    });
+    if (duplicateCode) {
+      throw new ApiError(STATUS_CODES.CONFLICT, "An exam with this exam code already exists.");
     }
   }
 
@@ -195,6 +280,10 @@ export const updateExam = async (id, data, userId) => {
     validateMarksDistribution(questionsToCheck, data.totalMarks, isDraft);
   }
 
+  if (data.examCode) {
+    data.examCode = data.examCode.toUpperCase();
+  }
+
   Object.assign(exam, data);
   exam.updatedBy = userId;
 
@@ -204,9 +293,19 @@ export const updateExam = async (id, data, userId) => {
 };
 
 export const deleteExam = async (id, userId) => {
-  const exam = await Exam.findOne({ _id: id, isDeleted: false });
+  const exam = await Exam.findOne({ _id: id, isDeleted: { $ne: true } });
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
   }
 
   exam.isDeleted = true;
@@ -238,10 +337,30 @@ export const getInstructions = async (examId) => {
 };
 
 export const addQuestion = async (examId, questionData, userId) => {
-  const exam = await Exam.findOne({ _id: examId, isDeleted: false });
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
   }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked") {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
+  }
+
+  validateQuestionMarkDistribution({ maximumMarks: questionData.maximumMarks }, questionData);
 
   exam.questions.push(questionData);
   exam.updatedBy = userId;
@@ -252,15 +371,35 @@ export const addQuestion = async (examId, questionData, userId) => {
 };
 
 export const updateQuestion = async (examId, questionId, updateData, userId) => {
-  const exam = await Exam.findOne({ _id: examId, isDeleted: false });
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked") {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
   }
 
   const question = exam.questions.id(questionId);
   if (!question) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Question not found in the exam");
   }
+
+  validateQuestionMarkDistribution(question, updateData);
 
   Object.assign(question, updateData);
   exam.updatedBy = userId;
@@ -271,9 +410,27 @@ export const updateQuestion = async (examId, questionId, updateData, userId) => 
 };
 
 export const deleteQuestion = async (examId, questionId, userId) => {
-  const exam = await Exam.findOne({ _id: examId, isDeleted: false });
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked") {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
   }
 
   const question = exam.questions.id(questionId);
@@ -290,9 +447,27 @@ export const deleteQuestion = async (examId, questionId, userId) => {
 };
 
 export const reorderQuestions = async (examId, questionsOrder, userId) => {
-  const exam = await Exam.findOne({ _id: examId, isDeleted: false });
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
   if (!exam) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked") {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
   }
 
   const reordered = [];
@@ -316,6 +491,294 @@ export const reorderQuestions = async (examId, questionsOrder, userId) => {
   return exam;
 };
 
+// HELPER: Validate criteria and partial marking distribution bounds
+const validateQuestionMarkDistribution = (question, updateData = {}) => {
+  let targetCriteria = question.evaluationCriteria || {};
+  let targetCriteriaSum = 0;
+
+  const evaluationCriteria = updateData.evaluationCriteria;
+  if (evaluationCriteria !== undefined) {
+    if (Array.isArray(evaluationCriteria)) {
+      const newCriteria = {
+        conceptualUnderstanding: 0,
+        keywordAccuracy: 0,
+        completeness: 0,
+        correctness: 0,
+      };
+      const mapping = {
+        "conceptual understanding": "conceptualUnderstanding",
+        conceptualunderstanding: "conceptualUnderstanding",
+        "keyword accuracy": "keywordAccuracy",
+        keywordaccuracy: "keywordAccuracy",
+        completeness: "completeness",
+        correctness: "correctness",
+      };
+      for (const item of evaluationCriteria) {
+        const key = item.name.trim().toLowerCase();
+        const mappedKey = mapping[key] || item.name;
+        if (newCriteria[mappedKey] !== undefined) {
+          newCriteria[mappedKey] = item.marks;
+        }
+      }
+      targetCriteria = newCriteria;
+    } else if (typeof evaluationCriteria === "object" && evaluationCriteria !== null) {
+      targetCriteria = {
+        conceptualUnderstanding: evaluationCriteria.conceptualUnderstanding || 0,
+        keywordAccuracy: evaluationCriteria.keywordAccuracy || 0,
+        completeness: evaluationCriteria.completeness || 0,
+        correctness: evaluationCriteria.correctness || 0,
+      };
+    }
+    targetCriteriaSum = Object.values(targetCriteria).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  } else if (question.evaluationCriteria) {
+    targetCriteriaSum =
+      (Number(question.evaluationCriteria.conceptualUnderstanding) || 0) +
+      (Number(question.evaluationCriteria.keywordAccuracy) || 0) +
+      (Number(question.evaluationCriteria.completeness) || 0) +
+      (Number(question.evaluationCriteria.correctness) || 0);
+  }
+
+  let partialRulesSum = 0;
+  const partialMarkingRules = updateData.partialMarkingRules;
+  if (partialMarkingRules !== undefined) {
+    partialRulesSum = partialMarkingRules.reduce((sum, r) => sum + (Number(r.marks) || 0), 0);
+  } else if (question.partialMarkingRules) {
+    partialRulesSum = question.partialMarkingRules.reduce(
+      (sum, r) => sum + (Number(r.marks) || 0),
+      0
+    );
+  }
+
+  const maxMarks =
+    updateData.maximumMarks !== undefined ? updateData.maximumMarks : question.maximumMarks;
+  if (targetCriteriaSum > maxMarks) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      `Total marks configured for evaluation criteria (${targetCriteriaSum}) exceeds the question's maximum marks (${maxMarks}).`
+    );
+  }
+
+  if (partialRulesSum > maxMarks) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      `Total marks configured for partial marking rules (${partialRulesSum}) exceeds the question's maximum marks (${maxMarks}).`
+    );
+  }
+};
+
+export const updateQuestionAnswerKey = async (examId, questionId, keyData, userId) => {
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked") {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
+  }
+
+  const question = exam.questions.id(questionId);
+  if (!question) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Question not found in the exam");
+  }
+
+  // Validate mark bounds
+  validateQuestionMarkDistribution(question, keyData);
+
+  // Apply map logic for evaluation criteria array if sent that way
+  let targetCriteria = question.evaluationCriteria || {};
+  if (keyData.evaluationCriteria !== undefined) {
+    if (Array.isArray(keyData.evaluationCriteria)) {
+      const newCriteria = {
+        conceptualUnderstanding: 0,
+        keywordAccuracy: 0,
+        completeness: 0,
+        correctness: 0,
+      };
+
+      const mapping = {
+        "conceptual understanding": "conceptualUnderstanding",
+        conceptualunderstanding: "conceptualUnderstanding",
+        "keyword accuracy": "keywordAccuracy",
+        keywordaccuracy: "keywordAccuracy",
+        completeness: "completeness",
+        correctness: "correctness",
+      };
+
+      for (const item of keyData.evaluationCriteria) {
+        const key = item.name.trim().toLowerCase();
+        const mappedKey = mapping[key] || item.name;
+        if (newCriteria[mappedKey] !== undefined) {
+          newCriteria[mappedKey] = item.marks;
+        }
+      }
+      targetCriteria = newCriteria;
+    } else if (
+      typeof keyData.evaluationCriteria === "object" &&
+      keyData.evaluationCriteria !== null
+    ) {
+      targetCriteria = {
+        conceptualUnderstanding: keyData.evaluationCriteria.conceptualUnderstanding || 0,
+        keywordAccuracy: keyData.evaluationCriteria.keywordAccuracy || 0,
+        completeness: keyData.evaluationCriteria.completeness || 0,
+        correctness: keyData.evaluationCriteria.correctness || 0,
+      };
+    }
+  }
+
+  // Update properties
+  if (keyData.modelAnswer !== undefined) {
+    question.modelAnswer = keyData.modelAnswer.trim();
+  }
+  if (keyData.keywords !== undefined) {
+    const cleanedKeywords = [
+      ...new Set(keyData.keywords.map((k) => k.trim()).filter((k) => k.length > 0)),
+    ];
+    question.keywords = cleanedKeywords;
+  }
+  if (keyData.expectedAnswerLength !== undefined) {
+    question.expectedAnswerLength = keyData.expectedAnswerLength;
+  }
+  if (keyData.evaluationCriteria !== undefined) {
+    question.evaluationCriteria = targetCriteria;
+  }
+  if (keyData.partialMarkingRules !== undefined) {
+    question.partialMarkingRules = keyData.partialMarkingRules;
+  }
+
+  exam.updatedBy = userId;
+  await exam.save();
+
+  logger.info(`Answer key updated for question ${questionId} in exam ${examId} by user ${userId}`);
+  return exam;
+};
+
+export const finalizeAnswerKey = async (examId, userId) => {
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  if (exam.answerKeyStatus === "locked") {
+    return exam;
+  }
+
+  // Completeness check
+  const incompleteQuestions = [];
+
+  if (!exam.questions || exam.questions.length === 0) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "Answer key cannot be finalized because this exam has no questions."
+    );
+  }
+
+  for (const q of exam.questions) {
+    const issues = [];
+    if (!q.questionText || q.questionText.trim().length === 0) {
+      issues.push("Question text is missing");
+    }
+    if (!q.maximumMarks || q.maximumMarks <= 0) {
+      issues.push("Maximum marks is invalid");
+    }
+    if (!q.modelAnswer || q.modelAnswer.trim().length === 0) {
+      issues.push("Model answer is missing");
+    }
+
+    const criteriaSum = q.evaluationCriteria
+      ? (Number(q.evaluationCriteria.conceptualUnderstanding) || 0) +
+        (Number(q.evaluationCriteria.keywordAccuracy) || 0) +
+        (Number(q.evaluationCriteria.completeness) || 0) +
+        (Number(q.evaluationCriteria.correctness) || 0)
+      : 0;
+
+    const partialSum = (q.partialMarkingRules || []).reduce(
+      (sum, r) => sum + (Number(r.marks) || 0),
+      0
+    );
+
+    if (criteriaSum > q.maximumMarks) {
+      issues.push(
+        `Evaluation criteria total (${criteriaSum}) exceeds question maximum marks (${q.maximumMarks})`
+      );
+    }
+
+    if (partialSum > q.maximumMarks) {
+      issues.push(
+        `Partial marking rules total (${partialSum}) exceeds question maximum marks (${q.maximumMarks})`
+      );
+    }
+
+    if (issues.length > 0) {
+      incompleteQuestions.push({
+        questionNumber: q.questionNumber,
+        questionId: q._id,
+        issues,
+      });
+    }
+  }
+
+  if (incompleteQuestions.length > 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Answer key is incomplete", incompleteQuestions);
+  }
+
+  exam.answerKeyStatus = "locked";
+  exam.updatedBy = userId;
+  await exam.save();
+
+  logger.info(`Answer key finalized and locked for exam ${examId} by user ${userId}`);
+  return exam;
+};
+
+export const unlockAnswerKey = async (examId, userId, userRole) => {
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Verify authorization: only owner or Admin can unlock
+  const currentUser = await User.findById(userId);
+  const isOwner = exam.createdBy.toString() === userId.toString();
+  const isAdmin = userRole === ROLES.ADMIN || (currentUser && currentUser.role === ROLES.ADMIN);
+
+  if (!isOwner && !isAdmin) {
+    throw new ApiError(
+      STATUS_CODES.FORBIDDEN,
+      "Access denied. You do not have permission to unlock this answer key."
+    );
+  }
+
+  exam.answerKeyStatus = "draft";
+  exam.updatedBy = userId;
+  await exam.save();
+
+  logger.info(`Answer key unlocked for exam ${examId} by user ${userId}`);
+  return exam;
+};
+
 export default {
   createExam,
   getExamById,
@@ -327,4 +790,7 @@ export default {
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
+  updateQuestionAnswerKey,
+  finalizeAnswerKey,
+  unlockAnswerKey,
 };

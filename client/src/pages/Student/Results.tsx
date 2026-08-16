@@ -32,8 +32,8 @@ export const StudentResults: React.FC = () => {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {results.map((res) => {
-            const subjectName = res.id === 'eval-1' ? 'Data Structures and Algorithms' : 'Ethics and Safety in AI Systems';
+          {results.map((res: any) => {
+            const subjectName = res.subjectName || res.examName || 'Subject';
             const percentage = ((res.finalScore / res.totalScore) * 100).toFixed(1);
             return (
               <div key={res.id} className="glass-card p-6 rounded-2xl border border-outline-variant/20 flex flex-col justify-between bg-white dark:bg-surface-container hover:shadow-md transition-shadow">
@@ -43,7 +43,7 @@ export const StudentResults: React.FC = () => {
                       Grade {res.grade}
                     </span>
                     <h4 className="text-base font-bold text-on-surface mt-2 font-display">
-                      {subjectName}
+                      {subjectName} {res.subjectCode ? `(${res.subjectCode})` : ''}
                     </h4>
                     <p className="text-xs text-outline mt-1 font-semibold">Evaluation ID: #{res.id}</p>
                   </div>

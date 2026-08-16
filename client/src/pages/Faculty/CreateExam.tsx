@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../context/NotificationContext';
-import { adminService } from '../../services/admin.service';
+import { subjectService } from '../../services/subject.service';
+import { examService } from '../../services/exam.service';
 import { Subject } from '../../types';
-import { mockExams } from '../../mocks/db';
 
 interface QuestionInput {
   tempId: string;
@@ -31,9 +31,12 @@ const mockBankQuestions = [
 export const CreateExam: React.FC = () => {
   const { addToast } = useNotifications();
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = !!id;
 
   // Core Form State
   const [name, setName] = useState('');
+  const [examCode, setExamCode] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [department, setDepartment] = useState('Computer Science');
@@ -46,7 +49,7 @@ export const CreateExam: React.FC = () => {
   const [totalMarks, setTotalMarks] = useState(100);
   const [instructions, setInstructions] = useState('1. All answers must be hand-written on the digital canvas.\n2. iPad Stylus/Apple Pencil ONLY allowed.\n3. Make sure to review calculations before submitting.');
   const [passingMarks, setPassingMarks] = useState(40);
-  const [status, setStatus] = useState<'Draft' | 'Published'>('Draft');
+  const [status, setStatus] = useState<'Draft' | 'Published' | 'Active' | 'Completed'>('Draft');
 
   // Allowed Materials
   const [allowedMaterials, setAllowedMaterials] = useState<string[]>(['Apple Pencil ONLY']);
@@ -79,18 +82,61 @@ export const CreateExam: React.FC = () => {
   const [lastAutoSave, setLastAutoSave] = useState<string | null>(null);
   const [showBackupBanner, setShowBackupBanner] = useState(false);
 
-  // Load subjects
+  // Load subjects & load exam details if in edit mode
   useEffect(() => {
-    adminService.getSubjects().then((subs) => {
+    subjectService.getSubjects().then((subs) => {
       setSubjects(subs);
-      if (subs.length > 0) setSubjectId(subs[0].id);
+      if (subs.length > 0 && !isEditMode) setSubjectId(subs[0].id);
     });
 
-    const backup = localStorage.getItem('exam_draft_backup');
-    if (backup) {
-      setShowBackupBanner(true);
+    if (isEditMode) {
+      examService.getExamById(id!).then((ex) => {
+        setName(ex.title);
+        setExamCode(ex.examCode || '');
+        const subId = typeof ex.subject === 'object' ? ex.subject?._id || ex.subject?.id : ex.subject;
+        setSubjectId(subId || '');
+        setDepartment(ex.department || 'Computer Science');
+        setSemester(ex.semester || '5');
+        setExamType(ex.examType || 'Mid-Term');
+        if (ex.examDate) {
+          setDate(ex.examDate.split('T')[0]);
+        }
+        setStartTime(ex.startTime || '');
+        setEndTime(ex.endTime || '');
+        setDuration(ex.duration || 180);
+        setTotalMarks(ex.totalMarks || 100);
+        setInstructions(ex.instructions || '');
+        setPassingMarks(ex.passingMarks || 40);
+        setStatus(ex.examStatus || 'Draft');
+        setAllowedMaterials(ex.allowedMaterials || []);
+
+        if (ex.questions && ex.questions.length > 0) {
+          const qs = ex.questions.map((q: any, idx: number) => ({
+            tempId: q._id || q.id || `q-loaded-${idx}`,
+            questionNumber: q.questionNumber,
+            questionText: q.questionText,
+            maximumMarks: q.maximumMarks,
+            questionType: q.questionType,
+            difficulty: q.difficulty,
+            bloomsLevel: q.bloomsLevel,
+            keywords: q.keywords || '',
+            rubric: q.rubric || '',
+            modelAnswer: q.modelAnswer || '',
+            isCollapsed: true,
+          }));
+          setQuestions(qs);
+        }
+      }).catch((err) => {
+        console.error('Failed to pre-load exam info:', err);
+        addToast('Failed to load exam details for editing.', 'error');
+      });
+    } else {
+      const backup = localStorage.getItem('exam_draft_backup');
+      if (backup) {
+        setShowBackupBanner(true);
+      }
     }
-  }, []);
+  }, [id, isEditMode]);
 
   // Sync auto-save every 45 seconds if changes occurred
   useEffect(() => {
@@ -260,7 +306,7 @@ export const CreateExam: React.FC = () => {
   const isPublishEnabled = Object.values(checklist).every(v => v);
 
   // Submit Exam Creation
-  const handleSaveExam = (e: React.FormEvent) => {
+  const handleSaveExam = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (status === 'Published' && !isPublishEnabled) {
@@ -268,48 +314,61 @@ export const CreateExam: React.FC = () => {
       return;
     }
 
-    if (!name || !date) {
-      addToast('Please input title and schedule date.', 'error');
+    if (!name || !date || !examCode) {
+      addToast('Please input title, code, and schedule date.', 'error');
       return;
     }
 
-    // Success response
-    if (status === 'Published') {
-      const subject = subjects.find(s => s.id === subjectId);
-      const newExam: any = {
-        id: `exam-${Date.now()}`,
-        name: name,
-        subjectCode: subject ? subject.code : 'CS-101',
-        subjectName: subject ? subject.name : 'Data Structures and Algorithms',
-        date: date,
-        time: startTime || '10:00 AM',
-        durationMinutes: duration,
-        totalMarks: totalMarks,
-        status: date === new Date().toISOString().split('T')[0] ? 'today' : 'upcoming',
-        allowedMaterials: allowedMaterials,
-        instructions: instructions.split('\n').filter(line => line.trim().length > 0),
-        questions: questions.map(q => ({
-          number: q.questionNumber,
-          text: q.questionText,
-          maxMarks: q.maximumMarks,
-          expectedConcept: q.keywords,
-          bloomsLevel: q.bloomsLevel,
-          difficulty: q.difficulty
-        }))
-      };
-      // Pull mockExams from database and insert
-      if (mockExams) {
-        mockExams.push(newExam);
-      }
-    }
+    const payload: any = {
+      title: name,
+      examCode: examCode,
+      subject: subjectId,
+      department,
+      semester,
+      examType,
+      examDate: date,
+      startTime,
+      endTime,
+      duration,
+      totalMarks,
+      passingMarks,
+      instructions,
+      allowedMaterials,
+      examStatus: status,
+      questions: questions.map((q) => ({
+        questionNumber: q.questionNumber,
+        questionText: q.questionText,
+        maximumMarks: q.maximumMarks,
+        questionType: q.questionType,
+        difficulty: q.difficulty,
+        bloomsLevel: q.bloomsLevel,
+        keywords: q.keywords,
+        rubric: q.rubric,
+        modelAnswer: q.modelAnswer,
+      })),
+    };
 
-    addToast(
-      status === 'Published' 
-        ? 'Exam scheduled, questions integrated, and published successfully!' 
-        : 'Exam draft auto-saved successfully in registry.', 
-      'success'
-    );
-    navigate('/faculty');
+    try {
+      if (isEditMode) {
+        await examService.updateExam(id!, payload);
+        addToast('Exam configuration updated successfully!', 'success');
+      } else {
+        await examService.createExam(payload);
+        // Clear local backup
+        localStorage.removeItem('exam_draft_backup');
+        addToast(
+          status === 'Published'
+            ? 'Exam scheduled, questions integrated, and published successfully!'
+            : 'Exam draft created successfully in registry.',
+          'success'
+        );
+      }
+      navigate('/faculty/exams');
+    } catch (err: any) {
+      console.error('Save exam failed:', err);
+      const errMsg = err.response?.data?.message || err.message || 'Server error occurred.';
+      addToast(`Failed to save exam: ${errMsg}`, 'error');
+    }
   };
 
   // Simulated Answer Key file pick
@@ -465,16 +524,29 @@ export const CreateExam: React.FC = () => {
                 Section 1 – Exam Information
               </h3>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-outline uppercase tracking-wider">Exam Title *</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. OOP & DSA Final Exam"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="px-3 py-2 bg-surface-container rounded-xl border border-outline-variant/30 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2 flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-outline uppercase tracking-wider">Exam Title *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. OOP & DSA Final Exam"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant/30 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-outline uppercase tracking-wider">Exam Code *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. DSA-M2026"
+                    value={examCode}
+                    onChange={(e) => setExamCode(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant/30 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -980,10 +1052,12 @@ export const CreateExam: React.FC = () => {
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
-                  className="px-2.5 py-1.5 bg-surface-container rounded-lg border border-outline-variant/30 text-xs"
+                  className="px-2.5 py-1.5 bg-surface-container rounded-lg border border-outline-variant/30 text-xs font-semibold text-on-surface"
                 >
                   <option value="Draft">Draft (Save & Tweak later)</option>
                   <option value="Published">Published (Lock & Release)</option>
+                  <option value="Active">Active (Session Ongoing)</option>
+                  <option value="Completed">Completed (Grading / Review)</option>
                 </select>
               </div>
 

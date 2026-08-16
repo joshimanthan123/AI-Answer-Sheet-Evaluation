@@ -9,12 +9,12 @@ export const createExam = asyncHandler(async (req, res) => {
 });
 
 export const getExamById = asyncHandler(async (req, res) => {
-  const result = await examService.getExamById(req.params.id);
+  const result = await examService.getExamById(req.params.id, req.user._id, req.user.role);
   return sendSuccess(res, STATUS_CODES.OK, "Exam retrieved successfully", result);
 });
 
 export const getAllExams = asyncHandler(async (req, res) => {
-  const result = await examService.getAllExams(req.query);
+  const result = await examService.getAllExams(req.query, req.user._id, req.user.role);
   return sendSuccess(
     res,
     STATUS_CODES.OK,
@@ -66,6 +66,30 @@ export const reorderQuestions = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Questions reordered successfully", result);
 });
 
+export const updateQuestionAnswerKey = asyncHandler(async (req, res) => {
+  const examId = req.params.examId || req.params.id;
+  const { questionId } = req.params;
+  const result = await examService.updateQuestionAnswerKey(
+    examId,
+    questionId,
+    req.body,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Answer key question updated successfully", result);
+});
+
+export const finalizeAnswerKey = asyncHandler(async (req, res) => {
+  const examId = req.params.examId || req.params.id;
+  const result = await examService.finalizeAnswerKey(examId, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Answer key finalized and locked successfully", result);
+});
+
+export const unlockAnswerKey = asyncHandler(async (req, res) => {
+  const examId = req.params.examId || req.params.id;
+  const result = await examService.unlockAnswerKey(examId, req.user._id, req.user.role);
+  return sendSuccess(res, STATUS_CODES.OK, "Answer key unlocked successfully", result);
+});
+
 export default {
   createExam,
   getExamById,
@@ -77,4 +101,7 @@ export default {
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
+  updateQuestionAnswerKey,
+  finalizeAnswerKey,
+  unlockAnswerKey,
 };

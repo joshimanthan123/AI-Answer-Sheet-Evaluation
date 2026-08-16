@@ -20,8 +20,8 @@ export const registerValidator = [
   body("password")
     .notEmpty()
     .withMessage("Password is required")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters long"),
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters long"),
 
   body("role")
     .optional()
@@ -34,17 +34,17 @@ export const registerValidator = [
     .isLength({ max: 100 })
     .withMessage("Department cannot exceed 100 characters"),
 
-  body("employeeId")
+  body("lecturerId")
     .if(body("role").equals(ROLES.FACULTY))
     .trim()
     .notEmpty()
-    .withMessage("Employee ID is required for faculty accounts"),
+    .withMessage("Lecturer ID is required for faculty accounts"),
 
-  body("rollNo")
+  body("studentId")
     .if(body("role").equals(ROLES.STUDENT))
     .trim()
     .notEmpty()
-    .withMessage("Roll number is required for student accounts"),
+    .withMessage("Student ID is required for student accounts"),
 
   body("semester")
     .optional()

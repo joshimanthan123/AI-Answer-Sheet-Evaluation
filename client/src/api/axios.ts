@@ -26,7 +26,13 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    // Handle global API errors here (e.g. token expired)
+    if (error.response?.status === 401) {
+      localStorage.removeItem('gradeai_token');
+      localStorage.removeItem('gradeai_user');
+      if (!window.location.pathname.startsWith('/auth')) {
+        window.location.href = '/auth/login';
+      }
+    }
     return Promise.reject(error.response?.data || error.message);
   }
 );

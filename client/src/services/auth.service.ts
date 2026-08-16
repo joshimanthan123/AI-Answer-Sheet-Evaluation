@@ -1,87 +1,97 @@
 import { User } from '../types';
-import { mockUsers } from '../mocks/db';
+import apiClient from '../api/axios';
+import { API_ENDPOINTS } from '../api/endpoints';
 
 export const authService = {
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Fast credentials mock matching email
-        const user = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-        if (user) {
-          const mockToken = `mock-jwt-token-for-${user.role}`;
-          localStorage.setItem('gradeai_token', mockToken);
-          localStorage.setItem('gradeai_user', JSON.stringify(user));
-          resolve({ user, token: mockToken });
-        } else {
-          // Default fallbacks with credentials fallback for testing easiness
-          if (email.includes('student') || email.includes('fac') || email.includes('admin')) {
-            let role: 'student' | 'faculty' | 'admin' = 'student';
-            if (email.includes('fac')) role = 'faculty';
-            if (email.includes('admin')) role = 'admin';
-
-            const defaultUser: User = {
-              id: `user-${role}-default`,
-              name: `Demo ${role.toUpperCase()}`,
-              email,
-              role,
-              status: 'online',
-            };
-            const mockToken = `mock-jwt-token-for-${role}`;
-            localStorage.setItem('gradeai_token', mockToken);
-            localStorage.setItem('gradeai_user', JSON.stringify(defaultUser));
-            resolve({ user: defaultUser, token: mockToken });
-          } else {
-            reject(new Error('Invalid email or password'));
-          }
-        }
-      }, 800);
-    });
+    const response = await apiClient.post<any, any>(API_ENDPOINTS.AUTH.LOGIN, { email, password });
+    const { user, token } = response.data;
+    localStorage.setItem('gradeai_token', token);
+    localStorage.setItem('gradeai_user', JSON.stringify(user));
+    return { user, token };
   },
 
-  register: async (name: string, email: string, role: 'student' | 'faculty' | 'admin'): Promise<{ user: User; token: string }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newUser: User = {
-          id: `user-${role}-${Date.now()}`,
-          name,
-          email,
-          role,
-          status: 'online',
-        };
-        const mockToken = `mock-jwt-token-for-${role}`;
-        localStorage.setItem('gradeai_token', mockToken);
-        localStorage.setItem('gradeai_user', JSON.stringify(newUser));
-        resolve({ user: newUser, token: mockToken });
-      }, 800);
+  register: async (
+    name: string,
+    email: string,
+    role: 'student' | 'faculty' | 'admin',
+    password?: string,
+    confirmPassword?: string,
+    lecturerId?: string,
+    studentId?: string
+  ): Promise<{ user: User; message?: string }> => {
+    const response = await apiClient.post<any, any>(API_ENDPOINTS.AUTH.REGISTER, {
+      name,
+      email,
+      role,
+      password,
+      confirmPassword,
+      lecturerId,
+      studentId,
     });
+    // In our register flow, we direct to /login and do NOT auto-login.
+    return response.data || response;
   },
 
   forgotPassword: async (email: string): Promise<{ message: string }> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email.includes('@')) {
-          resolve({ message: 'A password reset link has been dispatched to your email address.' });
-        } else {
-          reject(new Error('Invalid email address'));
-        }
-      }, 600);
-    });
+    const response = await apiClient.post<any, any>(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
+    return { message: response.message || 'A password reset link has been dispatched to your email address.' };
   },
 
   getMe: async (): Promise<User | null> => {
-    return new Promise((resolve) => {
+    try {
+      const response = await apiClient.get<any, any>(API_ENDPOINTS.AUTH.ME);
+      const user = response.data?.user || response.data;
+      if (user) {
+        localStorage.setItem('gradeai_user', JSON.stringify(user));
+        return user;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to retrieve session from server', err);
       const stored = localStorage.getItem('gradeai_user');
       if (stored) {
-        resolve(JSON.parse(stored));
-      } else {
-        resolve(null);
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return null;
+        }
       }
-    });
+      return null;
+    }
   },
 
   logout: async (): Promise<void> => {
-    localStorage.removeItem('gradeai_token');
-    localStorage.removeItem('gradeai_user');
+    try {
+      await apiClient.post(API_ENDPOINTS.AUTH.LOGIN.replace('/login', '/logout'));
+    } catch (err) {
+      console.error('Logout request failed', err);
+    } finally {
+      localStorage.removeItem('gradeai_token');
+      localStorage.removeItem('gradeai_user');
+    }
+  },
+
+  updateProfile: async (data: FormData | { name: string; email?: string }): Promise<User> => {
+    const storedUser = JSON.parse(localStorage.getItem('gradeai_user') || '{}');
+    const role = storedUser.role;
+    const isStudent = role === 'student';
+    const endpoint = isStudent ? '/student/profile' : '/faculty/profile';
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    const method = isStudent ? 'patch' : 'put';
+
+    const response = await apiClient[method]<any, any>(endpoint, data, { headers });
+    const user = response.data?.user || response.data;
+    localStorage.setItem('gradeai_user', JSON.stringify(user));
+    return user;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> => {
+    await apiClient.put('/faculty/change-password', {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    });
   }
 };
 export default authService;

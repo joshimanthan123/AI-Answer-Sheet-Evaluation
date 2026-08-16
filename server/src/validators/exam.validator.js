@@ -122,6 +122,55 @@ export const examValidator = [
     .withMessage("Difficulty must be Descriptive, Short Answer, Long Answer, MCQ, or True/False"),
 ];
 
+export const answerKeyValidator = [
+  body("modelAnswer").optional().trim(),
+  body("keywords").optional().isArray().withMessage("Keywords must be an array of strings"),
+  body("keywords.*").trim().notEmpty().withMessage("Keyword cannot be empty"),
+  body("expectedAnswerLength")
+    .optional()
+    .isIn(["short", "medium", "long"])
+    .withMessage("expectedAnswerLength must be short, medium, or long"),
+  body("evaluationCriteria")
+    .optional()
+    .custom((val) => {
+      if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+        const allowedKeys = [
+          "conceptualUnderstanding",
+          "keywordAccuracy",
+          "completeness",
+          "correctness",
+        ];
+        for (const k of Object.keys(val)) {
+          if (!allowedKeys.includes(k)) {
+            throw new Error(`Invalid criteria key: ${k}`);
+          }
+          if (typeof val[k] !== "number" || val[k] < 0) {
+            throw new Error(`Criteria value for ${k} must be a non-negative number`);
+          }
+        }
+      } else if (Array.isArray(val)) {
+        for (const item of val) {
+          if (!item.name || typeof item.marks !== "number" || item.marks < 0) {
+            throw new Error("Each array criterion must contain a name and non-negative marks");
+          }
+        }
+      }
+      return true;
+    }),
+  body("partialMarkingRules")
+    .optional()
+    .isArray()
+    .withMessage("partialMarkingRules must be an array"),
+  body("partialMarkingRules.*.criterion")
+    .trim()
+    .notEmpty()
+    .withMessage("Partial marking criterion name is required"),
+  body("partialMarkingRules.*.marks")
+    .isFloat({ min: 0 })
+    .withMessage("Partial marking marks must be a non-negative number"),
+];
+
 export default {
   examValidator,
+  answerKeyValidator,
 };

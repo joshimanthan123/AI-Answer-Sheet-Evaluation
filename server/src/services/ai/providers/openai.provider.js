@@ -76,6 +76,10 @@ export class OpenAiLlmProvider {
           weaknesses: parsed.weaknesses,
           suggestions: parsed.suggestions || "",
           justification: parsed.justification,
+          confidence: Number(parsed.confidence) || 0.85,
+          criteriaScores: parsed.criteriaScores || [],
+          matchedKeywords: parsed.matchedKeywords || [],
+          missingKeywords: parsed.missingKeywords || [],
           tokensUsed: {
             promptTokens: data.usage?.prompt_tokens || 0,
             completionTokens: data.usage?.completion_tokens || 0,

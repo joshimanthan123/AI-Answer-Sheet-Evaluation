@@ -97,8 +97,11 @@ export class AnswerKeyService {
   }
 
   async getAnswerKey(examId) {
-    let answerKey = await AnswerKey.findOne({ examId, isActive: true, uploadStatus: "Approved" })
-      .populate("uploadedBy", "name email");
+    let answerKey = await AnswerKey.findOne({
+      examId,
+      isActive: true,
+      uploadStatus: "Approved",
+    }).populate("uploadedBy", "name email");
 
     if (!answerKey) {
       answerKey = await AnswerKey.findOne({ examId })

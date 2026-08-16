@@ -48,3 +48,7 @@ test_3page.pdf
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+# Credentials
+google-credentials/
+gcp-credentials*.json

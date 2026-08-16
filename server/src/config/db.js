@@ -20,6 +20,48 @@ const connectDB = async () => {
       databaseState = "Connected";
       // eslint-disable-next-line no-console
       console.log(`[Database] MongoDB Connected: ${conn.connection.host}`);
+
+      if (env.NODE_ENV !== "production") {
+        try {
+          const User = (await import("../models/User.js")).default;
+          // Seed Test Faculty
+          const facultyEmail = "faculty@test.com";
+          const hasFaculty = await User.findOne({ email: facultyEmail });
+          if (!hasFaculty) {
+            await User.create({
+              name: "Test Faculty",
+              email: facultyEmail,
+              password: "Password123",
+              role: "faculty",
+              lecturerId: "FAC001",
+              employeeId: "FAC001",
+              isActive: true,
+            });
+            // eslint-disable-next-line no-console
+            console.log("[Database Seed] Created Test Faculty: faculty@test.com / Password123");
+          }
+
+          // Seed Test Student
+          const studentEmail = "student@test.com";
+          const hasStudent = await User.findOne({ email: studentEmail });
+          if (!hasStudent) {
+            await User.create({
+              name: "Test Student",
+              email: studentEmail,
+              password: "Password123",
+              role: "student",
+              studentId: "STU001",
+              rollNo: "STU001",
+              isActive: true,
+            });
+            // eslint-disable-next-line no-console
+            console.log("[Database Seed] Created Test Student: student@test.com / Password123");
+          }
+        } catch (seedErr) {
+          // eslint-disable-next-line no-console
+          console.error(`[Database Seed] Seeding warning: ${seedErr.message}`);
+        }
+      }
       return;
     } catch (error) {
       retries++;

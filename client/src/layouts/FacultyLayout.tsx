@@ -19,13 +19,14 @@ export const FacultyLayout: React.FC = () => {
     {
       category: 'Main',
       items: [
-        { name: 'Dashboard', path: '/faculty', icon: 'dashboard' }
+        { name: 'Dashboard', path: '/faculty', icon: 'dashboard' },
+        { name: 'Subjects', path: '/faculty/subjects', icon: 'library_books' }
       ]
     },
     {
       category: 'Exams',
       items: [
-        { name: 'Create Exam', path: '/faculty/create-exam', icon: 'note_add' },
+        { name: 'Exams List', path: '/faculty/exams', icon: 'assignment' },
         { name: 'Question Bank', path: '/faculty/question-bank', icon: 'menu_book' },
         { name: 'Upload Answer Key', path: '/faculty/upload-answer-key', icon: 'upload_file' },
         { name: 'Model Answers', path: '/faculty/model-answers', icon: 'file_copy' }

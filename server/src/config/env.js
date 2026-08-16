@@ -36,9 +36,9 @@ const env = {
   MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017/ai_evaluation_db",
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:5173",
   JWT: {
-    ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
+    ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET,
     REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
-    ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || "15m",
+    ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || process.env.JWT_EXPIRES_IN || "15m",
     REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || "7d",
   },
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE || "10485760", 10), // Default 10MB

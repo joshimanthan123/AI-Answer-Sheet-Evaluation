@@ -126,6 +126,49 @@ const answerSheetSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    studentIdentifier: {
+      type: String,
+      trim: true,
+    },
+    facultyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+    processingStatus: {
+      type: String,
+      enum: ["uploaded", "processing", "completed", "failed", "ready_for_evaluation"],
+      default: "uploaded",
+      index: true,
+    },
+    ocrStatus: {
+      type: String,
+      enum: ["pending", "processing", "completed", "failed"],
+      default: "pending",
+    },
+    segmentationStatus: {
+      type: String,
+      enum: ["pending", "processing", "completed", "failed"],
+      default: "pending",
+    },
+    errorMessage: {
+      type: String,
+      trim: true,
+    },
+    pages: [
+      {
+        pageNumber: Number,
+        originalFileReference: String,
+        processedFileReference: String,
+        width: Number,
+        height: Number,
+        processingStatus: String,
+      },
+    ],
+    extractedText: {
+      type: String,
+      trim: true,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

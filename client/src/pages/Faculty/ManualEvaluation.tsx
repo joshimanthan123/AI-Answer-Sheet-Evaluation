@@ -1,118 +1,266 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { facultyService } from '../../services/faculty.service';
 import { evaluationService } from '../../services/evaluation.service';
+import answerSheetService from '../../services/answerSheet.service';
+import { examService, Exam } from '../../services/exam.service';
 import { useNotifications } from '../../context/NotificationContext';
-import { AnswerSheet, Evaluation, EvaluationDetail } from '../../types';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { AnswerSheetViewer } from '../../components/AnswerSheetViewer';
 
+interface EvaluationQuestionDetail {
+  _id?: string;
+  questionId: string;
+  recognizedText: string;
+  studentAnswer: string;
+  modelAnswer: string;
+  similarityScore: number;
+  aiMarks: number;
+  finalAwardedMarks?: number;
+  feedback: string;
+  confidence?: number;
+  criteriaScores?: Array<{
+    criterion: string;
+    marksAwarded: number;
+    maxMarks: number;
+  }>;
+  matchedKeywords?: string[];
+  missingKeywords?: string[];
+  wasOverridden?: boolean;
+  facultyComment?: string;
+  // Resolved info from Exam
+  questionNumber?: number;
+  questionText?: string;
+  maxMarks?: number;
+}
+
 export const FacultyManualEvaluation: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: sheetId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToast } = useNotifications();
 
-  const [sheet, setSheet] = useState<AnswerSheet | null>(null);
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
-  const [details, setDetails] = useState<EvaluationDetail[]>([]);
+  const [sheet, setSheet] = useState<any>(null);
+  const [evaluation, setEvaluation] = useState<any>(null);
+  const [questions, setQuestions] = useState<EvaluationQuestionDetail[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [finalizing, setFinalizing] = useState(false);
+  const [reEvaluating, setReEvaluating] = useState(false);
 
   // Accordion active index
   const [activeQuestionIdx, setActiveQuestionIdx] = useState<number | null>(0);
 
-  useEffect(() => {
-    if (!id) return;
-    const loadData = async () => {
-      try {
-        const [sheetObj, evalObj, questions] = await Promise.all([
-          facultyService.getPendingEvaluations().then(list => list.find(s => s.id === id) || null),
-          evaluationService.getEvaluationById('eval-1'), // use eval-1 as baseline template to populate manually
-          evaluationService.getEvaluationDetails('eval-1')
-        ]);
-        if (sheetObj) setSheet(sheetObj);
-        if (evalObj) setEvaluation(evalObj);
-        if (questions) setDetails(questions);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [id]);
+  // Form states matching current active question
+  const [overrideScore, setOverrideScore] = useState<string>('');
+  const [facultyFeedback, setFacultyFeedback] = useState<string>('');
 
-  const handleScoreChange = (index: number, score: number) => {
-    setDetails(prev => prev.map((q, idx) => {
-      if (idx === index) {
-        const val = Math.min(q.weight, Math.max(0, score));
-        return { ...q, score: val, status: val === q.weight ? 'match' : val === 0 ? 'miss' : 'partial' };
-      }
-      return q;
-    }));
-  };
-
-  const handleTextChange = (index: number, text: string) => {
-    setDetails(prev => prev.map((q, idx) => {
-      if (idx === index) {
-        return { ...q, studentAnswer: text };
-      }
-      return q;
-    }));
-  };
-
-  const getCalculatedTotal = () => {
-    return details.reduce((sum, q) => sum + q.score, 0);
-  };
-
-  const handleApproveGrade = async () => {
-    if (!id) return;
-    setSaving(true);
+  const loadData = async () => {
+    if (!sheetId) return;
     try {
-      const finalScore = getCalculatedTotal();
-      await facultyService.approveGrading(id, finalScore, details);
-      addToast(`Evaluation submitted and approved for student (Score: ${finalScore}/100)`, 'success');
-      navigate('/faculty/pending');
-    } catch (err) {
-      addToast('Approval failed.', 'error');
+      setLoading(true);
+      const sheetRes = await answerSheetService.getStudentSheetDetail(sheetId);
+      const sheetObj = sheetRes.data || sheetRes;
+      setSheet(sheetObj);
+
+      if (sheetObj && sheetObj.exam) {
+        const examId = typeof sheetObj.exam === 'object' ? sheetObj.exam._id || sheetObj.exam.id : sheetObj.exam;
+        const examObj = await examService.getExamById(examId);
+
+        const evalObj = await evaluationService.getEvaluationByAnswerSheetId(sheetId);
+        setEvaluation(evalObj);
+
+        if (evalObj && evalObj.questions) {
+          const resolvedQuestions = evalObj.questions.map((q: any) => {
+            const matchQ = examObj.questions.find((eq: any) => eq._id.toString() === q.questionId.toString());
+            return {
+              ...q,
+              questionNumber: matchQ ? matchQ.questionNumber : undefined,
+              questionText: matchQ ? matchQ.questionText : 'Question details not found.',
+              maxMarks: matchQ ? matchQ.maximumMarks : 10,
+            };
+          });
+          // Sort by question number
+          resolvedQuestions.sort((a: any, b: any) => (a.questionNumber || 0) - (b.questionNumber || 0));
+          setQuestions(resolvedQuestions);
+
+          // Populate initial form inputs for the first question
+          if (resolvedQuestions.length > 0) {
+            const first = resolvedQuestions[0];
+            setOverrideScore(String(first.finalAwardedMarks !== undefined ? first.finalAwardedMarks : first.aiMarks));
+            setFacultyFeedback(first.facultyComment || '');
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast(err.response?.data?.message || 'Failed to load evaluation details.', 'error');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadData();
+  }, [sheetId]);
+
+  // Sync inputs when changing active question accordion
+  useEffect(() => {
+    if (activeQuestionIdx !== null && questions[activeQuestionIdx]) {
+      const q = questions[activeQuestionIdx];
+      setOverrideScore(String(q.finalAwardedMarks !== undefined ? q.finalAwardedMarks : q.aiMarks));
+      setFacultyFeedback(q.facultyComment || '');
+    }
+  }, [activeQuestionIdx, questions]);
+
+  const handleSaveQuestionReview = async (idx: number) => {
+    if (!evaluation) return;
+    const q = questions[idx];
+    const scoreVal = Number(overrideScore);
+    const maxVal = q.maxMarks || 10;
+
+    if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > maxVal) {
+      addToast(`Please award valid marks between 0 and maximum allowed marks (${maxVal})`, 'warning');
+      return;
+    }
+
+    try {
+      setSavingId(q.questionId);
+      const res = await evaluationService.reviewQuestion(
+        evaluation._id, 
+        q.questionId, 
+        scoreVal, 
+        facultyFeedback
+      );
+      
+      addToast(`Saved marks override for Question ${q.questionNumber || idx + 1}.`, 'success');
+      
+      // Update local state
+      setQuestions(prev => prev.map((item, i) => {
+        if (i === idx) {
+          return {
+            ...item,
+            finalAwardedMarks: scoreVal,
+            facultyComment: facultyFeedback,
+            wasOverridden: true
+          };
+        }
+        return item;
+      }));
+
+      // Update evaluation obtainedMarks locally
+      if (res && res.obtainedMarks !== undefined) {
+        setEvaluation((prev: any) => ({
+          ...prev,
+          obtainedMarks: res.obtainedMarks,
+          percentage: res.percentage,
+          grade: res.grade
+        }));
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast(err.response?.data?.message || 'Failed to override question marks.', 'error');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleFinalize = async () => {
+    if (!evaluation) return;
+    try {
+      setFinalizing(true);
+      await evaluationService.finalizeEvaluation(evaluation._id);
+      addToast('Evaluation scores locked and finalized successfully.', 'success');
+      // Navigate back to the exam's answer sheets list
+      const examId = typeof sheet.exam === 'object' ? sheet.exam._id || sheet.exam.id : sheet.exam;
+      navigate(`/faculty/exams/${examId}/answer-sheets`);
+    } catch (err: any) {
+      console.error(err);
+      addToast(err.response?.data?.message || 'Failed to finalize evaluation.', 'error');
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
+  const handleReEvaluate = async () => {
+    if (!sheetId) return;
+    if (!window.confirm('Are you sure you want to reset all overrides and trigger AI re-evaluation?')) return;
+    try {
+      setReEvaluating(true);
+      await evaluationService.reEvaluate(sheetId);
+      addToast('AI re-evaluation triggered. Reloading workspace in a moment...', 'success');
+      setTimeout(() => {
+        loadData();
+        setReEvaluating(false);
+      }, 3000);
+    } catch (err: any) {
+      console.error(err);
+      addToast(err.response?.data?.message || 'Failed to trigger re-evaluation.', 'error');
+      setReEvaluating(false);
+    }
+  };
+
+  const getCalculatedTotal = () => {
+    return questions.reduce((sum, q) => sum + (q.finalAwardedMarks !== undefined ? q.finalAwardedMarks : q.aiMarks), 0);
+  };
+
+  const getMaxTotalMarks = () => {
+    return questions.reduce((sum, q) => sum + (q.maxMarks || 0), 0);
+  };
+
   if (loading) return <LoadingSpinner size="lg" className="py-20" />;
-  if (!sheet) return <p className="text-error font-bold">Answer script file not found.</p>;
+  if (!sheet) return <p className="text-error font-bold p-8">Answer sheet details not found.</p>;
+
+  const examTitle = typeof sheet.exam === 'object' ? sheet.exam.title : 'Exam Layout';
+  const studentName = sheet.student ? sheet.student.name : sheet.studentIdentifier || 'Candidate';
 
   return (
     <div className="flex flex-col gap-6 text-left animate-fade-in h-[calc(100vh-140px)]">
       {/* Header bar */}
-      <section className="flex flex-col md:flex-row md:items-center justify-between border-b border-outline-variant/30 pb-4 shrink-0">
+      <section className="flex flex-col md:flex-row md:items-center justify-between border-b border-outline-variant/30 pb-4 shrink-0 font-sans">
         <div>
           <nav className="flex items-center gap-2 text-[10px] font-semibold text-outline uppercase tracking-wider mb-1">
-            <Link to="/faculty/pending" className="hover:text-primary hover:underline">Pending Audits</Link>
+            <Link to="/faculty/exams" className="hover:text-primary hover:underline">Exams</Link>
             <span className="material-symbols-outlined text-xs">chevron_right</span>
-            <span className="text-primary font-bold">Evaluation Workspace</span>
+            <Link to={`/faculty/exams/${typeof sheet.exam === 'object' ? sheet.exam._id : sheet.exam}/answer-sheets`} className="hover:text-primary hover:underline">Answer Sheets</Link>
+            <span className="material-symbols-outlined text-xs">chevron_right</span>
+            <span className="text-primary font-bold">Review Workspace</span>
           </nav>
-          <h2 className="text-xl font-bold text-on-surface">Grading Workstation: {sheet.studentName}</h2>
-          <p className="text-xs text-on-surface-variant">Subject: {sheet.subjectName} | Exam: {sheet.examName}</p>
+          <h2 className="text-xl font-bold text-on-surface">Review Workstation: {studentName}</h2>
+          <p className="text-xs text-on-surface-variant">Exam: {examTitle} {sheet.student?.rollNo ? `| Student Roll: ${sheet.student.rollNo}` : ''}</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 mt-2 md:mt-0">
           <div className="text-right">
             <span className="text-2xl font-black text-primary font-display">{getCalculatedTotal()}</span>
-            <span className="text-xs text-outline font-semibold"> / 100 Marks</span>
+            <span className="text-xs text-outline font-semibold"> / {getMaxTotalMarks()} Marks</span>
+            {evaluation && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-primary/10 text-primary border border-primary/20">
+                GRADE {evaluation.grade || 'F'}
+              </span>
+            )}
           </div>
 
-          <Button 
-            onClick={handleApproveGrade} 
-            isLoading={saving}
-            variant="primary"
-            size="md"
-          >
-            Approve & Release
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleReEvaluate}
+              isLoading={reEvaluating}
+              variant="outline"
+              size="md"
+              title="Reset manual overrides and re-evaluate via AI"
+            >
+              Re-Evaluate
+            </Button>
+            <Button 
+              onClick={handleFinalize} 
+              isLoading={finalizing}
+              variant="primary"
+              size="md"
+              disabled={!evaluation || evaluation.evaluationStatus === 'finalized'}
+            >
+              {evaluation?.evaluationStatus === 'finalized' ? 'Finalized' : 'Finalize & Lock'}
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -121,142 +269,186 @@ export const FacultyManualEvaluation: React.FC = () => {
         
         {/* Left Panel: Scanned Answer Sheet Viewer */}
         <div className="lg:col-span-6 flex flex-col h-full overflow-hidden">
-          <AnswerSheetViewer sheetId={id || ''} isFaculty={true} />
+          <AnswerSheetViewer sheetId={sheetId || ''} isFaculty={true} />
         </div>
 
         {/* Right Panel: Interactive evaluation form accordions */}
-        <div className="lg:col-span-6 flex flex-col border border-outline-variant/30 rounded-2xl bg-white dark:bg-surface-container overflow-hidden h-full">
-          <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low shrink-0 select-none">
-            <h3 className="font-bold text-sm">Grading Rubric Checklist</h3>
+        <div className="lg:col-span-6 flex flex-col border border-outline-variant/30 rounded-2xl bg-white dark:bg-surface-container overflow-hidden h-full font-sans">
+          <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low shrink-0 select-none flex justify-between items-center">
+            <h3 className="font-bold text-xs uppercase tracking-wider text-outline">Interactive Audit Rubric</h3>
+            {evaluation && (
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border ${
+                evaluation.evaluationStatus === 'finalized'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+              }`}>
+                {evaluation.evaluationStatus}
+              </span>
+            )}
           </div>
 
           <div className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-4">
-            {details.map((q, idx) => {
-              const isOpen = activeQuestionIdx === idx;
-              return (
-                <div key={q.id} className="border border-outline-variant/30 rounded-2xl overflow-hidden text-left bg-surface-container-low">
-                  
-                  {/* Accordion header button */}
-                  <button 
-                    onClick={() => setActiveQuestionIdx(isOpen ? null : idx)}
-                    className="w-full px-5 py-4 flex items-center justify-between text-xs font-bold hover:bg-outline-variant/10 transition-colors cursor-pointer text-on-surface"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                        isOpen ? 'bg-primary text-on-primary' : 'bg-outline-variant text-[10px]'
-                      }`}>
-                        Q{q.questionNumber}
-                      </span>
-                      <span className="truncate max-w-[200px] md:max-w-xs">{q.questionText}</span>
-                    </span>
-
-                    <div className="flex items-center gap-4">
-                      {/* AI similarity threshold */}
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold flex items-center gap-1 ${
-                        q.status === 'match' ? 'bg-green-50 text-green-700' :
-                        q.status === 'partial' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
-                      }`}>
-                        <span className="material-symbols-outlined text-[10px] font-bold">
-                          {q.status === 'match' ? 'check_circle' : q.status === 'partial' ? 'help' : 'cancel'}
+            {questions.length === 0 ? (
+              <div className="text-center py-16 space-y-2">
+                <span className="material-symbols-outlined text-3xl text-outline-variant">error_outline</span>
+                <p className="text-xs text-outline italic">No question-wise AI evaluation results found.</p>
+              </div>
+            ) : (
+              questions.map((q, idx) => {
+                const isOpen = activeQuestionIdx === idx;
+                const activeScore = q.finalAwardedMarks !== undefined ? q.finalAwardedMarks : q.aiMarks;
+                return (
+                  <div key={q.questionId} className="border border-outline-variant/30 rounded-2xl overflow-hidden text-left bg-surface-container-low">
+                    
+                    {/* Accordion header button */}
+                    <button 
+                      onClick={() => setActiveQuestionIdx(isOpen ? null : idx)}
+                      className="w-full px-5 py-4 flex items-center justify-between text-xs font-bold hover:bg-outline-variant/10 transition-colors cursor-pointer text-on-surface"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          isOpen ? 'bg-primary text-on-primary' : 'bg-outline-variant text-[10px]'
+                        }`}>
+                          Q{q.questionNumber || idx + 1}
                         </span>
-                        {q.conceptMatch}% Match
+                        <span className="truncate max-w-[200px] md:max-w-xs">{q.questionText}</span>
                       </span>
 
-                      <span className="font-display font-black text-primary text-sm">{q.score} / {q.weight}</span>
-                      <span className="material-symbols-outlined text-outline">
-                        {isOpen ? 'expand_less' : 'expand_more'}
-                      </span>
-                    </div>
-                  </button>
+                      <div className="flex items-center gap-4">
+                        {q.wasOverridden && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] bg-amber-100 text-amber-800 uppercase font-black">
+                            Overridden
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold flex items-center gap-1 ${
+                          q.similarityScore >= 60 ? 'bg-green-50 text-green-700' :
+                          q.similarityScore >= 30 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+                        }`}>
+                          {q.similarityScore}% Match
+                        </span>
 
-                  {/* Accordion content */}
-                  {isOpen && (
-                    <div className="px-5 pb-5 border-t border-outline-variant/20 pt-4 flex flex-col gap-4 text-xs">
-                      
-                      {/* Grid flow: Student Handwriting vs OCR Recognized */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Student Handwriting (Stylus ink vector) */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="font-bold text-[10px] text-outline uppercase select-none">Original Student Handwriting (Apple Pencil splines)</label>
-                          <div className="border border-outline-variant/40 rounded-xl bg-slate-50 dark:bg-slate-900/50 p-4 h-[120px] flex items-center justify-center relative overflow-hidden select-none">
-                            {/* Stylus Ink Simulation SVG */}
-                            <svg className="w-full h-full stroke-primary dark:stroke-primary-light fill-none stroke-[2] opacity-80" viewBox="0 0 400 100">
-                              {q.questionNumber === 1 ? (
-                                <>
-                                  <path d="M 20,40 C 40,30 60,60 80,40 C 100,20 125,50 150,30" />
-                                  <path d="M 160,40 C 180,30 190,50 210,40 C 230,30 250,50 270,30" />
-                                  <path d="M 20,70 C 40,65 70,80 90,70 C 110,60 140,80 170,70" strokeDasharray="3 3" />
-                                </>
-                              ) : q.questionNumber === 2 ? (
-                                <>
-                                  <path d="M 10,30 Q 30,80 50,30 T 90,30" />
-                                  <path d="M 110,50 C 130,40 150,60 170,40 C 190,20 210,50 230,30" />
-                                </>
-                              ) : (
-                                <>
-                                  <path d="M 30,50 C 60,30 90,70 120,50 C 150,30 180,60 210,40" />
-                                  <path d="M 220,50 C 240,40 260,60 280,45" />
-                                </>
-                              )}
-                            </svg>
-                            <span className="absolute bottom-2 right-2 text-[9px] font-bold text-outline uppercase bg-surface-container px-1 py-0.2 rounded border border-outline-variant/10">Spline Stream</span>
+                        <span className="font-display font-black text-primary text-sm">{activeScore} / {q.maxMarks || 10}</span>
+                        <span className="material-symbols-outlined text-outline">
+                          {isOpen ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Accordion content */}
+                    {isOpen && (
+                      <div className="px-5 pb-5 border-t border-outline-variant/20 pt-4 flex flex-col gap-4 text-xs">
+                        
+                        {/* Student Handwriting vs OCR Recognized */}
+                        <div className="grid grid-cols-1 gap-4">
+                          {/* OCR Transcribed Student Response */}
+                          <div className="flex flex-col gap-1.5">
+                            <label className="font-bold text-[10px] text-outline uppercase select-none">OCR Digitized Text</label>
+                            <div className="w-full px-4 py-3 border border-outline-variant/30 rounded-xl bg-surface-container-lowest text-xs text-on-surface-variant font-semibold leading-relaxed min-h-[60px]">
+                              {q.recognizedText || <span className="italic text-outline">No handwriting detected for this question.</span>}
+                            </div>
                           </div>
                         </div>
 
-                        {/* OCR Transcribed Student Response */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="font-bold text-[10px] text-outline uppercase select-none">OCR Transcribed Student Response</label>
-                          <textarea 
-                            value={q.studentAnswer}
-                            onChange={(e) => handleTextChange(idx, e.target.value)}
-                            className="w-full px-4 py-3 border border-outline-variant/60 rounded-xl bg-white dark:bg-surface-container text-xs text-on-surface-variant font-medium focus:outline-none focus:border-primary transition-colors h-[120px] leading-relaxed resize-none"
-                          />
+                        {/* Reference expectation */}
+                        <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                          <p className="font-bold text-[10px] text-primary uppercase select-none">Instructor Model Answer</p>
+                          <p className="text-on-surface-variant font-semibold mt-1 leading-relaxed">{q.modelAnswer || 'No model answer provided.'}</p>
+                        </div>
+
+                        {/* Keyword Mapping List */}
+                        {((q.matchedKeywords && q.matchedKeywords.length > 0) || (q.missingKeywords && q.missingKeywords.length > 0)) && (
+                          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 space-y-2">
+                            <p className="font-bold text-[9px] text-outline uppercase select-none">Concept Keyword Audits</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {q.matchedKeywords?.map((kw, i) => (
+                                <span key={`match-${i}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-250">
+                                  ✓ {kw}
+                                </span>
+                              ))}
+                              {q.missingKeywords?.map((kw, i) => (
+                                <span key={`miss-${i}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-50 text-rose-800 border border-rose-250">
+                                  ✗ {kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Criteria Breakdowns list */}
+                        {q.criteriaScores && q.criteriaScores.length > 0 && (
+                          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 space-y-2">
+                            <p className="font-bold text-[9px] text-outline uppercase select-none">Grading Criteria Match</p>
+                            <div className="space-y-1.5">
+                              {q.criteriaScores.map((cs, i) => (
+                                <div key={i} className="flex justify-between items-center text-[10px] font-semibold">
+                                  <span className="text-on-surface-variant">{cs.criterion}</span>
+                                  <span className="text-primary font-black">{cs.marksAwarded} / {cs.maxMarks} Marks</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Recommended AI Score and justification */}
+                        <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 text-[11px] space-y-1">
+                          <div>
+                            <span className="text-outline font-bold">Concept Alignment:</span>
+                            <span className="ml-2 font-black text-secondary">{q.similarityScore}%</span>
+                          </div>
+                          <div>
+                            <span className="text-outline font-bold">Confidence score:</span>
+                            <span className="ml-2 font-black text-secondary">{Math.round((q.confidence || 0.85) * 100)}%</span>
+                          </div>
+                          <div>
+                            <span className="text-outline font-bold">Quantitative Justification:</span>
+                            <p className="text-on-surface-variant font-medium mt-1 leading-normal italic">
+                              {q.feedback || 'Evaluated out of partial answers.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Marks override inputs */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mt-2 pt-2 border-t border-outline-variant/20">
+                          <div className="col-span-1">
+                            <Input 
+                              label="Faculty Marks Override"
+                              type="number"
+                              max={q.maxMarks}
+                              min={0}
+                              step="0.5"
+                              value={overrideScore}
+                              onChange={(e) => setOverrideScore(e.target.value)}
+                              disabled={evaluation?.evaluationStatus === 'finalized'}
+                            />
+                          </div>
+                          <div className="col-span-2 flex gap-2 items-end">
+                            <div className="flex-grow">
+                              <Input 
+                                label="Override Justification Comment"
+                                placeholder="State reason or grading remark..."
+                                value={facultyFeedback}
+                                onChange={(e) => setFacultyFeedback(e.target.value)}
+                                disabled={evaluation?.evaluationStatus === 'finalized'}
+                              />
+                            </div>
+                            <Button 
+                              onClick={() => handleSaveQuestionReview(idx)}
+                              isLoading={savingId === q.questionId}
+                              disabled={evaluation?.evaluationStatus === 'finalized'}
+                              variant="outline"
+                              size="md"
+                            >
+                              Save Review
+                            </Button>
+                          </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* Reference expectation */}
-                      <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
-                        <p className="font-bold text-[10px] text-primary uppercase select-none">Model Answer (Instructor Solution Schema)</p>
-                        <p className="text-on-surface-variant font-semibold mt-1 leading-relaxed">{q.expectedAnswer}</p>
-                      </div>
-
-                      {/* Similarity & Score Metrics Row */}
-                      <div className="p-3 bg-surface-container rounded-xl flex flex-wrap justify-between items-center gap-4 border border-outline-variant/15 text-[11px]">
-                        <div>
-                          <span className="text-outline font-bold">Semantic NLP Similarity Index:</span>
-                          <span className="ml-2 font-black text-secondary">{q.conceptMatch}% Match</span>
-                        </div>
-                        <div>
-                          <span className="text-outline font-bold">Recommended AI Score:</span>
-                          <span className="ml-2 font-black text-primary">{Math.round(q.weight * (q.conceptMatch / 100))} / {q.weight} Marks</span>
-                        </div>
-                      </div>
-
-                      {/* Marks overwrite controls & comments comments */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                        <div className="col-span-1">
-                          <Input 
-                            label="Faculty Override Score"
-                            type="number"
-                            max={q.weight}
-                            min={0}
-                            value={String(q.score)}
-                            onChange={(e) => handleScoreChange(idx, Number(e.target.value))}
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <Input 
-                            label="Re-evaluation Feedback Comments"
-                            placeholder="Add evaluation remarks, concept notes..."
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 

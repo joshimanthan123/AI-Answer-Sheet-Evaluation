@@ -1,53 +1,81 @@
-import { Evaluation, EvaluationDetail } from '../types';
-import { 
-  mockEvaluations, 
-  mockEvaluationDetails, 
-  mockStudentTermTrends, 
-  mockFacultyTopicTrends, 
-  mockDefaultMetrics 
-} from '../mocks/db';
+import apiClient from '../api/axios';
+import { Evaluation } from '../types';
 
 export const evaluationService = {
-  getEvaluationById: async (evaluationId: string): Promise<Evaluation | undefined> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const evaluation = mockEvaluations.find(ev => ev.id === evaluationId);
-        resolve(evaluation);
-      }, 400);
-    });
+  getEvaluationById: async (evaluationId: string): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/v1/evaluations/${evaluationId}`);
+    const resData = response.data || response;
+    const finalData = resData.data || resData;
+    return finalData;
   },
 
-  getEvaluationDetails: async (evaluationId: string): Promise<EvaluationDetail[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const details = mockEvaluationDetails[evaluationId] || [];
-        resolve(details);
-      }, 500);
-    });
+  getEvaluationDetails: async (evaluationId: string): Promise<any[]> => {
+    const response = await apiClient.get<any, any>(`/v1/evaluations/${evaluationId}`);
+    const resData = response.data || response;
+    const finalData = resData.data || resData;
+    return finalData.questions || [];
   },
 
-  getAnalyticsMetrics: async (): Promise<typeof mockDefaultMetrics> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockDefaultMetrics);
-      }, 300);
-    });
+  getEvaluationByAnswerSheetId: async (sheetId: string): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/v1/evaluations?answerSheet=${sheetId}`);
+    const resData = response.data || response;
+    const finalData = resData.data || resData;
+    if (Array.isArray(finalData)) {
+      return finalData.length > 0 ? finalData[0] : null;
+    }
+    return finalData;
   },
 
-  getStudentTrends: async (): Promise<typeof mockStudentTermTrends> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockStudentTermTrends);
-      }, 300);
-    });
+  startEvaluation: async (sheetId: string): Promise<any> => {
+    const response = await apiClient.post<any, any>(`/v1/answer-sheets/${sheetId}/evaluate`);
+    const resData = response.data || response;
+    return resData.data || resData;
   },
 
-  getFacultyTopicTrends: async (): Promise<typeof mockFacultyTopicTrends> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockFacultyTopicTrends);
-      }, 300);
+  bulkEvaluate: async (examId: string, answerSheetIds?: string[]): Promise<any> => {
+    const response = await apiClient.post<any, any>(`/v1/exams/${examId}/evaluate`, { answerSheetIds });
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+
+  reEvaluate: async (sheetId: string): Promise<any> => {
+    const response = await apiClient.post<any, any>(`/v1/answer-sheets/${sheetId}/re-evaluate`);
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+
+  reviewQuestion: async (evaluationId: string, questionId: string, finalAwardedMarks: number, facultyComment: string, overrideReason?: string): Promise<any> => {
+    const response = await apiClient.put<any, any>(`/v1/evaluations/${evaluationId}/questions/${questionId}/review`, {
+      finalAwardedMarks,
+      facultyComment,
+      overrideReason
     });
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+
+  finalizeEvaluation: async (evaluationId: string): Promise<any> => {
+    const response = await apiClient.post<any, any>(`/v1/evaluations/${evaluationId}/finalize`);
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+  
+  getAnalyticsMetrics: async (): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/v1/evaluations/analytics/metrics`);
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+
+  getStudentTrends: async (): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/v1/evaluations/analytics/student-trends`);
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+
+  getFacultyTopicTrends: async (): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/v1/evaluations/analytics/faculty-trends`);
+    const resData = response.data || response;
+    return resData.data || resData;
   }
 };
 

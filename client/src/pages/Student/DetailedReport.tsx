@@ -252,7 +252,16 @@ export const StudentDetailedReport: React.FC = () => {
           size="xl"
         >
           <div className="min-h-[500px]">
-            <AnswerSheetViewer sheetId={evaluation.answerSheetId || 'attempt-1'} isFaculty={false} />
+            <AnswerSheetViewer
+              sheetId={
+                evaluation.answerSheetId ||
+                (typeof (evaluation as any).answerSheet === 'object' && (evaluation as any).answerSheet !== null
+                  ? ((evaluation as any).answerSheet._id || (evaluation as any).answerSheet.id)
+                  : (evaluation as any).answerSheet) ||
+                'attempt-1'
+              }
+              isFaculty={false}
+            />
           </div>
         </Modal>
       )}

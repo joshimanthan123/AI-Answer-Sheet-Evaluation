@@ -42,18 +42,29 @@ export const UploadAnswerSheet: React.FC = () => {
       }
     });
 
-    // Seed mock upload attempt log
-    setAttempts([
-      {
-        id: 'attempt-1',
-        attemptNo: 1,
-        fileName: 'Alex_Johnson_DSA_Attempt1_draft.pdf',
-        fileSize: '3.4 MB',
-        uploadStatus: 'Failed',
-        submittedAt: '2026-07-31 10:15 AM'
-      }
-    ]);
+    loadAttempts();
   }, []);
+
+  const loadAttempts = async () => {
+    try {
+      const res = await answerSheetService.listStudentSheets();
+      const data = res.data?.data || res.data || [];
+      const mapped = data.map((sheet: any, idx: number) => ({
+        id: sheet._id || sheet.id,
+        attemptNo: idx + 1,
+        fileName: sheet.original_filename || sheet.fileName,
+        fileSize: sheet.fileSize || 'N/A',
+        uploadStatus: sheet.processing_status || sheet.uploadStatus || 'Uploaded',
+        submittedAt: sheet.uploaded_at ? new Date(sheet.uploaded_at).toLocaleString() : 'N/A',
+        obtainedMarks: sheet.obtainedMarks,
+        totalMarks: sheet.totalMarks,
+        grade: sheet.grade
+      }));
+      setAttempts(mapped);
+    } catch (err) {
+      console.error('Failed to load attempts:', err);
+    }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -100,8 +111,6 @@ export const UploadAnswerSheet: React.FC = () => {
       const result: any = await answerSheetService.uploadAnswerSheet(selectedFile, selectedExamId);
 
       if (result.success && result.data) {
-        const sheetData = result.data;
-        
         setActiveStep(1); // HWR Processing
         await new Promise((r) => setTimeout(r, 1000));
         
@@ -112,66 +121,15 @@ export const UploadAnswerSheet: React.FC = () => {
         await new Promise((r) => setTimeout(r, 1000));
 
         setIsUploading(false);
-
-        const newAttemptNo = attempts.length + 1;
-        const newLogItem: AttemptLog = {
-          id: sheetData.id,
-          attemptNo: newAttemptNo,
-          fileName: selectedFile.name,
-          fileSize: `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`,
-          uploadStatus: 'Faculty Review',
-          submittedAt: new Date().toLocaleString()
-        };
-
-        setAttempts(prev => [newLogItem, ...prev]);
         setSelectedFile(null);
+        await loadAttempts();
       } else {
         throw new Error('API submission returned success=false');
       }
     } catch (err) {
-      console.warn('FastAPI backend request failed, falling back to simulated pipeline ingestion:', err);
-      // Fallback simulated flow:
-      setActiveStep(1);
-      setTimeout(() => {
-        setActiveStep(2);
-        setTimeout(() => {
-          setActiveStep(3);
-          setTimeout(() => {
-            setIsUploading(false);
-            
-            const newAttemptNo = attempts.length + 1;
-            const attemptId = `attempt-${Date.now()}`;
-            const newLogItem: AttemptLog = {
-              id: attemptId,
-              attemptNo: newAttemptNo,
-              fileName: selectedFile.name,
-              fileSize: `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`,
-              uploadStatus: 'Faculty Review',
-              submittedAt: new Date().toLocaleString()
-            };
-
-            const selectedExamObj = exams.find(ex => ex.id === selectedExamId);
-            const newSheetItem: any = {
-              id: attemptId,
-              studentId: 'stud-1',
-              studentName: 'Alex Johnson',
-              subjectId: selectedExamObj ? selectedExamObj.subjectCode : 'CS-101',
-              subjectName: selectedExamObj ? selectedExamObj.subjectName : 'Data Structures and Algorithms',
-              examId: selectedExamId,
-              examName: selectedExamObj ? selectedExamObj.name : 'Scanned Sheet Exam',
-              date: new Date().toISOString().split('T')[0],
-              fileUrl: '#',
-              fileName: selectedFile.name,
-              status: 'pending'
-            };
-            mockAnswerSheets.push(newSheetItem);
-
-            setAttempts(prev => [newLogItem, ...prev]);
-            setSelectedFile(null);
-
-          }, 1500);
-        }, 1500);
-      }, 1500);
+      console.error('OCR pipeline upload failed:', err);
+      setIsUploading(false);
+      alert('Answer sheet upload failed. Please verify that the OCR FastAPI backend service is running.');
     }
   };
 

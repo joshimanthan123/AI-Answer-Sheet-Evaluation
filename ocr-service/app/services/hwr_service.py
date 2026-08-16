@@ -6,6 +6,7 @@ from app.models.hwr_models import HWRResult
 from app.providers.base_provider import IHWRProvider
 from app.providers.mock_provider import MockProvider
 from app.providers.azure_provider import AzureProvider, AzureProviderError
+from app.providers.google_vision_provider import GoogleVisionProviderError
 from app.utils.image_utils import validate_image
 
 logger = logging.getLogger("app.services.hwr_service")
@@ -76,9 +77,17 @@ class HandwritingRecognitionService:
                 raise HWRServiceError(f"Azure configuration error: {str(ape)}") from ape
             except Exception as e:
                 raise HWRServiceError(f"Failed to instantiate Azure provider: {str(e)}") from e
+        elif name == "google_vision":
+            try:
+                from app.providers.google_vision_provider import GoogleVisionHWRProvider
+                return GoogleVisionHWRProvider()
+            except GoogleVisionProviderError as gvpe:
+                raise HWRServiceError(f"Google Vision configuration error: {str(gvpe)}") from gvpe
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate Google Vision provider: {str(e)}") from e
         else:
             raise HWRServiceError(
-                f"Unsupported HWR provider '{provider_name}'. Supported elements are: 'mock', 'azure', 'paddle'."
+                f"Unsupported HWR provider '{provider_name}'. Supported elements are: 'mock', 'azure', 'paddle', 'google_vision'."
             )
 
     @classmethod
@@ -121,6 +130,9 @@ class HandwritingRecognitionService:
         except AzureProviderError as ape:
             # Map specific provider exceptions to service exceptions
             raise HWRServiceError(f"Azure HWR Engine failure: {str(ape)}") from ape
+        except GoogleVisionProviderError as gvpe:
+            # Map Google Vision exceptions to service exceptions
+            raise HWRServiceError(f"Google Vision HWR Engine failure: {str(gvpe)}") from gvpe
         except Exception as e:
             # Catch unexpected downstream errors
             raise HWRServiceError(f"Unexpected error in handwriting recognition provider: {str(e)}") from e

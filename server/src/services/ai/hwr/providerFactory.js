@@ -6,11 +6,11 @@ export class HwrProviderFactory {
   static getProvider() {
     const provider = env.AI?.HWR_PROVIDER || "mock";
     switch (provider.toLowerCase()) {
-    case "azure":
-      return new AzureHwrProvider();
-    case "mock":
-    default:
-      return new MockHwrProvider();
+      case "azure":
+        return new AzureHwrProvider();
+      case "mock":
+      default:
+        return new MockHwrProvider();
     }
   }
 }

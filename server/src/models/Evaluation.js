@@ -31,6 +31,59 @@ const questionEvaluationSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  studentAnswer: {
+    type: String,
+    trim: true,
+  },
+  aiAwardedMarks: {
+    type: Number,
+    default: 0,
+  },
+  finalAwardedMarks: {
+    type: Number,
+  },
+  wasOverridden: {
+    type: Boolean,
+    default: false,
+  },
+  overrideReason: {
+    type: String,
+    trim: true,
+  },
+  facultyComment: {
+    type: String,
+    trim: true,
+  },
+  keywordScore: {
+    type: Number,
+    default: 0,
+  },
+  semanticScore: {
+    type: Number,
+    default: 0,
+  },
+  confidence: {
+    type: Number,
+    default: 0,
+  },
+  matchedKeywords: {
+    type: [String],
+    default: [],
+  },
+  missingKeywords: {
+    type: [String],
+    default: [],
+  },
+  criteriaScores: [
+    {
+      criterion: { type: String, trim: true },
+      marksAwarded: { type: Number, default: 0 },
+      maxMarks: { type: Number, default: 0 },
+    },
+  ],
+  evaluationMetadata: {
+    type: mongoose.Schema.Types.Mixed,
+  },
 });
 
 const evaluationSchema = new mongoose.Schema(
@@ -89,6 +142,14 @@ const evaluationSchema = new mongoose.Schema(
           "FACULTY_REVIEW",
           "PUBLISHED",
           "FAILED",
+          // Lowercase lifecycle status mappings
+          "pending",
+          "queued",
+          "processing",
+          "completed",
+          "reviewed",
+          "finalized",
+          "failed",
         ],
         message: "Invalid evaluation status",
       },

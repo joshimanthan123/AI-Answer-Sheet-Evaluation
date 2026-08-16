@@ -1,6 +1,16 @@
 import apiClient from '../api/axios';
 import { mockAnswerSheets } from '../mocks/db';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OBJECT_ID_REGEX = /^[0-9a-f]{24}$/i;
+
+const isRealSheetId = (id: string) => {
+  console.log('[Digital Viewer] sheetId:', id);
+  console.log('[Digital Viewer] Is UUID:', UUID_REGEX.test(id));
+  console.log('[Digital Viewer] Is MongoDB ObjectId:', OBJECT_ID_REGEX.test(id));
+  return UUID_REGEX.test(id) || OBJECT_ID_REGEX.test(id);
+};
+
 const getAuthHeaders = () => {
   const userJson = localStorage.getItem('gradeai_user');
   if (userJson) {
@@ -55,7 +65,7 @@ export const answerSheetService = {
   },
 
   getStudentSheetDetail: async (id: string) => {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!isRealSheetId(id)) {
       const mockSheet = mockAnswerSheets.find(s => s.id === id) || mockAnswerSheets[0];
       return {
         success: true,
@@ -93,7 +103,7 @@ export const answerSheetService = {
   },
 
   getStudentSheetDigitalAnswers: async (id: string) => {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!isRealSheetId(id)) {
       return {
         success: true,
         data: [
@@ -115,8 +125,57 @@ export const answerSheetService = {
     return apiClient.get('/v1/faculty/answer-sheets', { headers });
   },
 
+  getExamAnswerSheets: async (examId: string) => {
+    const headers = getAuthHeaders();
+    return apiClient.get(`/v1/exams/${examId}/answer-sheets`, { headers });
+  },
+
+  uploadFacultySheets: async (
+    examId: string,
+    files: File[],
+    studentIdentifier?: string,
+    onProgress?: (percent: number) => void
+  ) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file); // Use 'files' field name as defined in multer array
+    });
+    formData.append('examId', examId);
+    if (studentIdentifier) {
+      formData.append('studentIdentifier', studentIdentifier);
+    }
+
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    
+    return apiClient.post('/v1/answer-sheets', formData, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 180000, // 3 minutes timeout
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      }
+    });
+  },
+
+  retryAnswerSheet: async (id: string) => {
+    const headers = getAuthHeaders();
+    return apiClient.post(`/v1/answer-sheets/${id}/retry`, {}, { headers });
+  },
+
+  deleteAnswerSheet: async (id: string) => {
+    const headers = getAuthHeaders();
+    return apiClient.delete(`/v1/answer-sheets/${id}`, { headers });
+  },
+
   getFacultySheetDetail: async (id: string) => {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!isRealSheetId(id)) {
       const mockSheet = mockAnswerSheets.find(s => s.id === id) || mockAnswerSheets[0];
       return {
         success: true,
@@ -154,7 +213,7 @@ export const answerSheetService = {
   },
 
   getFacultySheetDigitalAnswers: async (id: string) => {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!isRealSheetId(id)) {
       return {
         success: true,
         data: [
@@ -172,7 +231,7 @@ export const answerSheetService = {
   },
 
   getPageImageObjectURL: async (id: string, pageNumber: number, isFaculty = false, type: 'original' | 'processed' = 'original'): Promise<string> => {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!isRealSheetId(id)) {
       return 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000"><rect width="800" height="1000" fill="%23f0f4f9"/><text x="400" y="500" font-family="sans-serif" font-weight="bold" font-size="22" fill="%231a73e8" text-anchor="middle">Local Attempt Fallback Page Scan</text><text x="400" y="540" font-family="sans-serif" font-size="14" fill="%2370757a" text-anchor="middle">Bypassed remote endpoint checking for ID: ' + id + '</text></svg>';
     }
     const headers = getAuthHeaders();

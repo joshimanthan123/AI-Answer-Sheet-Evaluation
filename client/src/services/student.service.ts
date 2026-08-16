@@ -1,4 +1,5 @@
 import { Student, AnswerSheet, Evaluation, Feedback } from '../types';
+import apiClient from '../api/axios';
 import { 
   mockStudentProfile, 
   mockAnswerSheets, 
@@ -8,12 +9,20 @@ import {
 } from '../mocks/db';
 
 export const studentService = {
-  getProfile: async (studentId: string = 'stud-1'): Promise<Student> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockStudentProfile);
-      }, 500);
-    });
+  getDashboardData: async (): Promise<any> => {
+    const response = await apiClient.get<any, any>('/student/dashboard');
+    return response.data?.data || response.data;
+  },
+
+  getProfile: async (studentId: string = 'stud-1'): Promise<any> => {
+    const response = await apiClient.get<any, any>('/student/profile');
+    return response.data?.user || response.data;
+  },
+
+  updateProfile: async (data: FormData | { name: string; profilePhoto?: string }): Promise<any> => {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    const response = await apiClient.patch<any, any>('/student/profile', data, { headers });
+    return response.data?.user || response.data;
   },
 
   getEvaluations: async (studentId: string = 'stud-1'): Promise<AnswerSheet[]> => {
@@ -25,15 +34,9 @@ export const studentService = {
     });
   },
 
-  getResults: async (studentId: string = 'stud-1'): Promise<Evaluation[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const studentSheets = mockAnswerSheets.filter(sheet => sheet.studentId === studentId && sheet.status === 'evaluated');
-        const evalIds = studentSheets.map(s => s.evaluationId);
-        const results = mockEvaluations.filter(ev => evalIds.includes(ev.id));
-        resolve(results);
-      }, 500);
-    });
+  getResults: async (): Promise<any[]> => {
+    const response = await apiClient.get('/student/results');
+    return response.data?.data || response.data;
   },
 
   requestReevaluation: async (evaluationId: string): Promise<{ message: string }> => {
@@ -67,20 +70,54 @@ export const studentService = {
     });
   },
 
-  getExams: async (): Promise<any[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockExams);
-      }, 400);
-    });
+  getExams: async (params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<any> => {
+    const response = await apiClient.get('/student/exams', { params });
+    return response.data;
   },
 
-  getExamById: async (id: string): Promise<any | undefined> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockExams.find(e => e.id === id));
-      }, 300);
-    });
+  getExamById: async (examId: string): Promise<any> => {
+    const response = await apiClient.get(`/student/exams/${examId}`);
+    return response.data?.data || response.data;
+  },
+
+  getExamEligibility: async (examId: string): Promise<any> => {
+    const response = await apiClient.get(`/student/exams/${examId}/eligibility`);
+    return response.data?.data || response.data;
+  },
+
+  getExamWorkspace: async (examId: string): Promise<any> => {
+    const response = await apiClient.get(`/student/exams/${examId}/workspace`);
+    return response.data?.data || response.data;
+  },
+
+  startExam: async (examId: string): Promise<any> => {
+    const response = await apiClient.post(`/student/exams/${examId}/start`);
+    return response.data?.data || response.data;
+  },
+
+  autosaveExamAnswer: async (examId: string, payload: any): Promise<any> => {
+    const response = await apiClient.patch(`/student/exams/${examId}/autosave`, payload);
+    return response.data?.data || response.data;
+  },
+
+  submitExam: async (examId: string): Promise<any> => {
+    const response = await apiClient.post(`/student/exams/${examId}/submit`);
+    return response.data?.data || response.data;
+  },
+
+  getSubmissionStatus: async (examId: string): Promise<any> => {
+    const response = await apiClient.get(`/student/exams/${examId}/submission-status`);
+    return response.data?.data || response.data;
+  },
+
+  getExamResult: async (examId: string): Promise<any> => {
+    const response = await apiClient.get(`/student/exams/${examId}/result`);
+    return response.data?.data || response.data;
   }
 };
 

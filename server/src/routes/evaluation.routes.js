@@ -31,4 +31,22 @@ router
   )
   .delete(authorize(ROLES.ADMIN), evaluationController.deleteEvaluation);
 
+router
+  .route("/:id/questions/:questionId/review")
+  .put(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.reviewQuestion);
+
+router
+  .route("/:id/finalize")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.finalizeEvaluation);
+
+import * as resultsController from "../controllers/results.controller.js";
+
+router
+  .route("/:id/result")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.getIndividualResult);
+
+router
+  .route("/:id/report")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.downloadIndividualResultReport);
+
 export default router;

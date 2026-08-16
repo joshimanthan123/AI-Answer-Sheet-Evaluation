@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Subject from "../models/Subject.js";
 import Course from "../models/Course.js";
 import User from "../models/User.js";
@@ -7,13 +8,17 @@ import { ROLES } from "../constants/roles.js";
 
 export const createSubject = async (data, userId) => {
   // Validate course exists
-  const course = await Course.findOne({ _id: data.course, isDeleted: false });
+  const course = await Course.findOne({ _id: data.course, isDeleted: { $ne: true } });
   if (!course) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Course reference not found or is inactive");
   }
 
   // Validate faculty exists and has faculty role
-  const faculty = await User.findOne({ _id: data.faculty, isDeleted: false, role: ROLES.FACULTY });
+  const faculty = await User.findOne({
+    _id: data.faculty,
+    isDeleted: { $ne: true },
+    role: ROLES.FACULTY,
+  });
   if (!faculty) {
     throw new ApiError(
       STATUS_CODES.NOT_FOUND,
@@ -119,8 +124,14 @@ export const updateSubject = async (id, data, userId) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Subject not found");
   }
 
+  // Validate ownership
+  const user = await User.findById(userId);
+  if (user && user.role === ROLES.FACULTY && subject.faculty.toString() !== userId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this subject.");
+  }
+
   if (data.course) {
-    const course = await Course.findOne({ _id: data.course, isDeleted: false });
+    const course = await Course.findOne({ _id: data.course, isDeleted: { $ne: true } });
     if (!course) {
       throw new ApiError(STATUS_CODES.NOT_FOUND, "Course reference not found or is inactive");
     }
@@ -129,7 +140,7 @@ export const updateSubject = async (id, data, userId) => {
   if (data.faculty) {
     const faculty = await User.findOne({
       _id: data.faculty,
-      isDeleted: false,
+      isDeleted: { $ne: true },
       role: ROLES.FACULTY,
     });
     if (!faculty) {
@@ -172,6 +183,27 @@ export const deleteSubject = async (id, userId) => {
   const subject = await Subject.findOne({ _id: id, isDeleted: false });
   if (!subject) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Subject not found");
+  }
+
+  // Validate ownership
+  const user = await User.findById(userId);
+  if (user && user.role === ROLES.FACULTY && subject.faculty.toString() !== userId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this subject.");
+  }
+
+  // Check future dependent data (Exams)
+  try {
+    const Exam = mongoose.model("Exam");
+    const count = await Exam.countDocuments({ subject: id, isDeleted: false });
+    if (count > 0) {
+      throw new ApiError(
+        STATUS_CODES.CONFLICT,
+        "Cannot delete subject because active exams are linked to it."
+      );
+    }
+  } catch (err) {
+    if (err.name === "ApiError") throw err;
+    console.warn("Unable to perform exam dependency check:", err);
   }
 
   subject.isDeleted = true;

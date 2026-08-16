@@ -78,7 +78,7 @@ app.use(
       "/api/student/answer-sheets",
       "/api/v1/student/answer-sheets",
       "/api/faculty/answer-sheets",
-      "/api/v1/faculty/answer-sheets"
+      "/api/v1/faculty/answer-sheets",
     ],
     pathRewrite: (path) => {
       if (path.startsWith("/api/student/answer-sheets")) {

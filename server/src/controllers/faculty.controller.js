@@ -178,9 +178,81 @@ export const publishResults = asyncHandler(async (req, res) => {
   });
 });
 
+export const updateFacultyProfile = asyncHandler(async (req, res) => {
+  const { name, email } = req.body;
+
+  if (!name || name.trim().length < 2) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Name must be at least 2 characters long.");
+  }
+  if (!email) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Email address is required.");
+  }
+
+  const User = (await import("../models/User.js")).default;
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found.");
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Check unique constraints on email
+  if (normalizedEmail !== user.email) {
+    const emailExist = await User.findOne({ email: normalizedEmail });
+    if (emailExist) {
+      throw new ApiError(
+        STATUS_CODES.CONFLICT,
+        "An account has already been registered with this email address."
+      );
+    }
+  }
+
+  user.name = name.trim();
+  user.email = normalizedEmail;
+  await user.save();
+
+  return sendSuccess(res, STATUS_CODES.OK, "Profile updated successfully.", { user });
+});
+
+export const changeFacultyPassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "All fields are required.");
+  }
+  if (newPassword.length < 8) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "New password must be at least 8 characters long."
+    );
+  }
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Passwords do not match.");
+  }
+
+  const User = (await import("../models/User.js")).default;
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found.");
+  }
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    throw new ApiError(STATUS_CODES.UNAUTHORIZED, "The current password you entered is incorrect.");
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return sendSuccess(res, STATUS_CODES.OK, "Password changed successfully.");
+});
+
 export default {
   getFacultyDashboard,
   getFacultySubmissions,
   getFacultyReviewQueue,
   publishResults,
+  updateFacultyProfile,
+  changeFacultyPassword,
 };

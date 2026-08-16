@@ -1,9 +1,13 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
 # Locate the root folder of the ocr-service
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file if it exists
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 class Settings(BaseModel):
     """
@@ -36,7 +40,14 @@ class Settings(BaseModel):
     LOG_DIR: Path = BASE_DIR / "logs"
 
     # Handwriting Recognition Settings
-    HWR_PROVIDER: str = os.getenv("HWR_PROVIDER", "azure")
+    HWR_PROVIDER: str = os.getenv("HWR_PROVIDER", "google_vision")
+    PADDLE_MODEL: str = os.getenv("PADDLE_MODEL", "en_PP-OCRv5_mobile_rec")
+
+    # Google Cloud Vision Handwriting Recognition Settings
+    GOOGLE_CLOUD_PROJECT_ID: str | None = os.getenv("GOOGLE_CLOUD_PROJECT_ID", None)
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", None)
+    GOOGLE_VISION_LANGUAGE_HINT: str | None = os.getenv("GOOGLE_VISION_LANGUAGE_HINT", None)
+    GOOGLE_VISION_TIMEOUT_SECONDS: float = float(os.getenv("GOOGLE_VISION_TIMEOUT_SECONDS", "30.0"))
 
     # Legacy Azure AI Vision Read (v3.2) settings — retained for backward compatibility.
     AZURE_ENDPOINT: str | None = os.getenv("AZURE_ENDPOINT", None)
@@ -117,8 +128,8 @@ class Settings(BaseModel):
     @classmethod
     def validate_provider(cls, v: str) -> str:
         prov = v.lower().strip()
-        if prov not in ("mock", "azure", "paddle"):
-            raise ValueError(f"Unsupported OCR provider: {v}. Must be 'mock', 'azure', or 'paddle'")
+        if prov not in ("mock", "azure", "paddle", "google_vision"):
+            raise ValueError(f"Unsupported OCR provider: {v}. Must be 'mock', 'azure', 'paddle', or 'google_vision'")
         return prov
 
     @field_validator("LLM_PROVIDER")

@@ -3,6 +3,7 @@ import AnswerSheet from "../models/AnswerSheet.js";
 import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import { STATUS_CODES } from "../constants/statusCodes.js";
+import evaluationPipelineService from "./ai/evaluationPipeline.service.js";
 
 export const createEvaluation = async (data, userId) => {
   // Validate answer sheet exists
@@ -189,10 +190,236 @@ export const deleteEvaluation = async (id, userId) => {
   return evaluation;
 };
 
+export const bulkEvaluate = async (examId, answerSheetIds, userId) => {
+  let sheets = [];
+  if (answerSheetIds && answerSheetIds.length > 0) {
+    sheets = await AnswerSheet.find({
+      _id: { $in: answerSheetIds },
+      exam: examId,
+      isDeleted: false,
+    });
+  } else {
+    sheets = await AnswerSheet.find({
+      exam: examId,
+      isDeleted: false,
+      processingStatus: { $in: ["completed", "ready_for_evaluation"] },
+    });
+  }
+
+  if (sheets.length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "No eligible answer sheets found for evaluation");
+  }
+
+  const results = [];
+  for (const sheet of sheets) {
+    try {
+      const evalObj = await evaluationPipelineService.queueEvaluation(sheet._id, userId);
+      results.push({
+        answerSheetId: sheet._id,
+        success: true,
+        evaluationId: evalObj._id,
+        status: evalObj.evaluationStatus,
+      });
+    } catch (err) {
+      results.push({
+        answerSheetId: sheet._id,
+        success: false,
+        error: err.message,
+      });
+    }
+  }
+
+  return results;
+};
+
+export const reEvaluateAnswerSheet = async (answerSheetId, userId) => {
+  const ansSheet = await AnswerSheet.findOne({ _id: answerSheetId, isDeleted: false }).populate(
+    "exam"
+  );
+  if (!ansSheet) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Answer sheet not found");
+  }
+  const exam = ansSheet.exam;
+  if (exam && exam.createdBy && exam.createdBy.toString() !== userId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "You do not own this Exam");
+  }
+
+  let evaluation = await Evaluation.findOne({ answerSheet: answerSheetId, isDeleted: false });
+  if (!evaluation) {
+    evaluation = await Evaluation.create({
+      answerSheet: answerSheetId,
+      evaluationType: "AI",
+      obtainedMarks: 0,
+      totalMarks: exam ? exam.totalMarks : 10,
+      percentage: 0,
+      evaluationStatus: "pending",
+      createdBy: userId,
+      updatedBy: userId,
+    });
+  } else {
+    evaluation.evaluationStatus = "pending";
+    evaluation.updatedBy = userId;
+    await evaluation.save();
+  }
+
+  // Restart pipeline async
+  evaluationPipelineService.runPipeline(evaluation._id, answerSheetId, userId).catch((err) => {
+    logger.error(`Re-evaluation run failure for answerSheet ${answerSheetId}: ${err.message}`);
+  });
+
+  return evaluation;
+};
+
+export const reviewQuestion = async (evaluationId, questionId, data, userId) => {
+  const evaluation = await Evaluation.findOne({ _id: evaluationId, isDeleted: false }).populate({
+    path: "answerSheet",
+    populate: { path: "exam" },
+  });
+  if (!evaluation) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation not found");
+  }
+
+  const exam = evaluation.answerSheet?.exam;
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Associated exam details not found");
+  }
+
+  if (exam.createdBy && exam.createdBy.toString() !== userId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "You do not own this exam evaluation");
+  }
+
+  if (
+    evaluation.evaluationStatus === "finalized" ||
+    evaluation.evaluationStatus === "PUBLISHED" ||
+    evaluation.evaluationStatus === "reviewed"
+  ) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Cannot modify a finalized evaluation");
+  }
+
+  const qEval = evaluation.questions.find(
+    (q) =>
+      q.questionId.toString() === questionId.toString() ||
+      q._id.toString() === questionId.toString()
+  );
+  if (!qEval) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Question evaluation sub-record not found");
+  }
+
+  // Get matching exam question to fetch maxMarks
+  const examQuestion = exam.questions.find(
+    (eq) => eq._id.toString() === qEval.questionId.toString()
+  );
+  const maxMarks = examQuestion ? examQuestion.maximumMarks : 10;
+
+  const overrideScore = Number(data.finalAwardedMarks);
+  if (isNaN(overrideScore) || overrideScore < 0 || overrideScore > maxMarks) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      `Overriding marks must be a valid number between 0 and maximum allowed marks (${maxMarks})`
+    );
+  }
+
+  qEval.finalAwardedMarks = overrideScore;
+  qEval.facultyMarks = overrideScore;
+  qEval.wasOverridden = true;
+  if (data.facultyComment) {
+    qEval.facultyComment = data.facultyComment;
+    qEval.feedback = `${qEval.feedback || ""} | Faculty comment: ${data.facultyComment}`;
+  }
+  if (data.overrideReason) {
+    qEval.overrideReason = data.overrideReason;
+  }
+
+  // Also recalculate obtained marks dynamically
+  let newObtainedTotal = 0;
+  for (const q of evaluation.questions) {
+    newObtainedTotal += q.finalAwardedMarks !== undefined ? q.finalAwardedMarks : q.aiAwardedMarks;
+  }
+  evaluation.obtainedMarks = newObtainedTotal;
+  evaluation.percentage = Number(((newObtainedTotal / evaluation.totalMarks) * 100).toFixed(2));
+
+  let grade = "F";
+  if (evaluation.percentage >= 90) grade = "A+";
+  else if (evaluation.percentage >= 80) grade = "A";
+  else if (evaluation.percentage >= 70) grade = "B";
+  else if (evaluation.percentage >= 60) grade = "C";
+  else if (evaluation.percentage >= 50) grade = "D";
+  else if (evaluation.percentage >= 40) grade = "E";
+  evaluation.grade = grade;
+
+  evaluation.updatedBy = userId;
+  await evaluation.save();
+
+  return evaluation;
+};
+
+export const finalizeEvaluation = async (evaluationId, userId) => {
+  const evaluation = await Evaluation.findOne({ _id: evaluationId, isDeleted: false }).populate({
+    path: "answerSheet",
+    populate: { path: "exam" },
+  });
+  if (!evaluation) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation not found");
+  }
+
+  const exam = evaluation.answerSheet?.exam;
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Associated exam details not found");
+  }
+
+  if (exam.createdBy && exam.createdBy.toString() !== userId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "You do not own this exam evaluation");
+  }
+
+  let finalObtained = 0;
+  for (const q of evaluation.questions) {
+    // If not overridden, final score defaults to AI marks
+    if (q.finalAwardedMarks === undefined) {
+      q.finalAwardedMarks = q.aiAwardedMarks || 0;
+    }
+    finalObtained += q.finalAwardedMarks;
+  }
+
+  evaluation.obtainedMarks = finalObtained;
+  evaluation.totalMarks = evaluation.totalMarks || exam.totalMarks || 10;
+  evaluation.percentage = Number(((finalObtained / evaluation.totalMarks) * 100).toFixed(2));
+
+  let grade = "F";
+  if (evaluation.percentage >= 90) grade = "A+";
+  else if (evaluation.percentage >= 80) grade = "A";
+  else if (evaluation.percentage >= 70) grade = "B";
+  else if (evaluation.percentage >= 60) grade = "C";
+  else if (evaluation.percentage >= 50) grade = "D";
+  else if (evaluation.percentage >= 40) grade = "E";
+
+  evaluation.grade = grade;
+  evaluation.evaluationStatus = "finalized";
+  evaluation.updatedBy = userId;
+  await evaluation.save();
+
+  // Seal student submission status
+  if (evaluation.answerSheet) {
+    const ansSheetObj = await AnswerSheet.findById(evaluation.answerSheet._id);
+    if (ansSheetObj) {
+      ansSheetObj.submissionStatus = "Completed";
+      if (ansSheetObj.submissionType === "UPLOAD") {
+        ansSheetObj.uploadStatus = "Published";
+      }
+      await ansSheetObj.save();
+    }
+  }
+
+  return evaluation;
+};
+
 export default {
   createEvaluation,
   getEvaluationById,
   getAllEvaluations,
   updateEvaluation,
   deleteEvaluation,
+  bulkEvaluate,
+  reEvaluateAnswerSheet,
+  reviewQuestion,
+  finalizeEvaluation,
 };
