@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useNotifications } from '../../context/NotificationContext';
 import { examService, Exam } from '../../services/exam.service';
 import { subjectService } from '../../services/subject.service';
@@ -9,6 +9,8 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 export const Exams: React.FC = () => {
   const { addToast } = useNotifications();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const subjectIdParam = searchParams.get('subjectId');
 
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -16,7 +18,7 @@ export const Exams: React.FC = () => {
   
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubId, setSelectedSubId] = useState('');
+  const [selectedSubId, setSelectedSubId] = useState(subjectIdParam || '');
   const [selectedStatus, setSelectedStatus] = useState('');
 
   const loadData = async () => {
@@ -207,6 +209,14 @@ export const Exams: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <Link 
+                            to={`/faculty/exams/${ex.id}/results`}
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 transition-colors flex bg-surface-container rounded-lg border border-outline-variant/20 active:scale-90"
+                            title="Results & Analytics"
+                          >
+                            <span className="material-symbols-outlined text-sm">analytics</span>
+                          </Link>
+
                           <Link 
                             to={`/faculty/exams/${ex.id}`}
                             className="p-1.5 text-outline hover:text-primary transition-colors flex bg-surface-container rounded-lg border border-outline-variant/20 active:scale-90"

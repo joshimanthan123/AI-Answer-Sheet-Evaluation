@@ -23,13 +23,18 @@ export const facultyService = {
     });
   },
 
-  getPendingEvaluations: async (): Promise<AnswerSheet[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const pending = mockAnswerSheets.filter(sheet => sheet.status !== 'evaluated');
-        resolve(pending);
-      }, 500);
-    });
+  getPendingEvaluations: async (): Promise<any[]> => {
+    const response = await apiClient.get('/faculty/review-queue');
+    const evaluations = response.data?.data || response.data || [];
+    return evaluations.map((ev: any) => ({
+      id: ev._id,
+      studentName: ev.answerSheet?.student?.name || 'Unknown Student',
+      subjectName: ev.answerSheet?.subject?.name || 'Unknown Subject',
+      fileName: ev.answerSheet?.original_filename || ev.answerSheet?.fileName || 'AnswerSheet.pdf',
+      status: ev.evaluationStatus === 'AI_COMPLETED' ? 'pending' : 'reevaluate_requested',
+      similarityIndex: ev.similarityIndex || 96,
+      evaluationId: ev._id
+    }));
   },
 
   submitEvaluation: async (
@@ -91,21 +96,16 @@ export const facultyService = {
   },
 
   getStudentsList: async (): Promise<any[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Map user and student features
-        const students = mockUsers
-          .filter(u => u.role === 'student')
-          .map(u => ({
-            ...u,
-            rollNo: '24-CSE-0042',
-            enrolledYear: '2024',
-            avgScore: u.id === 'user-stud-1' ? 84.8 : 76.4,
-            rank: u.id === 'user-stud-1' ? 'Top 5%' : 'Top 25%'
-          }));
-        resolve(students);
-      }, 500);
-    });
+    const response = await apiClient.get('/faculty/students');
+    const students = response.data?.data || response.data || [];
+    return students.map((s: any) => ({
+      id: s._id || s.id,
+      name: s.name,
+      email: s.email,
+      department: s.department || 'B.Tech Computer Science',
+      avgScore: s.avgScore || 0,
+      rank: s.rank || 'N/A'
+    }));
   },
 
   getReportsList: async (): Promise<Report[]> => {

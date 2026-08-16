@@ -360,6 +360,7 @@ export const getIndividualResult = async (evaluationId, userId, userRole) => {
       "Unknown Candidate",
     studentName: sheet?.student?.name,
     filename: sheet?.uploadedFileName,
+    examId: exam._id,
     examTitle: exam.title,
     examCode: exam.examCode,
     subjectName: sheet?.subject?.name,

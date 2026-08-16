@@ -248,6 +248,20 @@ export const changeFacultyPassword = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Password changed successfully.");
 });
 
+export const getFacultyStudents = asyncHandler(async (req, res) => {
+  const User = (await import("../models/User.js")).default;
+  const students = await User.find({ role: "student", isDeleted: false })
+    .select("name email department semester rollNo")
+    .lean();
+  
+  return sendSuccess(
+    res,
+    STATUS_CODES.OK,
+    "Students list retrieved successfully",
+    students || []
+  );
+});
+
 export default {
   getFacultyDashboard,
   getFacultySubmissions,
@@ -255,4 +269,5 @@ export default {
   publishResults,
   updateFacultyProfile,
   changeFacultyPassword,
+  getFacultyStudents,
 };

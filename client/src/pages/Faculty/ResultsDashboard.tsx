@@ -121,7 +121,7 @@ export const ResultsDashboard: React.FC = () => {
           <div className="flex items-center gap-2 text-xs text-outline font-semibold">
             <Link to="/faculty/exams" className="hover:text-primary">Exams</Link>
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-            {exam && <Link to={`/faculty/exams/${exam._id}`} className="hover:text-primary">{exam.title}</Link>}
+            {exam && <Link to={`/faculty/exams/${exam.id || exam._id}`} className="hover:text-primary">{exam.title}</Link>}
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
             <span className="text-on-surface">Exam Analytics & Reports</span>
           </div>

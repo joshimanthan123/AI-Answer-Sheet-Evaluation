@@ -17,6 +17,7 @@ router.get("/dashboard", facultyController.getFacultyDashboard);
 router.post("/exams", examValidator, validate, examController.createExam);
 router.get("/submissions", facultyController.getFacultySubmissions);
 router.get("/review-queue", facultyController.getFacultyReviewQueue);
+router.get("/students", facultyController.getFacultyStudents);
 router.post(
   "/results/publish",
   publishResultsValidator,

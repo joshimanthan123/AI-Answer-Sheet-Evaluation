@@ -1,12 +1,5 @@
 import { Student, AnswerSheet, Evaluation, Feedback } from '../types';
 import apiClient from '../api/axios';
-import { 
-  mockStudentProfile, 
-  mockAnswerSheets, 
-  mockEvaluations, 
-  mockFeedbacks,
-  mockExams 
-} from '../mocks/db';
 
 export const studentService = {
   getDashboardData: async (): Promise<any> => {
@@ -25,13 +18,19 @@ export const studentService = {
     return response.data?.user || response.data;
   },
 
-  getEvaluations: async (studentId: string = 'stud-1'): Promise<AnswerSheet[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const studentSheets = mockAnswerSheets.filter(sheet => sheet.studentId === studentId);
-        resolve(studentSheets);
-      }, 500);
-    });
+  getEvaluations: async (): Promise<any[]> => {
+    const response = await apiClient.get('/student/results');
+    const results = response.data?.data || response.data || [];
+    return results.map((res: any) => ({
+      id: res.id || res._id,
+      fileName: 'Optical Scan Paper.pdf',
+      subjectName: res.subjectName || 'Unknown Subject',
+      examName: res.examName || 'Semester Placement',
+      status: res.status === 'approved' || res.status === 'finalized' ? 'evaluated' : 'pending',
+      inkColor: 'blue',
+      scanDpi: 300,
+      evaluationId: res.id || res._id
+    }));
   },
 
   getResults: async (): Promise<any[]> => {
@@ -42,23 +41,6 @@ export const studentService = {
   requestReevaluation: async (evaluationId: string): Promise<{ message: string }> => {
     const response = await apiClient.post(`/student/results/${evaluationId}/reevaluate`);
     return response.data?.data || response.data;
-  },
-
-  submitFeedback: async (studentId: string, message: string, rating: number): Promise<Feedback> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newFeedback: Feedback = {
-          id: `f-${mockFeedbacks.length + 1}`,
-          studentId,
-          studentName: 'Alex Johnson',
-          message,
-          rating,
-          date: new Date().toISOString().split('T')[0]
-        };
-        mockFeedbacks.push(newFeedback);
-        resolve(newFeedback);
-      }, 600);
-    });
   },
 
   getExams: async (params?: {

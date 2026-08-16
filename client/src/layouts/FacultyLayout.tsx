@@ -17,35 +17,35 @@ export const FacultyLayout: React.FC = () => {
 
   const navigationCategories = [
     {
-      category: 'Main',
+      category: 'FACULTY PORTAL',
       items: [
-        { name: 'Dashboard', path: '/faculty', icon: 'dashboard' },
-        { name: 'Subjects', path: '/faculty/subjects', icon: 'library_books' }
+        { name: 'Dashboard', path: '/faculty', icon: 'dashboard' }
       ]
     },
     {
-      category: 'Exams',
+      category: 'ACADEMIC MANAGEMENT',
       items: [
-        { name: 'Exams List', path: '/faculty/exams', icon: 'assignment' },
-        { name: 'Question Bank', path: '/faculty/question-bank', icon: 'menu_book' },
-        { name: 'Upload Answer Key', path: '/faculty/upload-answer-key', icon: 'upload_file' },
-        { name: 'Model Answers', path: '/faculty/model-answers', icon: 'file_copy' }
+        { name: 'Subjects', path: '/faculty/subjects', icon: 'library_books' },
+        { name: 'Exams', path: '/faculty/exams', icon: 'assignment' }
       ]
     },
     {
-      category: 'Evaluations',
+      category: 'EVALUATION',
       items: [
-        { name: 'AI Evaluation Queue', path: '/faculty/evaluation-queue', icon: 'playlist_play' },
-        { name: 'Review Evaluations', path: '/faculty/review-evaluations', icon: 'rate_review' },
-        { name: 'Published Results', path: '/faculty/published-results', icon: 'fact_check' }
+        { name: 'Evaluation Queue', path: '/faculty/evaluation-queue', icon: 'playlist_play' },
+        { name: 'Review Evaluations', path: '/faculty/review-evaluations', icon: 'rate_review' }
       ]
     },
     {
-      category: 'Support & Admin',
+      category: 'RESULTS & REPORTS',
       items: [
-        { name: 'Student List', path: '/faculty/students', icon: 'group' },
-        { name: 'Analytics & Reports', path: '/faculty/reports', icon: 'analytics' },
-        { name: 'Settings', path: '/faculty/settings', icon: 'settings' }
+        { name: 'Analytics & Reports', path: '/faculty/reports', icon: 'analytics' }
+      ]
+    },
+    {
+      category: 'ACCOUNT',
+      items: [
+        { name: 'Profile', path: '/faculty/settings', icon: 'settings' }
       ]
     }
   ];
@@ -66,7 +66,11 @@ export const FacultyLayout: React.FC = () => {
                 {cat.category}
               </span>
               {cat.items.map((item) => {
-                const isActive = location.pathname === item.path || (item.path !== '/faculty' && location.pathname.startsWith(item.path));
+                const isActive = item.name === 'Dashboard' 
+                  ? location.pathname === '/faculty' || location.pathname === '/faculty/'
+                  : item.name === 'Exams'
+                    ? location.pathname.startsWith('/faculty/exams') || location.pathname.startsWith('/faculty/answer-sheets')
+                    : location.pathname.startsWith(item.path);
                 return (
                   <Link
                     key={item.name}
@@ -188,7 +192,11 @@ export const FacultyLayout: React.FC = () => {
               <div key={cat.category} className="space-y-1">
                 <span className="text-[9px] font-black text-outline uppercase tracking-wider block mb-1 px-4">{cat.category}</span>
                 {cat.items.map((item) => {
-                  const isActive = location.pathname === item.path || (item.path !== '/faculty' && location.pathname.startsWith(item.path));
+                  const isActive = item.name === 'Dashboard' 
+                    ? location.pathname === '/faculty' || location.pathname === '/faculty/'
+                    : item.name === 'Exams'
+                      ? location.pathname.startsWith('/faculty/exams') || location.pathname.startsWith('/faculty/answer-sheets')
+                      : location.pathname.startsWith(item.path);
                   return (
                     <Link
                       key={item.name}

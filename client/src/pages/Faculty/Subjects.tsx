@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Subject, Course } from '../../types';
 import subjectService from '../../services/subject.service';
 import adminService from '../../services/admin.service';
@@ -293,6 +294,14 @@ export const FacultySubjects: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Link 
+                          to={`/faculty/exams?subjectId=${s.id}`}
+                          className="w-8 h-8 rounded-lg hover:bg-outline-variant/15 flex items-center justify-center text-emerald-600 cursor-pointer active:scale-95 transition-all"
+                          title="View Exams"
+                        >
+                          <span className="material-symbols-outlined text-sm font-bold">assignment</span>
+                        </Link>
+
                         <button 
                           onClick={() => handleEditClick(s)}
                           className="w-8 h-8 rounded-lg hover:bg-outline-variant/15 flex items-center justify-center text-primary cursor-pointer active:scale-95 transition-all"

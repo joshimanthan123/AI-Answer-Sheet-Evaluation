@@ -29,6 +29,7 @@ interface ResultDetail {
   studentIdentifier: string;
   studentName?: string;
   filename?: string;
+  examId?: string;
   examTitle: string;
   examCode?: string;
   subjectName?: string;
@@ -98,6 +99,14 @@ export const IndividualResult: React.FC = () => {
           <div className="flex items-center gap-2 text-xs text-outline font-semibold select-none">
             <Link to="/faculty/exams" className="hover:text-primary">Exams</Link>
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+            {result.examId && (
+              <>
+                <Link to={`/faculty/exams/${result.examId}`} className="hover:text-primary font-bold">{result.examTitle}</Link>
+                <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+                <Link to={`/faculty/exams/${result.examId}/results`} className="hover:text-primary font-bold">Results & Analytics</Link>
+                <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+              </>
+            )}
             <span className="text-on-surface">Candidate Result</span>
           </div>
           <h2 className="text-2xl font-black text-on-surface font-display mt-1">
