@@ -67,10 +67,18 @@ export const StudentDetailedReport: React.FC = () => {
           <nav className="flex items-center gap-2 text-[10px] font-semibold text-outline uppercase tracking-wider mb-2">
             <Link to="/student/results" className="hover:text-primary hover:underline">Results</Link>
             <span className="material-symbols-outlined text-xs">chevron_right</span>
-            <span className="text-primary font-bold">CS101: Data Structures</span>
+            <span className="text-primary font-bold">
+              {(evaluation as any).answerSheet?.subject?.code ? `${(evaluation as any).answerSheet.subject.code}: ${(evaluation as any).answerSheet.subject.name}` : (evaluation as any).subjectName || "Subject Details"}
+            </span>
           </nav>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface">Evaluation Report: Mid-Term Examination</h2>
-          <p className="text-xs text-on-surface-variant mt-1">Student: Alex Johnson | ID: #88294-B | Submitted: {evaluation.date}</p>
+          <h2 className="font-headline-lg text-headline-lg text-on-surface">
+            Evaluation Report: {(evaluation as any).answerSheet?.exam?.title || "Exam Details"}
+          </h2>
+          <p className="text-xs text-on-surface-variant mt-1">
+            Student: {(evaluation as any).answerSheet?.student?.name || "Student"} | 
+            Roll No: {(evaluation as any).answerSheet?.student?.rollNo || "N/A"} | 
+            Submitted: {evaluation.date || ((evaluation as any).createdAt ? new Date((evaluation as any).createdAt).toLocaleDateString() : new Date().toLocaleDateString())}
+          </p>
         </div>
         <div className="flex gap-3">
           <button 

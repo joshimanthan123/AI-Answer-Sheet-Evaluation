@@ -27,8 +27,7 @@ export const StudentLayout: React.FC = () => {
   const menuItems = [
     { name: 'Dashboard', path: '/student', icon: 'home' },
     { name: 'My Exams', path: '/student/exams', icon: 'assignment' },
-    { name: 'Exam Workspace', path: '/student/exam-workspace', icon: 'draw' },
-    { name: 'Upload Answer Sheet', path: '/student/upload-answer-sheet', icon: 'cloud_upload' },
+    { name: 'Submission History', path: '/student/upload-answer-sheet', icon: 'cloud_upload' },
     { name: 'Results', path: '/student/results', icon: 'fact_check' },
     { name: 'Performance Analytics', path: '/student/analytics', icon: 'bar_chart' },
     { name: 'Settings', path: '/student/settings', icon: 'settings' }

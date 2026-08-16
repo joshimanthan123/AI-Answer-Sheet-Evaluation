@@ -372,7 +372,7 @@ async function runTests() {
     // --- Scenario 11: Fetch Published Results ---
     console.log("Scenario 11: Seed and retrieve published evaluation result for Student A");
     // Seed evaluation in DB
-    await Evaluation.create({
+    let seededEval = await Evaluation.create({
       answerSheet: attemptId,
       evaluationType: "AI",
       obtainedMarks: 8,
@@ -415,8 +415,38 @@ async function runTests() {
     }
     console.log("✔ Scenario 12 Passed!\n");
 
+
+    // --- Scenario 13: Student Re-evaluation Request ---
+    console.log("Scenario 13: Student A requests manual review/re-evaluation on their published evaluation");
+    const req13 = { user: studentA, params: { evaluationId: seededEval._id } };
+    const res13 = makeMockResponse();
+    await callController(studentController.requestStudentReevaluation, req13, res13);
+
+    if (res13.statusCode !== 200 || !res13.body.success) {
+      throw new Error(`Scenario 13 Failed! Status: ${res13.statusCode}, message: ${res13.body.message}`);
+    }
+    // Verify status was updated to FACULTY_REVIEW
+    const updatedEval = await Evaluation.findById(seededEval._id);
+    if (!updatedEval || updatedEval.evaluationStatus !== "FACULTY_REVIEW") {
+      throw new Error(`Scenario 13 Failed: evaluationStatus is '${updatedEval?.evaluationStatus}', expected 'FACULTY_REVIEW'`);
+    }
+    console.log("✔ Scenario 13 Passed!\n");
+
+
+    // --- Scenario 14: IDOR Check - Student B attempts to request Re-evaluation of Student A's result ---
+    console.log("Scenario 14: Student B attempts to request manual review on Student A's evaluation (Expects 403)");
+    const req14 = { user: studentB, params: { evaluationId: seededEval._id } };
+    const res14 = makeMockResponse();
+    await callController(studentController.requestStudentReevaluation, req14, res14);
+
+    if (res14.statusCode !== 403) {
+      throw new Error(`Scenario 14 Failed! Expected status 403 but got ${res14.statusCode}`);
+    }
+    console.log("✔ Scenario 14 Passed!\n");
+
+
     console.log("==================================================================");
-    console.log("ALL 12 SCENARIOS IN INTEGRATION TEST PASSED SUCCESSFULLY!");
+    console.log("ALL 14 SCENARIOS IN INTEGRATION TEST PASSED SUCCESSFULLY!");
     console.log("==================================================================");
 
   } catch (err) {
