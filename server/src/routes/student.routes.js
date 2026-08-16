@@ -15,6 +15,7 @@ router.patch("/profile", upload.single("profilePhoto"), studentController.update
 
 router.get("/dashboard", studentController.getStudentDashboard);
 router.get("/results", studentController.getStudentResults);
+router.post("/results/:evaluationId/reevaluate", studentController.requestStudentReevaluation);
 router.get("/exams", studentController.getStudentExams);
 router.get("/exams/:examId/eligibility", studentController.getStudentExamEligibility);
 router.get("/exams/:examId/workspace", studentController.getStudentExamWorkspace);

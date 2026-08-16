@@ -138,7 +138,13 @@ export const getStudentResults = asyncHandler(async (req, res) => {
   );
 });
 
+export const requestStudentReevaluation = asyncHandler(async (req, res) => {
+  const result = await studentExamService.requestReevaluation(req.user._id, req.params.evaluationId);
+  return sendSuccess(res, STATUS_CODES.OK, "Re-evaluation request successfully registered", result);
+});
+
 export default {
+  requestStudentReevaluation,
   getStudentDashboard,
   getStudentExams,
   getStudentExamById,

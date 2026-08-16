@@ -87,6 +87,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="upload-answer-sheet" element={<StudentUploadAnswerSheet />} />
           <Route path="success" element={<StudentSuccess />} />
           <Route path="evaluations/:id" element={<StudentDetailedReport />} />
+          <Route path="results/:id" element={<StudentDetailedReport />} />
           <Route path="results" element={<StudentResults />} />
           <Route path="analytics" element={<StudentAnalytics />} />
           <Route path="settings" element={<StudentSettings />} />

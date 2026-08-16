@@ -53,7 +53,7 @@ export const FacultySettings: React.FC = () => {
     setProfileError('');
     setProfileSaving(true);
     try {
-      await updateProfile(name.trim(), email.trim().toLowerCase());
+      await updateProfile({ name: name.trim(), email: email.trim().toLowerCase() });
       addToast('Profile updated successfully.', 'success');
       setIsEditing(false);
     } catch (err: any) {

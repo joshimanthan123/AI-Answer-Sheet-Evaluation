@@ -40,17 +40,8 @@ export const studentService = {
   },
 
   requestReevaluation: async (evaluationId: string): Promise<{ message: string }> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const evaluationIndex = mockEvaluations.findIndex(ev => ev.id === evaluationId);
-        if (evaluationIndex !== -1) {
-          mockEvaluations[evaluationIndex].status = 'pending_review';
-          resolve({ message: 'Re-evaluation request successfully registered with the faculty head.' });
-        } else {
-          reject(new Error('Evaluation record not found'));
-        }
-      }, 600);
-    });
+    const response = await apiClient.post(`/student/results/${evaluationId}/reevaluate`);
+    return response.data?.data || response.data;
   },
 
   submitFeedback: async (studentId: string, message: string, rating: number): Promise<Feedback> => {

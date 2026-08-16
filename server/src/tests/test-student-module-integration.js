@@ -24,7 +24,7 @@ const makeMockResponse = () => {
 
 // Helper to await asyncHandler controller methods
 async function callController(controllerMethod, req, res) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const next = (err) => {
       if (err) {
         res.status(err.statusCode || 500).json({ success: false, message: err.message });
@@ -67,8 +67,7 @@ async function runTests() {
   let subject2 = null;
   let exam1 = null;
   let exam2 = null;
-  let submissionA = null;
-  let evaluationA = null;
+  let attemptId = null;
 
   try {
     // 0. Cleanup any stale test data (idempotency)
@@ -235,7 +234,7 @@ async function runTests() {
     await callController(studentController.getStudentExamEligibility, req2, res2);
 
     if (res2.statusCode !== 200 || !res2.body.data.eligible) {
-      throw new Error(`Scenario 2 Failed! Eligible flag is false.`);
+      throw new Error("Scenario 2 Failed! Eligible flag is false.");
     }
     console.log("✔ Scenario 2 Passed!\n");
 
@@ -259,7 +258,7 @@ async function runTests() {
     await callController(studentController.getStudentExamWorkspace, req4, res4);
 
     if (res4.statusCode !== 200 || !res4.body.data.exam) {
-      throw new Error(`Scenario 4 Failed! Workspace payload load error.`);
+      throw new Error("Scenario 4 Failed! Workspace payload load error.");
     }
     console.log("✔ Scenario 4 Passed!\n");
 
@@ -285,7 +284,7 @@ async function runTests() {
     if (res6.statusCode !== 200 || !res6.body.data.id) {
       throw new Error(`Scenario 6 Failed! Status: ${res6.statusCode}`);
     }
-    const attemptId = res6.body.data.id;
+    attemptId = res6.body.data.id;
     console.log(`✔ Scenario 6 Passed! Attempt ID: ${attemptId}\n`);
 
 
@@ -345,8 +344,8 @@ async function runTests() {
     }
     
     const dbSub = await AnswerSheet.findById(attemptId);
-    if (dbSub.status !== "submitted") {
-      throw new Error("Scenario 9 Failed: Answer sheet status is not 'submitted' in DB.");
+    if (dbSub.submissionStatus !== "Submitted") {
+      throw new Error(`Scenario 9 Failed: Answer sheet submissionStatus is '${dbSub.submissionStatus}', expected 'Submitted'`);
     }
     console.log("✔ Scenario 9 Passed!\n");
 
@@ -373,7 +372,7 @@ async function runTests() {
     // --- Scenario 11: Fetch Published Results ---
     console.log("Scenario 11: Seed and retrieve published evaluation result for Student A");
     // Seed evaluation in DB
-    const evalData = await Evaluation.create({
+    await Evaluation.create({
       answerSheet: attemptId,
       evaluationType: "AI",
       obtainedMarks: 8,
@@ -442,8 +441,8 @@ async function runTests() {
       await AnswerSheet.deleteMany({ exam: exam2._id });
       await Exam.deleteOne({ _id: exam2._id });
     }
-    if (submissionA) {
-      await Evaluation.deleteMany({ answerSheet: submissionA._id });
+    if (attemptId) {
+      await Evaluation.deleteMany({ answerSheet: attemptId });
     }
     await mongoose.connection.close();
     console.log("Database connection closed cleanly.");

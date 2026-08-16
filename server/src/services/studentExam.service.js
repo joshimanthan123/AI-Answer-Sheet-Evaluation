@@ -350,7 +350,7 @@ export const getStudentExamWorkspace = async (studentId, examId) => {
     isDeleted: false,
   }).lean() : null;
 
-  const { status, canEnter, reason } = getExamStatusAndEligibility(exam, submission, evaluation, new Date());
+  const { status } = getExamStatusAndEligibility(exam, submission, evaluation, new Date());
 
   // Enforce access validation block
   if (status === "upcoming") {
@@ -597,7 +597,7 @@ export const submitStudentExam = async (studentId, examId) => {
   }
 
   // 4. Verify Submission window
-  const { status, canEnter } = getExamStatusAndEligibility(exam, submission, evaluation, new Date());
+  const { status } = getExamStatusAndEligibility(exam, submission, evaluation, new Date());
   if (status === "expired") {
     throw new ApiError(STATUS_CODES.FORBIDDEN, "This exam duration has expired and cannot be submitted");
   }
@@ -921,13 +921,34 @@ export const getStudentResults = async (studentId) => {
       finalScore: ev.obtainedMarks,
       totalScore: ev.totalMarks,
       grade: ev.grade || "N/A",
-      status: ev.evaluationStatus.toLowerCase() === 'published' ? 'approved' : 'pending',
+      status: ev.evaluationStatus.toLowerCase() === "published" ? "approved" : "pending",
       date: ev.updatedAt ? new Date(ev.updatedAt).toLocaleDateString() : new Date().toLocaleDateString()
     };
   });
 };
 
+export const requestReevaluation = async (studentId, evaluationId) => {
+  const evaluation = await Evaluation.findOne({ _id: evaluationId, isDeleted: false })
+    .populate("answerSheet");
+
+  if (!evaluation) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation record not found");
+  }
+
+  // Enforce IDOR protection: assert the student owns the answer sheet of this evaluation
+  if (evaluation.answerSheet?.student.toString() !== studentId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this answer sheet.");
+  }
+
+  // Update status to FACULTY_REVIEW and save
+  evaluation.evaluationStatus = "FACULTY_REVIEW";
+  await evaluation.save();
+
+  return { message: "Re-evaluation request successfully registered with the faculty head." };
+};
+
 export default {
+  requestReevaluation,
   getStudentEligibleSubjectIds,
   getExamStatusAndEligibility,
   getStudentExams,

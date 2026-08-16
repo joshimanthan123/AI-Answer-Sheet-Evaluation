@@ -73,7 +73,7 @@ export const StudentResults: React.FC = () => {
                   </div>
 
                   <Link 
-                    to={`/student/evaluations/${res.id}`}
+                    to={`/student/results/${res.id}`}
                     className="px-4 py-2 border border-primary hover:bg-primary/5 text-primary rounded-xl text-xs font-black transition-all text-center flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                   >
                     View Detailed Report <span className="material-symbols-outlined text-sm">arrow_forward</span>
