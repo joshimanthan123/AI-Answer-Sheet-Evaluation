@@ -45,6 +45,7 @@ export const ExamDetails: React.FC = () => {
   const subjectName = typeof exam.subject === 'object' ? exam.subject?.name : '';
   const subjectCode = typeof exam.subject === 'object' ? exam.subject?.code : '';
   const semesterVal = typeof exam.subject === 'object' ? exam.subject?.semester : exam.semester;
+  const examId = (exam as any)._id || exam.id;
 
   return (
     <div className="flex flex-col gap-6 text-left max-w-5xl mx-auto py-6 animate-fade-in">
@@ -88,14 +89,14 @@ export const ExamDetails: React.FC = () => {
             Back
           </Link>
           <Link 
-            to={`/faculty/exams/${exam.id}/results`} 
+            to={`/faculty/exams/${examId}/results`} 
             className="px-3.5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow active:scale-95"
           >
             <span className="material-symbols-outlined text-xs font-semibold">analytics</span>
             Results & Analytics
           </Link>
           <Link 
-            to={`/faculty/exams/${exam.id}/answer-key`} 
+            to={`/faculty/exams/${examId}/answer-key`} 
             className={`px-3.5 py-2 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow active:scale-95 ${
               exam.answerKeyStatus === 'locked' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary'
             }`}
@@ -106,7 +107,7 @@ export const ExamDetails: React.FC = () => {
             {exam.answerKeyStatus === 'locked' ? 'Manage Answer Key' : 'Manage Answer Key'}
           </Link>
           <Link 
-            to={`/faculty/exams/${exam.id}/edit`} 
+            to={`/faculty/exams/${examId}/edit`} 
             className="px-3.5 py-2 bg-secondary text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow active:scale-95"
           >
             <span className="material-symbols-outlined text-xs">edit</span>
@@ -214,7 +215,7 @@ export const ExamDetails: React.FC = () => {
               Upload candidate scans, check background OCR processing statuses, and view layout parses side-by-side.
             </p>
             <Link
-              to={`/faculty/exams/${exam.id}/answer-sheets`}
+              to={`/faculty/exams/${examId}/answer-sheets`}
               className="w-full py-2 bg-primary text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 hover:shadow active:scale-95 transition"
             >
               <span className="material-symbols-outlined text-xs">file_upload</span>

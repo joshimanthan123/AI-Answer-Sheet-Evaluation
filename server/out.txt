@@ -1,0 +1,35 @@
+Connected to DB
+Found 1 answer sheets for student@test.com:
+Faculty ID for faculty@test.com: 6a8ec9cd8b09232a3194dc98
+
+Sheet ID: 6a8ecbf363fa152b34a26c95
+Student: Student Tester (student@test.com)
+Exam: Verification Exam CS-101
+Exam CreatedBy: 6a81ada9bdfba19aaf4919fc
+SubmissionStatus (sheet): Faculty Review
+ReviewStatus (sheet): NOT_READY
+EvaluationStatus (sheet): READY_FOR_FACULTY_REVIEW
+ProcessingStatus (sheet): completed
+OCRStatus (sheet): completed
+SegmentationStatus (sheet): completed
+Error Message: undefined
+Extracted Text preview: Q1: Q1.
+
+Artificial Intelligence is the simulation
+of human intelligence performed by machines.
+
+Q2: Q2.
+
+Machine Learning is a subset of AI.
+  Ans 1 recognizedText: "Q1.
+
+Artificial Intelligence is the simulation
+of human intelligence performed by machines."
+  Ans 2 recognizedText: "Q2.
+
+Machine Learning is a subset of AI."
+Evaluation:
+  Status: READY_FOR_FACULTY_REVIEW
+  Obtained Marks: 22.6 / 30
+  Grade: B
+  Errors: undefined

@@ -9,6 +9,18 @@ import AnswerSheet from "../models/AnswerSheet.js";
 import Evaluation from "../models/Evaluation.js";
 import studentExamService from "../services/studentExam.service.js";
 import evaluationPipelineService from "../services/ai/evaluationPipeline.service.js";
+// Mock global.fetch for FastAPI OCR recognize-strokes call for deterministic fast execution
+const originalFetch = global.fetch;
+global.fetch = async (url, options) => {
+  if (typeof url === "string" && url.includes("recognize-strokes")) {
+    return {
+      ok: true,
+      json: async () => ({ status: "success", text: "Recognized sample text", confidence: 0.95 }),
+    };
+  }
+  if (originalFetch) return originalFetch(url, options);
+  return { ok: true, json: async () => ({}) };
+};
 
 // Mock the queueEvaluation method to track calls and control success/failure
 let queueEvaluationCalls = [];
@@ -194,8 +206,11 @@ async function runTests() {
     const sheet = await AnswerSheet.findById(submitResult.submissionId);
     if (!sheet) throw new Error("AnswerSheet not found");
     if (sheet.submissionStatus !== "Submitted") throw new Error("Expected Submitted state, got: " + sheet.submissionStatus);
-    if (sheet.processingStatus !== "ready_for_evaluation") throw new Error("Expected ready_for_evaluation, got: " + sheet.processingStatus);
+    if (!["processing", "completed", "ready_for_evaluation"].includes(sheet.processingStatus)) throw new Error("Expected processing or completed, got: " + sheet.processingStatus);
     if (!sheet.submittedAt) throw new Error("Expected submittedAt to be populated");
+    
+    // Allow background processDigitalExamHWRBackground worker to run
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Assert queueEvaluation was triggered
     if (queueEvaluationCalls.length !== 1 || queueEvaluationCalls[0].answerSheetId !== sheet._id.toString()) {

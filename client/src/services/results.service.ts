@@ -96,6 +96,39 @@ export const resultsService = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  },
+
+  getPublishableResults: async (params: any = {}): Promise<{ data: any[]; pagination: any }> => {
+    const response = await apiClient.get<any, any>('/faculty/results/publishable', { params });
+    const resData = response.data || response;
+    return {
+      data: resData.data || [],
+      pagination: resData.pagination || { page: 1, limit: 10, total: 0, totalPages: 1 }
+    };
+  },
+
+  getPublishedResults: async (params: any = {}): Promise<{ data: any[]; pagination: any }> => {
+    const response = await apiClient.get<any, any>('/faculty/results/published', { params });
+    const resData = response.data || response;
+    return {
+      data: resData.data || [],
+      pagination: resData.pagination || { page: 1, limit: 10, total: 0, totalPages: 1 }
+    };
+  },
+
+  publishResult: async (answerSheetId: string, comment: string = ''): Promise<any> => {
+    const response = await apiClient.post<any, any>(`/faculty/answer-sheets/${answerSheetId}/publish-result`, { comment });
+    return response.data || response;
+  },
+
+  unpublishResult: async (answerSheetId: string, reason: string = ''): Promise<any> => {
+    const response = await apiClient.post<any, any>(`/faculty/answer-sheets/${answerSheetId}/unpublish-result`, { reason });
+    return response.data || response;
+  },
+
+  getPublicationStatus: async (answerSheetId: string): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/faculty/answer-sheets/${answerSheetId}/publication-status`);
+    return response.data || response;
   }
 };
 

@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import Exam from "../models/Exam.js";
 import Subject from "../models/Subject.js";
+import Course from "../models/Course.js";
+import Department from "../models/Department.js";
 import AnswerSheet from "../models/AnswerSheet.js";
 import Evaluation from "../models/Evaluation.js";
 import ApiError from "../utils/ApiError.js";
@@ -18,27 +20,44 @@ export const isSubmissionLocked = (status) => {
 
 // Reusable logic to get student eligible subject ids
 export const getStudentEligibleSubjectIds = async (student) => {
-  if (!student || !student.semester) return [];
+  if (!student) return [];
   
-  const subjectsInSemester = await Subject.find({
-    semester: student.semester,
-    isDeleted: false,
+  const allSubjects = await Subject.find({
+    isDeleted: { $ne: true },
   }).populate({
     path: "course",
     populate: { path: "department" }
   }).lean();
 
-  const filtered = subjectsInSemester.filter(sub => {
-    if (!student.department) return true;
-    const course = sub.course;
-    if (!course || !course.department) return false;
-    const dept = course.department;
-    return (
-      dept._id.toString() === student.department ||
-      (dept.name && dept.name.toLowerCase() === student.department.toLowerCase()) ||
-      (dept.code && dept.code.toLowerCase() === student.department.toLowerCase())
+  if (!allSubjects || allSubjects.length === 0) return [];
+
+  let filtered = allSubjects;
+
+  if (student.semester) {
+    const semMatches = allSubjects.filter(
+      sub => sub.semester && sub.semester.toString() === student.semester.toString()
     );
-  });
+    if (semMatches.length > 0) {
+      filtered = semMatches;
+    }
+  }
+
+  if (student.department) {
+    const studentDeptStr = student.department.toString().toLowerCase();
+    const deptMatches = filtered.filter(sub => {
+      const course = sub.course;
+      if (!course || !course.department) return true;
+      const dept = course.department;
+      return (
+        (dept._id && dept._id.toString().toLowerCase() === studentDeptStr) ||
+        (dept.name && dept.name.toLowerCase() === studentDeptStr) ||
+        (dept.code && dept.code.toLowerCase() === studentDeptStr)
+      );
+    });
+    if (deptMatches.length > 0) {
+      filtered = deptMatches;
+    }
+  }
 
   return filtered.map(sub => sub._id.toString());
 };
@@ -59,7 +78,7 @@ export const getExamStatusAndEligibility = (exam, submission, evaluation, now = 
   const end = exam.endTime ? new Date(exam.endTime) : (start ? new Date(start.getTime() + (exam.duration || 60) * 60 * 1000) : null);
 
   const isInsideWindow = start && end && now >= start && now <= end;
-  const isActiveStatus = exam.examStatus === "Active";
+  const isActiveStatus = exam.examStatus === "Active" || exam.examStatus === "Published";
 
   let status = "expired";
   let canEnter = false;
@@ -86,20 +105,23 @@ export const getExamStatusAndEligibility = (exam, submission, evaluation, now = 
     status = "submitted";
     canEnter = false;
     reason = "You have already submitted this exam.";
-  } else if (alreadyStarted && (isInsideWindow || isActiveStatus)) {
+  } else if (alreadyStarted && (!end || now <= end)) {
     status = "in_progress";
     canEnter = true;
-  } else if (start && start > now) {
-    status = "upcoming";
-    canEnter = false;
-    reason = "Exam has not started yet.";
-  } else if (isInsideWindow || (isActiveStatus && !alreadySubmitted)) {
-    status = "active";
-    canEnter = true;
-  } else {
+  } else if (end && now > end) {
     status = "expired";
     canEnter = false;
     reason = "Exam duration has expired.";
+  } else if (start && start > now && !isActiveStatus) {
+    status = "upcoming";
+    canEnter = false;
+    reason = "Exam has not started yet.";
+  } else if (isInsideWindow || isActiveStatus || !start) {
+    status = "active";
+    canEnter = true;
+  } else {
+    status = "active";
+    canEnter = true;
   }
 
   return { status, canEnter, reason, startTime: start, endTime: end };
@@ -120,8 +142,8 @@ export const getStudentExams = async (studentId, query = {}) => {
 
   // Search filtering
   const mongoQuery = {
-    isPublished: true,
-    isDeleted: false,
+    $or: [{ isPublished: true }, { examStatus: { $in: ["Published", "Active", "Completed"] } }],
+    isDeleted: { $ne: true },
     subject: subjectMatch,
   };
 
@@ -140,13 +162,13 @@ export const getStudentExams = async (studentId, query = {}) => {
   // Fetch student answer sheets and evaluations
   const studentSubmissions = await AnswerSheet.find({
     student: studentId,
-    isDeleted: false,
+    isDeleted: { $ne: true },
   }).lean();
 
   const studentSubmissionIds = studentSubmissions.map(s => s._id);
   const evaluations = await Evaluation.find({
     answerSheet: { $in: studentSubmissionIds },
-    isDeleted: false,
+    isDeleted: { $ne: true },
   }).lean();
 
   // Map each exam
@@ -226,7 +248,7 @@ export const getStudentExamById = async (studentId, examId) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Student not found");
   }
 
-  const exam = await Exam.findOne({ _id: examId, isDeleted: false })
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } })
     .populate("subject", "name code semester")
     .lean();
 
@@ -244,12 +266,12 @@ export const getStudentExamById = async (studentId, examId) => {
   const submission = await AnswerSheet.findOne({
     student: studentId,
     exam: examId,
-    isDeleted: false,
+    isDeleted: { $ne: true },
   }).lean();
 
   const evaluation = submission ? await Evaluation.findOne({
     answerSheet: submission._id,
-    isDeleted: false,
+    isDeleted: { $ne: true },
   }).lean() : null;
 
   const { status, canEnter, reason, startTime, endTime } = getExamStatusAndEligibility(exam, submission, evaluation, new Date());
@@ -617,7 +639,8 @@ export const submitStudentExam = async (studentId, examId) => {
       $set: {
         submissionStatus: "Submitted",
         submittedAt: new Date(),
-        processingStatus: "ready_for_evaluation"
+        processingStatus: "processing",
+        ocrStatus: "processing"
       }
     },
     { new: true }
@@ -642,8 +665,8 @@ export const submitStudentExam = async (studentId, examId) => {
   }
 
   // 6. Trigger pipeline queue in background asynchronously (do not await)
-  evaluationPipelineService.queueEvaluation(finalizedSheet._id, studentId).catch((err) => {
-    logger.error(`Failed to trigger background evaluation pipeline during submission for AnswerSheet ${finalizedSheet._id}: ${err.message}`);
+  processDigitalExamHWRBackground(finalizedSheet._id, studentId, studentId).catch((err) => {
+    logger.error(`Failed to trigger background HWR for AnswerSheet ${finalizedSheet._id}: ${err.message}`);
   });
 
   return {
@@ -652,6 +675,171 @@ export const submitStudentExam = async (studentId, examId) => {
     submittedAt: finalizedSheet.submittedAt,
     alreadySubmitted: false
   };
+};
+
+// Background worker running real digital canvas strokes HWR/OCR processing
+export const processDigitalExamHWRBackground = async (sheetId, studentId, userId) => {
+  try {
+    const answerSheet = await AnswerSheet.findById(sheetId);
+    if (!answerSheet) return;
+
+    logger.info(`Starting background HWR processing for digital AnswerSheet ${sheetId}`);
+
+    const exam = await Exam.findById(answerSheet.exam);
+    if (!exam) {
+      throw new Error("Exam not found during HWR processing");
+    }
+
+    const uvicornUrl = "http://127.0.0.1:8000/api/v1/ocr/recognize-strokes";
+    const updatedAnswers = [];
+    const rawTextParts = [];
+
+    for (const ansItem of answerSheet.answers) {
+      if (!ansItem.handwrittenData) {
+        updatedAnswers.push({
+          questionId: ansItem.questionId,
+          handwrittenData: "",
+          recognizedText: "",
+          hwrStatus: "Completed",
+          confidence: 1.0,
+          confidenceLevel: "HIGH",
+          submissionTime: ansItem.submissionTime || new Date(),
+        });
+        continue;
+      }
+
+      let parsedHandwritten;
+      try {
+        parsedHandwritten = JSON.parse(ansItem.handwrittenData);
+      } catch (e) {
+        parsedHandwritten = null;
+      }
+
+      const matchedQ = exam.questions.find(q => q._id.toString() === ansItem.questionId.toString());
+      const qNum = matchedQ ? matchedQ.questionNumber : 1;
+
+      if (!parsedHandwritten || !parsedHandwritten.strokes || !Array.isArray(parsedHandwritten.strokes)) {
+        updatedAnswers.push({
+          questionId: ansItem.questionId,
+          handwrittenData: ansItem.handwrittenData,
+          recognizedText: ansItem.recognizedText || "",
+          hwrStatus: "Completed",
+          confidence: 1.0,
+          confidenceLevel: "HIGH",
+          submissionTime: ansItem.submissionTime || new Date(),
+        });
+        continue;
+      }
+
+      // Format payload for FastAPI recognize-strokes endpoint
+      const payload = {
+        strokes: parsedHandwritten.strokes.map(st => ({
+          points: (st.points || []).map(p => ({ x: p.x, y: p.y })),
+          color: st.color || "#0000FF",
+          width: st.width || 3
+        })),
+        width: 800,
+        height: 600,
+        page_num: qNum
+      };
+
+      logger.info(`Sending ${payload.strokes.length} strokes of question ${ansItem.questionId} (Q${qNum}) to FastAPI for OCR...`);
+
+      const response = await fetch(uvicornUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`FastAPI strokes OCR returned status ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (!result.success || !result.data) {
+        throw new Error(result.message || "Failed to process strokes in python service");
+      }
+
+      const hwrResult = result.data;
+      const recognizedText = hwrResult.text || "";
+      const confidence = hwrResult.confidence ?? 1.0;
+
+      let confidenceLevel = "HIGH";
+      if (confidence < 0.6) {
+        confidenceLevel = "LOW";
+      } else if (confidence < 0.85) {
+        confidenceLevel = "MEDIUM";
+      }
+
+      updatedAnswers.push({
+        questionId: ansItem.questionId,
+        handwrittenData: ansItem.handwrittenData,
+        recognizedText,
+        hwrStatus: "Completed",
+        confidence,
+        confidenceLevel,
+        submissionTime: ansItem.submissionTime || new Date(),
+      });
+
+      rawTextParts.push(`Q${qNum}: ${recognizedText}`);
+    }
+
+    answerSheet.answers = updatedAnswers;
+    answerSheet.extractedText = rawTextParts.join("\n\n");
+    answerSheet.processingStatus = "completed";
+    answerSheet.ocrStatus = "completed";
+    answerSheet.segmentationStatus = "completed";  // Digital is pre-segmented by question, mark completed
+    answerSheet.submissionStatus = "Pending AI Evaluation";
+    answerSheet.updatedBy = userId;
+
+    await answerSheet.save();
+    logger.info(`Background HWR completed successfully for digital AnswerSheet ${sheetId}`);
+
+    // Automatically trigger AI evaluation queueing logic
+    evaluationPipelineService.queueEvaluation(sheetId, studentId).catch(async (err) => {
+      if (err.message === "ANSWER_KEY_NOT_FOUND") {
+        // Not a real failure: the exam has no approved answer key yet. Mark the
+        // sheet as awaiting the key (instead of logging a misleading error) so it
+        // can be picked up automatically once faculty approves the answer key.
+        logger.warn(
+          `Digital AnswerSheet ${sheetId}: AI evaluation deferred — no approved answer key for this exam yet. Marking AWAITING_ANSWER_KEY.`
+        );
+        try {
+          await AnswerSheet.findByIdAndUpdate(sheetId, {
+            evaluationStatus: "AWAITING_ANSWER_KEY",
+            evaluationCurrentStep: "Waiting for an approved answer key",
+            evaluationError: null,
+          });
+        } catch (dbErr) {
+          logger.error(
+            `Failed to set AWAITING_ANSWER_KEY status for digital AnswerSheet ${sheetId}: ${dbErr.message}`
+          );
+        }
+      } else {
+        logger.error(
+          `Failed to trigger background evaluation pipeline after digital HWR: ${err.message}`
+        );
+      }
+    });
+
+  } catch (error) {
+    logger.error(`Background HWR pipeline failed for digital AnswerSheet ${sheetId}: ${error.message}`);
+    try {
+      await AnswerSheet.findByIdAndUpdate(sheetId, {
+        processingStatus: "failed",
+        ocrStatus: "failed",
+        segmentationStatus: "failed",
+        submissionStatus: "Failed",
+        errorMessage: error.message,
+        updatedBy: userId,
+      });
+    } catch (dbErr) {
+      logger.error(`Failed to log error status for digital AnswerSheet ${sheetId}: ${dbErr.message}`);
+    }
+  }
 };
 
 // Map internal statuses to dynamic pipeline steps for student

@@ -54,7 +54,7 @@ export const FacultyAnswerSheetViewerPage: React.FC = () => {
             <span className="text-on-surface">Answer Sheet Scan</span>
           </div>
           <h2 className="text-xl font-black text-on-surface font-display mt-0.5">
-            {sheet?.studentIdentifier || 'Student Draft'} - {sheet?.uploadedFileName || 'Scan View'}
+            {sheet?.student?.name ? `${sheet.student.name}${sheet.student.rollNo ? ` (${sheet.student.rollNo})` : ''}` : (sheet?.studentIdentifier || 'Student Draft')} - {sheet?.uploadedFileName || 'Scan View'}
           </h2>
         </div>
         <button

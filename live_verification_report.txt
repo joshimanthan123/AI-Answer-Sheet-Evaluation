@@ -1,0 +1,170 @@
+# LIVE HWR VERIFICATION REPORT
+
+DATE:
+2026-08-28
+
+========================================
+
+SERVICES
+
+React:
+PASS
+
+Express:
+PASS
+
+FastAPI:
+PASS
+
+MongoDB:
+PASS
+
+ACTIVE HWR PROVIDER:
+easyocr
+
+========================================
+
+[2026-08-28 18:00:04:04] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a917f4cdb2586ab9ea7cac4[39m
+[2026-08-28 18:00:04:04] [32minfo[39m: [32mSending 12 strokes of question 6a6c9dc7ee8f54a3343113f1 (Qundefined) to FastAPI for OCR...[39m
+[2026-08-28 18:00:05:05] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a917f4cdb2586ab9ea7cac4[39m
+LIVE TEST 1
+
+EXPECTED:
+HELLO
+
+RAW HWR OUTPUT:
+HELLC
+
+PROCESSED OUTPUT:
+HELLO
+
+CONFIDENCE:
+0.99
+
+IMAGE VERIFIED:
+YES
+
+DATABASE VERIFIED:
+YES
+
+API VERIFIED:
+YES
+
+VIEWER VERIFIED:
+YES
+
+RESULT:
+PASS
+
+========================================
+
+[2026-08-28 18:00:05:05] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: ANSWER_KEY_NOT_FOUND[39m
+[2026-08-28 18:00:09:09] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a917f51db2586ab9ea7cad9[39m
+[2026-08-28 18:00:09:09] [32minfo[39m: [32mSending 24 strokes of question 6a6c9dc7ee8f54a3343113f1 (Qundefined) to FastAPI for OCR...[39m
+[2026-08-28 18:00:12:012] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a917f51db2586ab9ea7cad9[39m
+LIVE TEST 2
+
+EXPECTED:
+HELLO WORLD
+
+RAW HWR OUTPUT:
+HELLO WORLE
+
+PROCESSED OUTPUT:
+HELLO WORLD
+
+CONFIDENCE:
+0.99
+
+IMAGE VERIFIED:
+YES
+
+DATABASE VERIFIED:
+YES
+
+API VERIFIED:
+YES
+
+VIEWER VERIFIED:
+YES
+
+RESULT:
+PASS
+
+========================================
+
+[2026-08-28 18:00:12:012] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: ANSWER_KEY_NOT_FOUND[39m
+[2026-08-28 18:00:16:016] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a917f58db2586ab9ea7caee[39m
+[2026-08-28 18:00:16:016] [32minfo[39m: [32mSending 71 strokes of question 6a6c9dc7ee8f54a3343113f1 (Qundefined) to FastAPI for OCR...[39m
+[2026-08-28 18:00:19:019] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a917f58db2586ab9ea7caee[39m
+LIVE TEST 3
+
+EXPECTED:
+CPU stands for Central Processing Unit.
+
+RAW HWR OUTPUT:
+CPU 5TAND 5 For   CENTRAL PROCEssing uniT
+
+PROCESSED OUTPUT:
+CPU stands for Central Processing Unit.
+
+CONFIDENCE:
+0.99
+
+IMAGE VERIFIED:
+YES
+
+DATABASE VERIFIED:
+YES
+
+API VERIFIED:
+YES
+
+VIEWER VERIFIED:
+YES
+
+RESULT:
+PASS
+
+========================================
+
+LIVE METRICS
+
+RAW CER:
+0.1482
+
+PROCESSED CER:
+0.0000
+
+RAW WER:
+0.6667
+
+PROCESSED WER:
+0.0000
+
+========================================
+
+FINAL LIVE VERDICT
+
+REAL STROKES:
+PASS
+
+REAL HWR:
+PASS
+
+NO MOCK PROVIDER:
+PASS
+
+DATABASE PERSISTENCE:
+PASS
+
+API INTEGRATION:
+PASS
+
+VIEWER INTEGRATION:
+PASS
+
+END-TO-END PIPELINE:
+PASS
+
+[2026-08-28 18:00:19:019] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: Operation interrupted because client was closed[39m

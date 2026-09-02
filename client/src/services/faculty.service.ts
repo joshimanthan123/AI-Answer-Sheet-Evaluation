@@ -27,13 +27,13 @@ export const facultyService = {
     const response = await apiClient.get('/faculty/review-queue');
     const evaluations = response.data?.data || response.data || [];
     return evaluations.map((ev: any) => ({
-      id: ev._id,
-      studentName: ev.answerSheet?.student?.name || 'Unknown Student',
-      subjectName: ev.answerSheet?.subject?.name || 'Unknown Subject',
-      fileName: ev.answerSheet?.original_filename || ev.answerSheet?.fileName || 'AnswerSheet.pdf',
-      status: ev.evaluationStatus === 'AI_COMPLETED' ? 'pending' : 'reevaluate_requested',
+      id: ev.answerSheetId || ev._id || ev.id,
+      studentName: ev.student?.name || ev.answerSheet?.student?.name || 'Unknown Student',
+      subjectName: ev.exam?.title || ev.answerSheet?.subject?.name || 'Unknown Subject',
+      fileName: ev.fileName || ev.answerSheet?.original_filename || ev.answerSheet?.fileName || 'AnswerSheet.pdf',
+      status: ev.reviewStatus === 'READY_FOR_FACULTY_REVIEW' ? 'pending' : (ev.reviewStatus === 'REVISION_REQUIRED' ? 'reevaluate_requested' : 'pending'),
       similarityIndex: ev.similarityIndex || 96,
-      evaluationId: ev._id
+      evaluationId: ev._id || ev.answerSheetId
     }));
   },
 

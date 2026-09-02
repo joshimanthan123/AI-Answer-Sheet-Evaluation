@@ -76,7 +76,7 @@ async function runTest() {
     });
 
     tempCourse = await Course.create({
-      name: "B.Tech Computer Engineering",
+      name: "B.Tech Computer Engineering " + Date.now(),
       code: "BTCE",
       durationYears: 4,
       totalSemesters: 8,

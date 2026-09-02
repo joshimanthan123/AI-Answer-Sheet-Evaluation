@@ -59,7 +59,7 @@ export const FacultyManualEvaluation: React.FC = () => {
     if (!sheetId) return;
     try {
       setLoading(true);
-      const sheetRes = await answerSheetService.getStudentSheetDetail(sheetId);
+      const sheetRes = await answerSheetService.getFacultySheetDetail(sheetId);
       const sheetObj = sheetRes.data || sheetRes;
       setSheet(sheetObj);
 

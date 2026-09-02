@@ -28,6 +28,11 @@ class SegmentedAnswer(BaseModel):
     start_line: int = Field(description="1-based offset index in the combined line list specifying answer start.")
     end_line: int = Field(description="1-based offset index specifying answer end.")
     metadata: AnswerMetadata = Field(description="Detailed metadata detailing page and line counts.")
+    # Phase 4B fields
+    confidence_level: str | None = None
+    status: str = "READY_FOR_EVALUATION"
+    source_pages: list[int] = Field(default_factory=list)
+
 
 
 class SegmentationResult(BaseModel):

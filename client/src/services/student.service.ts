@@ -35,6 +35,22 @@ export const studentService = {
 
   getResults: async (): Promise<any[]> => {
     const response = await apiClient.get('/student/results');
+    const records = response.data?.data || response.data || [];
+    return records.map((res: any) => ({
+      id: res.answerSheetId || res.id || res._id,
+      examName: res.examName,
+      subjectName: res.course || res.subjectName || 'Subject',
+      finalScore: res.totalFinalMarks !== undefined ? res.totalFinalMarks : (res.finalScore || 0),
+      totalScore: res.maximumMarks !== undefined ? res.maximumMarks : (res.totalScore || 10),
+      grade: res.grade || 'F',
+      date: res.publishedAt ? new Date(res.publishedAt).toLocaleDateString() : (res.date || 'N/A'),
+      status: 'approved',
+      percentage: res.percentage || 0
+    }));
+  },
+
+  getResultDetails: async (answerSheetId: string): Promise<any> => {
+    const response = await apiClient.get(`/student/results/${answerSheetId}`);
     return response.data?.data || response.data;
   },
 

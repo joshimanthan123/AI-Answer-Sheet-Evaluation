@@ -184,14 +184,18 @@ class AnswerSheetService:
                         raise ValueError("PDF content holds no pages.")
                     for page_num in range(page_count):
                         page = pdf_doc.load_page(page_num)
-                        pix = page.get_pixmap()
+                        pix = page.get_pixmap(dpi=150)
                         png_bytes = pix.tobytes("png")
+                        
+                        pdf_raw = page.get_text() or ""
+                        # Keep raw text if it contains legible text content
+                        clean_raw = pdf_raw.strip() if any(c.isalnum() for c in pdf_raw) else ""
                         
                         orig_cv_img = self.preprocessor.load(png_bytes)
                         if orig_cv_img is None:
                             raise ValueError(f"Failed to load PDF page {page_num + 1} as OpenCV image.")
                         h, w = orig_cv_img.shape[:2]
-                        pages_data.append((page_num + 1, png_bytes, w, h))
+                        pages_data.append((page_num + 1, png_bytes, w, h, clean_raw))
                 except Exception as e:
                     logger.error("PyMuPDF extraction failed: %s", str(e))
                     raise AnswerSheetProcessingError(f"PDF extraction failed: {str(e)}")
@@ -206,7 +210,7 @@ class AnswerSheetService:
                     _, png_buffer = cv2.imencode(".png", orig_cv_img)
                     png_bytes = png_buffer.tobytes()
                     
-                    pages_data.append((1, png_bytes, w, h))
+                    pages_data.append((1, png_bytes, w, h, ""))
                 except Exception as e:
                     logger.error("Image loading failed: %s", str(e))
                     raise AnswerSheetProcessingError(f"Image parsing failed: {str(e)}")
@@ -219,7 +223,8 @@ class AnswerSheetService:
             hwr_results_by_page = []
             final_pages = []
 
-            for page_num, img_bytes, w, h in pages_data:
+            for page_entry in pages_data:
+                page_num, img_bytes, w, h, raw_text = page_entry
                 # Store original page PNG representation
                 orig_page_ref = f"{student_id}/{sheet_id}/original/page-{page_num:03d}.png"
                 processed_page_ref = f"{student_id}/{sheet_id}/processed/page-{page_num:03d}.png"
@@ -244,12 +249,13 @@ class AnswerSheetService:
                     processed_file_reference=processed_page_ref,
                     width=w,
                     height=h,
-                    processing_status="PROCESSED"
+                    processing_status="PROCESSED",
+                    extracted_text=raw_text if raw_text else None
                 )
                 final_pages.append(page_obj)
 
-                # Run HWR recognition on the processed page copy
-                hwr_result = self.hwr_service.recognize_handwriting(preprocess_result.processed, page_num=page_num)
+                # Run HWR recognition on orig_cv_img (original page image) for optimal OCR/HWR accuracy
+                hwr_result = self.hwr_service.recognize_handwriting(orig_cv_img, page_num=page_num, raw_text=raw_text)
                 logger.info(
                     "AnswerSheet %s. Page %d: HWR recognized lines count = %d",
                     str(sheet_id),
@@ -282,9 +288,14 @@ class AnswerSheetService:
                 page_start = segmented_ans.metadata.page_start
                 digital_ans = DigitalAnswer(
                     question_number=segmented_ans.normalized_question_number,
+                    normalized_question_number=segmented_ans.normalized_question_number,
                     text=segmented_ans.answer_text,
+                    answer_text=segmented_ans.answer_text,
                     page_number=page_start,
-                    confidence=segmented_ans.confidence
+                    confidence=segmented_ans.confidence,
+                    source_pages=segmented_ans.source_pages,
+                    confidence_level=segmented_ans.confidence_level,
+                    status=segmented_ans.status
                 )
                 digital_answers.append(digital_ans)
                 logger.info(
@@ -298,7 +309,7 @@ class AnswerSheetService:
 
             updated_sheet = await self.repository.update(sheet_id, {
                 "digital_answers": digital_answers,
-                "processing_status": AnswerSheetStatus.EVALUATION_PENDING,
+                "processing_status": AnswerSheetStatus.COMPLETED,
                 "updated_at": datetime.now(timezone.utc)
             })
             return updated_sheet

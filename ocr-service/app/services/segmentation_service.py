@@ -6,6 +6,7 @@ from app.config import settings
 from app.models.hwr_models import HWRResult, HWRLine
 from app.models.segmentation_models import SegmentedAnswer, AnswerMetadata, SegmentationResult
 from app.utils.question_detector import parse_question_number
+from app.utils.confidence_utils import calculate_average_confidence, classify_confidence
 
 logger = logging.getLogger("app.services.segmentation_service")
 
@@ -78,7 +79,7 @@ class AnswerSegmentationService:
                 warnings.append(f"EMPTY_ANSWER: No content found for question {current_normalized}")
             else:
                 confs = [l.confidence for l in non_empty_runs]
-                avg_confidence = sum(confs) / len(confs)
+                avg_confidence = calculate_average_confidence(confs) or 0.0
                 # Reconstruct full block text by merging lines
                 answer_text = " ".join([l.text.strip() for l, p in current_lines]).strip()
                 
@@ -111,10 +112,15 @@ class AnswerSegmentationService:
                 
             # Check for duplicates
             is_dup = any(a.normalized_question_number == current_normalized for a in answers_list)
+            if_dup = is_dup
             if is_dup:
                 duplicate_questions.append(current_normalized)
                 warnings.append(f"DUPLICATE_HEADER: Multiple segments found for question {current_normalized}")
                 
+            # Compute source pages unique list
+            source_pages = list(sorted(list(set([p for l, p in current_lines])))) if current_lines else [page_start]
+            confidence_level = classify_confidence(avg_confidence)
+
             # Instantiate SegmentedAnswer
             segmented = SegmentedAnswer(
                 question_number=current_question,
@@ -128,7 +134,10 @@ class AnswerSegmentationService:
                     page_start=page_start,
                     page_end=page_end,
                     line_count=line_count
-                )
+                ),
+                confidence_level=confidence_level,
+                source_pages=source_pages,
+                status="READY_FOR_EVALUATION"
             )
             answers_list.append(segmented)
             
@@ -175,6 +184,30 @@ class AnswerSegmentationService:
         # Finalize the last question segment in the document pool
         if current_normalized:
             finalize_active_segment(overall_counter)
+        elif not answers_list and flat_lines:
+            # Fallback: If no explicit question header was detected, group all document lines into Q1
+            non_empty_lines = [l for l, p, idx in flat_lines if l.text.strip()]
+            if non_empty_lines:
+                all_text = " ".join([l.text.strip() for l, p, idx in flat_lines if l.text.strip()])
+                confs = [l.confidence for l in non_empty_lines]
+                avg_conf = calculate_average_confidence(confs) or 0.95
+                answers_list.append(SegmentedAnswer(
+                    question_number="1",
+                    normalized_question_number="Q1",
+                    original_header="Q1",
+                    answer_text=all_text,
+                    confidence=round(avg_conf, 4),
+                    start_line=1,
+                    end_line=len(flat_lines),
+                    metadata=AnswerMetadata(
+                        page_start=1,
+                        page_end=flat_lines[-1][1],
+                        line_count=len(flat_lines)
+                    ),
+                    confidence_level=classify_confidence(avg_conf),
+                    source_pages=list(sorted(list(set([p for l, p, idx in flat_lines])))),
+                    status="READY_FOR_EVALUATION"
+                ))
             
         # 3. Check for excess unknown lines
         if len(unknown_sections) > settings.SEGMENTATION_MAX_UNKNOWN_LINES:

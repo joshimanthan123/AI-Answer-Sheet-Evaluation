@@ -23,13 +23,10 @@ export const StudentDetailedReport: React.FC = () => {
     if (!id) return;
     const loadData = async () => {
       try {
-        const [evalObj, questions] = await Promise.all([
-          evaluationService.getEvaluationById(id),
-          evaluationService.getEvaluationDetails(id)
-        ]);
-        if (evalObj) {
-          setEvaluation(evalObj);
-          setDetails(questions);
+        const payload = await studentService.getResultDetails(id);
+        if (payload && payload.evaluation) {
+          setEvaluation(payload.evaluation);
+          setDetails(payload.questions || []);
         }
       } catch (err) {
         console.error(err);

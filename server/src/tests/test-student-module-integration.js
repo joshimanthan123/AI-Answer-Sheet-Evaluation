@@ -384,6 +384,7 @@ async function runTests() {
         {
           questionId: questionId,
           recognizedText: "Binary Search Tree properties",
+          maxMarks: 10,
           aiAwardedMarks: 8,
           finalAwardedMarks: 8,
         }

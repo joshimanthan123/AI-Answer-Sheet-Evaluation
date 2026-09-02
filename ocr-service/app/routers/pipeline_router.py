@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import base64
 import logging
 from typing import List, Union
@@ -258,3 +259,112 @@ async def run_pipeline(
         message="OCR pipeline processing completed successfully.",
         data=pipeline_res.model_dump()
     )
+
+
+from pydantic import BaseModel
+
+class StrokePoint(BaseModel):
+    x: float
+    y: float
+
+class Stroke(BaseModel):
+    points: List[StrokePoint]
+    color: str = "#0000FF"
+    width: int = 3
+
+class StrokesPayload(BaseModel):
+    strokes: List[Stroke]
+    width: int = 800
+    height: int = 600
+    page_num: int = 1
+
+@router.post("/recognize-strokes", response_model=ApiResponse, tags=["Recognition"])
+async def recognize_strokes(
+    payload: StrokesPayload,
+    hwr_service: HandwritingRecognitionService = Depends(get_hwr_service)
+):
+    """
+    Renders student digital canvas strokes into a clean white numpy image matrix
+    with bounding box normalization and padding, saves diagnostic images,
+    and performs handwriting recognition using the configured provider.
+    """
+    # 1. Collect points to calculate bounding box
+    all_x = []
+    all_y = []
+    
+    for stroke in payload.strokes:
+        if not stroke.points:
+            continue
+        for pt in stroke.points:
+            all_x.append(pt.x)
+            all_y.append(pt.y)
+            
+    padding = 50
+    target_min_height = 250
+    stroke_thickness = 5
+    
+    if not all_x or not all_y:
+        # Fallback to white canvas if empty
+        img = np.ones((payload.height or 400, payload.width or 800, 3), dtype=np.uint8) * 255
+    else:
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        
+        bbox_w = max(max_x - min_x, 10)
+        bbox_h = max(max_y - min_y, 10)
+        
+        # Scale to ensure handwriting is clearly visible and reasonably sized
+        scale = max(target_min_height / bbox_h, 1.5)
+        
+        canvas_w = int(bbox_w * scale + padding * 2)
+        canvas_h = int(bbox_h * scale + padding * 2)
+        
+        img = np.ones((canvas_h, canvas_w, 3), dtype=np.uint8) * 255
+        
+        for stroke in payload.strokes:
+            if not stroke.points or len(stroke.points) < 2:
+                continue
+            
+            scaled_pts = []
+            for p in stroke.points:
+                sx = int((p.x - min_x) * scale + padding)
+                sy = int((p.y - min_y) * scale + padding)
+                scaled_pts.append((sx, sy))
+                
+            for i in range(len(scaled_pts) - 1):
+                cv2.line(img, scaled_pts[i], scaled_pts[i+1], (0, 0, 0), stroke_thickness, lineType=cv2.LINE_AA)
+
+    # 2. Save diagnostic debug images
+    import os
+    debug_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "debug")
+    os.makedirs(debug_dir, exist_ok=True)
+    
+    out_png = os.path.join(debug_dir, "generated_student_handwriting.png")
+    orig_png = os.path.join(debug_dir, "01-original.png")
+    
+    cv2.imwrite(out_png, img)
+    cv2.imwrite(orig_png, img)
+    logger.info("Saved diagnostic stroke image to %s", out_png)
+
+    # 3. Transcribe handwriting
+    try:
+        hwr_result = hwr_service.recognize_handwriting(img, page_num=payload.page_num)
+        
+        from app.services.hwr_postprocessor import postprocess_hwr_text
+        raw_text = hwr_result.text
+        proc_text = postprocess_hwr_text(raw_text)
+        
+        hwr_result.raw_text = raw_text
+        hwr_result.processed_text = proc_text
+        hwr_result.text = proc_text
+    except HWRServiceError as hse:
+        if "timeout" in str(hse).lower() or "gate" in str(hse).lower():
+            raise AzureTimeoutException(str(hse))
+        raise OCRProviderFailureException(str(hse))
+        
+    return ApiResponse(
+        success=True,
+        message="Handwriting strokes recognized successfully.",
+        data=hwr_result.model_dump()
+    )
+

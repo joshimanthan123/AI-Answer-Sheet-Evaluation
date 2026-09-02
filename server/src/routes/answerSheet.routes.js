@@ -58,6 +58,10 @@ router
   .post(authorize(ROLES.FACULTY, ROLES.ADMIN), answerSheetController.retryAnswerSheet);
 
 router
+  .route("/:id/digital")
+  .get(answerSheetController.getDigitalAnswers);
+
+router
   .route("/:id")
   .get(answerSheetController.getAnswerSheetById)
   .put(
@@ -73,7 +77,32 @@ router
   .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.startEvaluation);
 
 router
+  .route("/:id/evaluation-status")
+  .get(
+    authorize(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN),
+    evaluationController.getEvaluationStatus
+  );
+
+router
+  .route("/:id/evaluation")
+  .get(
+    authorize(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN),
+    evaluationController.getEvaluationResults
+  );
+
+router
+  .route("/:id/answers/:question_number/evaluation")
+  .get(
+    authorize(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN),
+    evaluationController.getQuestionEvaluation
+  );
+
+router
   .route("/:id/re-evaluate")
   .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.reEvaluateAnswerSheet);
+
+router
+  .route("/:id/answers/:question_number/re-evaluate")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.reEvaluateQuestion);
 
 export default router;

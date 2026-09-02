@@ -1,0 +1,5 @@
+MissingSchemaError: Schema hasn't been registered for model "Evaluation".
+Use mongoose.model(name, schema)
+    at Mongoose.model (D:\CE\sem5\SGP\Ai based evaluation sheet\server\node_modules\mongoose\lib\mongoose.js:577:13)
+    at run (file:///D:/CE/sem5/SGP/Ai%20based%20evaluation%20sheet/server/verify_faculty_viewer.js:48:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)

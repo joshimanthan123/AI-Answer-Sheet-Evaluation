@@ -47,15 +47,17 @@ export const UploadAnswerSheet: React.FC = () => {
 
   const loadAttempts = async () => {
     try {
-      const res = await answerSheetService.listStudentSheets();
-      const data = res.data?.data || res.data || [];
+      const res: any = await answerSheetService.listStudentSheets();
+      const data = res.data?.data || res.data || (Array.isArray(res) ? res : []);
       const mapped = data.map((sheet: any, idx: number) => ({
         id: sheet._id || sheet.id,
-        attemptNo: idx + 1,
-        fileName: sheet.original_filename || sheet.fileName,
-        fileSize: sheet.fileSize || 'N/A',
+        attemptNo: sheet.attemptNo || idx + 1,
+        fileName: sheet.original_filename || sheet.uploadedFileName || sheet.fileName || 'Answer Sheet',
+        fileSize: sheet.fileSize ? (typeof sheet.fileSize === 'number' ? `${(sheet.fileSize / 1024).toFixed(1)} KB` : sheet.fileSize) : 'N/A',
         uploadStatus: sheet.processing_status || sheet.uploadStatus || 'Uploaded',
-        submittedAt: sheet.uploaded_at ? new Date(sheet.uploaded_at).toLocaleString() : 'N/A',
+        submittedAt: (sheet.uploaded_at || sheet.createdAt || sheet.submittedAt) 
+          ? new Date(sheet.uploaded_at || sheet.createdAt || sheet.submittedAt).toLocaleString() 
+          : 'N/A',
         obtainedMarks: sheet.obtainedMarks,
         totalMarks: sheet.totalMarks,
         grade: sheet.grade
@@ -112,13 +114,30 @@ export const UploadAnswerSheet: React.FC = () => {
 
       if (result.success && result.data) {
         setActiveStep(1); // HWR Processing
-        await new Promise((r) => setTimeout(r, 1000));
-        
+        const uploadedSheetId = result.data.id;
+
+        // Poll for OCR completion (up to 15 seconds)
+        let completed = false;
+        let attemptsCount = 0;
+        while (!completed && attemptsCount < 15) {
+          await new Promise((r) => setTimeout(r, 1000));
+          attemptsCount++;
+          try {
+            const detail: any = await answerSheetService.getStudentSheetDetail(uploadedSheetId);
+            const status = String(detail?.processing_status || '').toUpperCase();
+            if (['COMPLETED', 'OCR_COMPLETED', 'SEGMENTED', 'FAILED'].includes(status)) {
+              completed = true;
+            }
+          } catch (e) {
+            // Ignore temporary polling errors
+          }
+        }
+
         setActiveStep(2); // AI Evaluation
-        await new Promise((r) => setTimeout(r, 1000));
-        
+        await new Promise((r) => setTimeout(r, 500));
+
         setActiveStep(3); // Faculty Review
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 500));
 
         setIsUploading(false);
         setSelectedFile(null);

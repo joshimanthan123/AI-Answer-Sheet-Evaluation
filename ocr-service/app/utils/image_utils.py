@@ -393,3 +393,60 @@ def morphological_cleanup(image: np.ndarray, operation: str = "open", kernel_siz
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     
     return cv2.morphologyEx(image, op_type, kernel)
+
+
+def otsu_threshold(image: np.ndarray) -> np.ndarray:
+    """
+    Performs global binarization using Otsu's thresholding method.
+    Converts image to grayscale first if it contains color channels.
+    
+    Args:
+        image: The input image.
+        
+    Returns:
+        np.ndarray: Binarized 1-channel image.
+    """
+    validate_image(image)
+    gray = convert_to_grayscale(image)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return thresh
+
+
+def upscale_image(image: np.ndarray, scale_factor: float = 1.5) -> np.ndarray:
+    """
+    Upscales an image by a scaling factor using bicubic interpolation.
+    
+    Args:
+        image: The input image.
+        scale_factor: Multiplier for width and height (> 0).
+        
+    Returns:
+        np.ndarray: Upscaled image.
+    """
+    validate_image(image)
+    if scale_factor <= 0:
+        raise ValueError(f"Scale factor must be positive. Got: {scale_factor}")
+        
+    height, width = image.shape[:2]
+    new_width = int(width * scale_factor)
+    new_height = int(height * scale_factor)
+    
+    return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+
+
+def denoise_bilateral(image: np.ndarray, d: int = 9, sigma_color: float = 75.0, sigma_space: float = 75.0) -> np.ndarray:
+    """
+    Applies bilateral filter for edge-preserving noise reduction.
+    
+    Args:
+        image: The input image.
+        d: Diameter of pixel neighborhood.
+        sigma_color: Filter sigma in color space.
+        sigma_space: Filter sigma in coordinate space.
+        
+    Returns:
+        np.ndarray: Filtered image.
+    """
+    validate_image(image)
+    return cv2.bilateralFilter(image, d, sigma_color, sigma_space)
+

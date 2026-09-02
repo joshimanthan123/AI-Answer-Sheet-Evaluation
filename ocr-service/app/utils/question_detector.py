@@ -102,11 +102,27 @@ def parse_question_number(line: str) -> Optional[Tuple[str, str]]:
             return orig_stripped[:sub_match.end()].strip(), norm
 
     # Priority 5: Numeric headers (e.g. 1. or 2) )
-    num_match = re.match(r'^([0-9]+)\b\s*[.\)\-]+', cleaned)
+    num_match = re.match(r'^([0-9]+)\b\s*[.\)\-:]+', cleaned)
     if num_match:
         num = num_match.group(1)
-        norm = f"Q{num}"
-        return orig_stripped[:num_match.end()].strip(), norm
+        suffix = cleaned[num_match.end():].strip()
+        false_positive_indicators = [
+            r'^(first|second|third|fourth|fifth|firstly|secondly|thirdly|another)\b',
+            r'^(advantage|disadvantage|type|method|point|reason|step|part|example|definition|option|feature|characteristic|pro|con|benefit|drawback)\b',
+            r'^following\s+(are|points|advantages|disadvantages|types|methods|reasons|steps|parts|examples|features)\b'
+        ]
+        is_false_positive = False
+        for pattern in false_positive_indicators:
+            if re.search(pattern, suffix, re.IGNORECASE):
+                is_false_positive = True
+                break
+        
+        if suffix and suffix[0].islower():
+            is_false_positive = True
+            
+        if not is_false_positive:
+            norm = f"Q{num}"
+            return orig_stripped[:num_match.end()].strip(), norm
 
     # Priority 6: Roman numerals (e.g. II., III) )
     if settings.SEGMENTATION_ALLOW_ROMAN:

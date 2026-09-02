@@ -159,7 +159,7 @@ class GoogleVisionHWRProvider(IHWRProvider):
                             if word_conf is None:
                                 word_conf = 1.0  # Fallback if no word level confidence exists
                             
-                            current_line_words.append((word_text, float(word_conf)))
+                            current_line_words.append((word_text, float(word_conf), word))
                             
                             # Check for line break at the end of the word
                             is_line_break = False
@@ -179,14 +179,41 @@ class GoogleVisionHWRProvider(IHWRProvider):
                             if is_line_break:
                                 line_text = " ".join([w[0] for w in current_line_words])
                                 line_conf = sum([w[1] for w in current_line_words]) / len(current_line_words)
-                                lines.append(HWRLine(text=line_text, confidence=round(line_conf, 4)))
+                                
+                                # Construct bounding box from word vertices
+                                box_pts = []
+                                for w_item in current_line_words:
+                                    w_obj = w_item[2]
+                                    if hasattr(w_obj, "bounding_box") and w_obj.bounding_box:
+                                        box_pts.extend([[v.x, v.y] for v in w_obj.bounding_box.vertices if hasattr(v, "x") and hasattr(v, "y")])
+                                
+                                line_box = None
+                                if box_pts:
+                                    xs = [pt[0] for pt in box_pts]
+                                    ys = [pt[1] for pt in box_pts]
+                                    line_box = [[min(xs), min(ys)], [max(xs), min(ys)], [max(xs), max(ys)], [min(xs), max(ys)]]
+                                    
+                                lines.append(HWRLine(text=line_text, confidence=round(line_conf, 4), boundingBox=line_box))
                                 current_line_words = []
                         
                         # Flush remainder of paragraph
                         if current_line_words:
                             line_text = " ".join([w[0] for w in current_line_words])
                             line_conf = sum([w[1] for w in current_line_words]) / len(current_line_words)
-                            lines.append(HWRLine(text=line_text, confidence=round(line_conf, 4)))
+                            
+                            box_pts = []
+                            for w_item in current_line_words:
+                                w_obj = w_item[2]
+                                if hasattr(w_obj, "bounding_box") and w_obj.bounding_box:
+                                    box_pts.extend([[v.x, v.y] for v in w_obj.bounding_box.vertices if hasattr(v, "x") and hasattr(v, "y")])
+                            
+                            line_box = None
+                            if box_pts:
+                                xs = [pt[0] for pt in box_pts]
+                                ys = [pt[1] for pt in box_pts]
+                                line_box = [[min(xs), min(ys)], [max(xs), min(ys)], [max(xs), max(ys)], [min(xs), max(ys)]]
+                                
+                            lines.append(HWRLine(text=line_text, confidence=round(line_conf, 4), boundingBox=line_box))
                             
         except Exception as exc:
             raise GoogleVisionProviderError(

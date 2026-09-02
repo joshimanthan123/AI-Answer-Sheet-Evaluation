@@ -43,7 +43,7 @@ async function runTest() {
       role: "student",
       studentId: "STUD" + Date.now(),
       semester: 5,
-      department: "CE-DASH",
+      department: "CEDASH",
     });
     console.log("✓ Created mock faculty and student users.");
 
@@ -158,7 +158,7 @@ async function runTest() {
     // Submit status should mean active exam is not counts (since already submitted)
     if (dashboardData.activeExams !== 0) throw new Error(`Expected 0 active exams (student already submitted), got ${dashboardData.activeExams}`);
     if (dashboardData.completedExams !== 1) throw new Error(`Expected 1 completed exam, got ${dashboardData.completedExams}`);
-    if (dashboardData.pipeline.status !== "ocr_processing") throw new Error(`Expected pipeline status 'ocr_processing', got ${dashboardData.pipeline.status}`);
+    if (dashboardData.pipeline.status !== "processing") throw new Error(`Expected pipeline status 'processing', got ${dashboardData.pipeline.status}`);
     if (dashboardData.pipeline.currentStage !== "Handwriting Recognition") throw new Error(`Expected stage 'Handwriting Recognition', got ${dashboardData.pipeline.currentStage}`);
     if (dashboardData.pipeline.progress !== 40) throw new Error(`Expected progress 40, got ${dashboardData.pipeline.progress}`);
     console.log("✓ Scenario 3 passed!");
@@ -219,7 +219,7 @@ async function runTest() {
 
     console.log("\nALL STUDENT DASHBOARD INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉");
   } catch (err) {
-    console.error("\n❌ TESTS FAILED:", err);
+    console.error("\n❌ TESTS FAILED:", err.stack || err);
     process.exitCode = 1;
   } finally {
     console.log("Cleaning up test documents...");

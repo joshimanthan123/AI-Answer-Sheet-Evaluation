@@ -7,6 +7,7 @@ import { STATUS_CODES } from "../constants/statusCodes.js";
 import { sendSuccess } from "../helpers/response.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import logger from "../utils/logger.js";
+import facultyReviewService from "../services/facultyReview.service.js";
 
 export const getFacultyDashboard = asyncHandler(async (req, res) => {
   const result = await dashboardService.getFacultyDashboard(req.user._id);
@@ -52,35 +53,12 @@ export const getFacultySubmissions = asyncHandler(async (req, res) => {
 });
 
 export const getFacultyReviewQueue = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
-  const limitNum = Number(limit);
-  const skip = (Number(page) - 1) * limitNum;
-
-  const mongoQuery = {
-    evaluationStatus: { $in: ["AI_COMPLETED", "FACULTY_REVIEW"] },
-    isDeleted: false,
-  };
-
-  const total = await Evaluation.countDocuments(mongoQuery);
-  const data = await Evaluation.find(mongoQuery)
-    .sort("-createdAt")
-    .skip(skip)
-    .limit(limitNum)
-    .populate({
-      path: "answerSheet",
-      populate: [
-        { path: "student", select: "name email rollNo department" },
-        { path: "exam", select: "title totalMarks duration" },
-        { path: "subject", select: "name code" },
-      ],
-    })
-    .populate("evaluatedBy", "name email");
-
-  return sendSuccess(res, STATUS_CODES.OK, "Evaluation review queue retrieved successfully", data, {
-    total,
-    page: Number(page),
-    limit: limitNum,
-    totalPages: Math.ceil(total / limitNum),
+  const result = await facultyReviewService.getReviewQueue(req.query, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation review queue retrieved successfully", result.data, {
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
   });
 });
 
@@ -262,6 +240,62 @@ export const getFacultyStudents = asyncHandler(async (req, res) => {
   );
 });
 
+export const getFacultyReviewDetails = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.getReviewDetails(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Faculty review details retrieved successfully", result);
+});
+
+export const startFacultyReview = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.startReview(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Faculty review started successfully", result);
+});
+
+export const reviewQuestion = asyncHandler(async (req, res) => {
+  const { facultyMarks, comment } = req.body;
+  const result = await facultyReviewService.reviewQuestion(
+    req.params.id,
+    req.params.questionNumber,
+    facultyMarks,
+    comment,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Question evaluation review saved", result);
+});
+
+export const addOverallComment = asyncHandler(async (req, res) => {
+  const { comment } = req.body;
+  const result = await facultyReviewService.addOverallComment(req.params.id, comment, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Review comment saved successfully", result);
+});
+
+export const requestReEvaluation = asyncHandler(async (req, res) => {
+  const { scope, questionNumber, reason } = req.body;
+  const result = await facultyReviewService.requestReEvaluation(
+    req.params.id,
+    scope,
+    questionNumber,
+    reason,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "AI recheck requested successfully", result);
+});
+
+export const requestRevision = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  const result = await facultyReviewService.requestRevision(req.params.id, reason, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Revision requested successfully", result);
+});
+
+export const approveReview = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.approveReview(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation progress approved successfully", result);
+});
+
+export const finalizeReview = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.finalizeReview(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation score finalized and locked", result);
+});
+
 export default {
   getFacultyDashboard,
   getFacultySubmissions,
@@ -270,4 +304,12 @@ export default {
   updateFacultyProfile,
   changeFacultyPassword,
   getFacultyStudents,
+  getFacultyReviewDetails,
+  startFacultyReview,
+  reviewQuestion,
+  addOverallComment,
+  requestReEvaluation,
+  requestRevision,
+  approveReview,
+  finalizeReview,
 };

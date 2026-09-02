@@ -116,6 +116,28 @@ def get_answer_sheet_service(
         segmentation_service=segmentation_service,
     )
 
+from app.services.answer_sheet_processing_service import AnswerSheetProcessingService
+
+_answer_sheet_processing_service: AnswerSheetProcessingService | None = None
+
+def get_answer_sheet_processing_service(
+    repo: IAnswerSheetRepository = Depends(get_answer_sheet_repository),
+    storage: LocalStorage = Depends(get_storage),
+    preprocessor: ImagePreprocessor = Depends(get_preprocessor),
+    hwr_service: HandwritingRecognitionService = Depends(get_hwr_service),
+    segmentation_service: AnswerSegmentationService = Depends(get_segmentation_service),
+) -> AnswerSheetProcessingService:
+    global _answer_sheet_processing_service
+    if _answer_sheet_processing_service is None:
+        _answer_sheet_processing_service = AnswerSheetProcessingService(
+            repository=repo,
+            storage=storage,
+            preprocessor=preprocessor,
+            hwr_service=hwr_service,
+            segmentation_service=segmentation_service
+        )
+    return _answer_sheet_processing_service
+
 def get_current_user_id(x_user_id: str = Header(default=None)) -> str:
     if not x_user_id:
         raise HTTPException(status_code=401, detail="Header X-User-Id is missing")

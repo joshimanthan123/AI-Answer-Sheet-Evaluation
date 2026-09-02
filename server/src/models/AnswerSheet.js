@@ -23,6 +23,18 @@ const answerItemSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  confidenceLevel: {
+    type: String,
+    enum: ["HIGH", "MEDIUM", "LOW"],
+    default: "HIGH",
+    trim: true,
+  },
+  confidence: {
+    type: Number,
+    min: 0,
+    max: 1,
+    default: 1.0,
+  },
 });
 
 const answerSheetSchema = new mongoose.Schema(
@@ -168,6 +180,123 @@ const answerSheetSchema = new mongoose.Schema(
     extractedText: {
       type: String,
       trim: true,
+    },
+    evaluationStatus: {
+      type: String,
+      enum: [
+        "READY_FOR_EVALUATION",
+        "AWAITING_ANSWER_KEY",
+        "QUEUED_FOR_EVALUATION",
+        "LOADING_ANSWER_KEY",
+        "BUILDING_PROMPT",
+        "AI_EVALUATING",
+        "VALIDATING_RESULT",
+        "EVALUATION_COMPLETED",
+        "EVALUATION_FAILED",
+        "PARTIALLY_EVALUATED",
+        "READY_FOR_FACULTY_REVIEW",
+      ],
+      default: "READY_FOR_EVALUATION",
+      index: true,
+    },
+    evaluationProgress: {
+      type: Number,
+      default: 0,
+    },
+    evaluationCurrentStep: {
+      type: String,
+      default: null,
+    },
+    evaluationError: {
+      type: String,
+      default: null,
+    },
+    evaluationStartedAt: {
+      type: Date,
+    },
+    evaluationCompletedAt: {
+      type: Date,
+    },
+    evaluationAttempt: {
+      type: Number,
+      default: 0,
+    },
+    evaluationSummary: {
+      totalQuestions: { type: Number, default: 0 },
+      evaluatedQuestions: { type: Number, default: 0 },
+      failedQuestions: { type: Number, default: 0 },
+      totalMaximumMarks: { type: Number, default: 0 },
+      totalAwardedMarks: { type: Number, default: 0 },
+      percentage: { type: Number, default: 0 },
+    },
+    reviewStatus: {
+      type: String,
+      enum: [
+        "NOT_READY",
+        "READY_FOR_FACULTY_REVIEW",
+        "FACULTY_REVIEW_IN_PROGRESS",
+        "REVISION_REQUIRED",
+        "APPROVED",
+        "FINALIZED",
+        "READY_FOR_RESULT_PUBLICATION",
+        "RESULT_PUBLISHED",
+        "RESULT_UNPUBLISHED",
+        "READY_FOR_EVALUATION", // Keep from old transitions just in case
+      ],
+      default: "NOT_READY",
+      index: true,
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    reviewStartedAt: {
+      type: Date,
+    },
+    reviewedAt: {
+      type: Date,
+    },
+    finalizedAt: {
+      type: Date,
+    },
+    finalizedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    resultPublication: {
+      status: {
+        type: String,
+        enum: [
+          "NOT_READY",
+          "READY_FOR_RESULT_PUBLICATION",
+          "RESULT_PUBLISHED",
+          "RESULT_UNPUBLISHED"
+        ],
+        default: "NOT_READY",
+        index: true,
+      },
+      publishedAt: {
+        type: Date,
+        default: null
+      },
+      publishedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+      },
+      unpublishedAt: {
+        type: Date,
+        default: null
+      },
+      unpublishedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+      },
+      publicationComment: {
+        type: String,
+        default: null
+      }
     },
     isDeleted: {
       type: Boolean,

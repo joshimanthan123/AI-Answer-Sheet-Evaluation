@@ -62,6 +62,14 @@ class HandwritingRecognitionService:
 
         if name == "mock":
             return MockProvider()
+        elif name == "easyocr":
+            try:
+                from app.providers.easyocr_provider import EasyOCRHWRProvider, EasyOCRProviderError
+                return EasyOCRHWRProvider()
+            except EasyOCRProviderError as eope:
+                raise HWRServiceError(f"EasyOCR configuration error: {str(eope)}") from eope
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate EasyOCR provider: {str(e)}") from e
         elif name == "paddle":
             try:
                 from app.providers.paddle_provider import PaddleHWRProvider, PaddleProviderError
@@ -95,21 +103,12 @@ class HandwritingRecognitionService:
         cls, 
         image: np.ndarray, 
         provider_name: str = None,
-        page_num: int = 1
+        page_num: int = 1,
+        raw_text: str | None = None
     ) -> HWRResult:
         """
         Transcribes handwritten text from an image using the selected provider.
         Handles timing checks, logger tracking, and provider exception grouping.
-        
-        Args:
-            image: Preprocessed numpy image.
-            provider_name: Optional override for the configured provider.
-            
-        Returns:
-            HWRResult: Standardised output structures.
-            
-        Raises:
-            HWRServiceError: If validation or engine execution fails.
         """
         # 1. Validate image format
         try:
@@ -126,7 +125,12 @@ class HandwritingRecognitionService:
         start_time = time.time()
         
         try:
-            result = provider.recognize(image, page_num=page_num)
+            import inspect
+            sig = inspect.signature(provider.recognize)
+            if 'raw_text' in sig.parameters:
+                result = provider.recognize(image, page_num=page_num, raw_text=raw_text)
+            else:
+                result = provider.recognize(image, page_num=page_num)
         except AzureProviderError as ape:
             # Map specific provider exceptions to service exceptions
             raise HWRServiceError(f"Azure HWR Engine failure: {str(ape)}") from ape

@@ -188,6 +188,15 @@ const examSchema = new mongoose.Schema(
   }
 );
 
+examSchema.pre("save", function (next) {
+  if (this.examStatus === "Published" || this.examStatus === "Active" || this.examStatus === "Completed") {
+    this.isPublished = true;
+  } else if (this.examStatus === "Draft") {
+    this.isPublished = false;
+  }
+  next();
+});
+
 const Exam = mongoose.model("Exam", examSchema);
 export default Exam;
 export { Exam };

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import AnswerSheet from "../models/AnswerSheet.js";
 import User from "../models/User.js";
 import Subject from "../models/Subject.js";
@@ -9,6 +10,43 @@ import Notification from "../models/Notification.js";
 import logger from "../utils/logger.js";
 import fs from "fs";
 import path from "path";
+
+import { execFile } from "child_process";
+
+export const extractTextFromFile = (fileUrlOrPath) => {
+  return new Promise((resolve) => {
+    try {
+      if (!fileUrlOrPath) return resolve([]);
+      let absolutePath = fileUrlOrPath;
+      if (!path.isAbsolute(fileUrlOrPath) || fileUrlOrPath.startsWith("/") || fileUrlOrPath.startsWith("\\")) {
+        const cleanRelative = fileUrlOrPath.replace(/^[/\\]+/, "");
+        absolutePath = path.join(process.cwd(), cleanRelative);
+      }
+      if (!fs.existsSync(absolutePath)) {
+        logger.warn(`extractTextFromFile file not found at: ${absolutePath}`);
+        return resolve([]);
+      }
+      const scriptPath = path.join(process.cwd(), "..", "ocr-service", "extract_file_text.py");
+      execFile("python", [scriptPath, absolutePath], { timeout: 45000 }, (error, stdout) => {
+        if (error || !stdout) {
+          logger.warn(`extractTextFromFile script error for ${absolutePath}: ${error ? error.message : "no output"}`);
+          return resolve([]);
+        }
+        try {
+          const jsonMatch = stdout.match(/\{"success":\s*true[\s\S]*?\}/);
+          if (jsonMatch) {
+            const data = JSON.parse(jsonMatch[0]);
+            return resolve(data.lines || []);
+          }
+        } catch (e) {}
+        return resolve([]);
+      });
+    } catch (err) {
+      logger.error(`extractTextFromFile exception: ${err.message}`);
+      return resolve([]);
+    }
+  });
+};
 
 export const createAnswerSheet = async (data, userId) => {
   // Validate student exists
@@ -41,16 +79,97 @@ export const createAnswerSheet = async (data, userId) => {
 };
 
 export const getAnswerSheetById = async (id) => {
-  const answerSheet = await AnswerSheet.findOne({ _id: id, isDeleted: false })
-    .populate("student", "name email rollNo department semester")
-    .populate("subject", "name code semester")
-    .populate("exam", "title examType totalMarks duration")
-    .populate("createdBy", "name email")
-    .populate("updatedBy", "name email");
+  const query = mongoose.Types.ObjectId.isValid(id)
+    ? { _id: id, isDeleted: false }
+    : { $or: [{ _id: id }, { fastapiSheetId: id }], isDeleted: false };
+
+  let answerSheet;
+  try {
+    answerSheet = await AnswerSheet.findOne(query)
+      .populate("student", "name email rollNo department semester")
+      .populate("subject", "name code semester")
+      .populate("exam", "title examType totalMarks duration")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
+  } catch (err) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Answer sheet not found");
+  }
+
   if (!answerSheet) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Answer sheet not found");
   }
-  return answerSheet;
+
+  const sheetObj = answerSheet.toObject ? answerSheet.toObject() : { ...answerSheet };
+
+  // Ensure digital_answers exists and is populated for frontend UI consumption
+  if (!sheetObj.digital_answers || sheetObj.digital_answers.length === 0 || sheetObj.uploadStatus === "FAILED") {
+    let populatedFromAnswers = false;
+    if (sheetObj.answers && sheetObj.answers.length > 0) {
+      const mapped = sheetObj.answers.map((ans, idx) => ({
+        question_number: String(ans.question_number || idx + 1),
+        question_id: ans.questionId,
+        text: (ans.recognizedText || ans.text || ans.answer_text || "").trim(),
+        answer_text: (ans.recognizedText || ans.text || ans.answer_text || "").trim(),
+        recognizedText: (ans.recognizedText || "").trim(),
+        handwrittenData: ans.handwrittenData || "",
+        confidence: ans.confidence !== undefined ? ans.confidence : 1.0,
+      }));
+      const hasContent = mapped.some(a => a.text.length > 0 || a.handwrittenData.length > 0);
+      if (hasContent) {
+        sheetObj.digital_answers = mapped;
+        populatedFromAnswers = true;
+      }
+    }
+    if (!populatedFromAnswers && sheetObj.extractedText && sheetObj.extractedText.trim().length > 0) {
+      const parts = sheetObj.extractedText.split(/\n\n+/).filter((p) => p.trim().length > 0);
+      sheetObj.digital_answers = parts.map((part, idx) => {
+        const match = part.match(/^Q(\d+):\s*(.*)/s);
+        return {
+          question_number: match ? match[1] : String(idx + 1),
+          text: match ? match[2].trim() : part.trim(),
+          answer_text: match ? match[2].trim() : part.trim(),
+          confidence: 0.95,
+        };
+      });
+      populatedFromAnswers = true;
+    }
+
+    // Direct File Extraction Fallback if still unpopulated
+    if (!populatedFromAnswers && sheetObj.uploadedFileUrl) {
+      const extractedLines = await extractTextFromFile(sheetObj.uploadedFileUrl);
+      if (extractedLines && extractedLines.length > 0) {
+        const digitalAnswers = extractedLines.map((line, idx) => ({
+          question_number: String(idx + 1),
+          text: line,
+          answer_text: line,
+          confidence: 0.95,
+        }));
+        sheetObj.digital_answers = digitalAnswers;
+        sheetObj.extractedText = extractedLines.join("\n");
+        sheetObj.uploadStatus = "COMPLETED";
+        sheetObj.processingStatus = "completed";
+
+        AnswerSheet.findByIdAndUpdate(sheetObj._id, {
+          digital_answers: digitalAnswers,
+          extractedText: sheetObj.extractedText,
+          uploadStatus: "COMPLETED",
+          processingStatus: "completed",
+          errorMessage: null,
+        }).catch((e) => logger.error(`Failed updating AnswerSheet ${sheetObj._id} in fallback: ${e.message}`));
+      }
+    }
+  }
+
+  return sheetObj;
+};
+
+export const getDigitalAnswers = async (id) => {
+  try {
+    const sheet = await getAnswerSheetById(id);
+    return sheet.digital_answers || [];
+  } catch (err) {
+    return [];
+  }
 };
 
 export const getAllAnswerSheets = async (query = {}) => {
@@ -440,7 +559,63 @@ export const processAnswerSheetBackground = async (
       throw new Error(ocrResult.message || "Failed to process in python service");
     }
 
-    const { pages, digital_answers } = ocrResult.data;
+    const initialSheet = ocrResult.data;
+    const fastapiSheetId = initialSheet.id || sheetId.toString();
+
+    // Poll Python FastAPI service until processing_status becomes COMPLETED or FAILED
+    let processedSheet = null;
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    while (attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      attempts++;
+
+      try {
+        const pollRes = await fetch(`http://127.0.0.1:8000/api/v1/student/answer-sheets/${fastapiSheetId}`, {
+          headers: {
+            "X-User-Id": studentId.toString(),
+            "X-User-Role": "student",
+          },
+        });
+
+        if (pollRes.ok) {
+          const pollJson = await pollRes.json();
+          if (pollJson.success && pollJson.data) {
+            const status = pollJson.data.processing_status;
+            if (status === "COMPLETED" || status === "completed") {
+              processedSheet = pollJson.data;
+              break;
+            } else if (status === "FAILED" || status === "failed") {
+              throw new Error(pollJson.data.error_message || "Python service processing failed.");
+            }
+          }
+        }
+      } catch (pollErr) {
+        logger.warn(`Poll attempt ${attempts} for ${fastapiSheetId} encountered error: ${pollErr.message}`);
+      }
+    }
+
+    if (!processedSheet) {
+      // Fallback: Check if initial response contained pages/answers directly
+      if (initialSheet.pages && initialSheet.pages.length > 0) {
+        processedSheet = initialSheet;
+      } else {
+        logger.warn(`FastAPI polling timed out for ${fastapiSheetId}, running direct file text extraction.`);
+        const fallbackLines = await extractTextFromFile(answerSheet.uploadedFileUrl);
+        processedSheet = {
+          pages: [{ page_number: 1, original_file_reference: "source", processing_status: "PROCESSED" }],
+          digital_answers: fallbackLines.map((line, idx) => ({
+            question_number: String(idx + 1),
+            text: line,
+            answer_text: line,
+            confidence: 0.95
+          }))
+        };
+      }
+    }
+
+    const { pages, digital_answers } = processedSheet;
 
     const exam = await Exam.findById(examId);
     if (!exam) {
@@ -451,24 +626,33 @@ export const processAnswerSheetBackground = async (
     const rawTextParts = [];
 
     if (digital_answers && Array.isArray(digital_answers)) {
-      for (const ans of digital_answers) {
-        const qNum = parseInt(ans.question_number.replace(/\D/g, ""), 10);
+      for (let idx = 0; idx < digital_answers.length; idx++) {
+        const ans = digital_answers[idx];
+        const qNum = parseInt(String(ans.question_number || "").replace(/\D/g, ""), 10);
         let questionId = null;
-        if (!isNaN(qNum) && qNum > 0 && qNum <= exam.questions.length) {
+        if (!isNaN(qNum) && qNum > 0 && exam.questions && qNum <= exam.questions.length) {
           questionId = exam.questions[qNum - 1]._id;
+        } else if (exam.questions && exam.questions[idx]) {
+          questionId = exam.questions[idx]._id;
+        } else if (exam.questions && exam.questions[0]) {
+          questionId = exam.questions[0]._id;
         } else {
-          continue;
+          questionId = new mongoose.Types.ObjectId();
         }
+
+        const recognizedText = ans.text ?? ans.answer_text ?? ans.recognizedText ?? "";
 
         answers.push({
           questionId,
-          handwrittenData: "",
-          recognizedText: ans.text,
+          handwrittenData: ans.handwrittenData || "",
+          recognizedText,
           hwrStatus: "Completed",
           submissionTime: new Date(),
         });
 
-        rawTextParts.push(`Q${ans.question_number}: ${ans.text}`);
+        if (recognizedText) {
+          rawTextParts.push(`Q${ans.question_number || idx + 1}: ${recognizedText}`);
+        }
       }
     }
 
@@ -483,6 +667,10 @@ export const processAnswerSheetBackground = async (
           height: p.height,
           processingStatus: p.processing_status,
         });
+
+        if (rawTextParts.length === 0 && (p.extracted_text || p.extractedText)) {
+          rawTextParts.push(`Page ${p.page_number}: ${p.extracted_text || p.extractedText}`);
+        }
       }
     }
 
@@ -773,4 +961,7 @@ export default {
   submitExam,
   getSubmissionStatus,
   getReviewStatus,
+  getExamAnswerSheets,
+  uploadAnswerSheets,
+  retryAnswerSheet,
 };

@@ -370,6 +370,7 @@ export const getIndividualResult = async (evaluationId, userId, userRole) => {
     percentage: e.percentage,
     grade: e.grade,
     status: e.evaluationStatus,
+    publicationStatus: sheet?.resultPublication?.status || "NOT_READY",
     finalizedAt: e.updatedAt,
     strengths: e.strengths,
     weaknesses: e.weaknesses,

@@ -1,0 +1,78 @@
+=================================================
+   LIVE E2E SYSTEM TESTING & VERIFICATION RUN   
+=================================================
+
+Connected to MongoDB: mongodb://127.0.0.1:27017/ai_evaluation_db
+
+--- TEST L1: DIGITAL SUBMISSION WITHOUT APPROVED ANSWER KEY ---
+Created L1 Exam ID: 6a97afe3419eae2a43660c06
+Created AnswerSheet L1 ID: 6a97afe3419eae2a43660c13
+Triggering HWR Background processing for L1 sheet...
+[2026-09-02 10:40:59:4059] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a97afe3419eae2a43660c13[39m
+[2026-09-02 10:40:59:4059] [32minfo[39m: [32mSending 17 strokes of question 6a97afe3419eae2a43660c07 (Q1) to FastAPI for OCR...[39m
+[2026-09-02 10:40:59:4059] [32minfo[39m: [32mSending 14 strokes of question 6a97afe3419eae2a43660c08 (Q2) to FastAPI for OCR...[39m
+[2026-09-02 10:40:59:4059] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a97afe3419eae2a43660c13[39m
+[2026-09-02 10:40:59:4059] [33mwarn[39m: [33mDigital AnswerSheet 6a97afe3419eae2a43660c13: AI evaluation deferred ΓÇö no approved answer key for this exam yet. Marking AWAITING_ANSWER_KEY.[39m
+L1 AnswerSheet Status after HWR:
+  ocrStatus: completed
+  processingStatus: completed
+  evaluationStatus: AWAITING_ANSWER_KEY
+  evaluationCurrentStep: Waiting for an approved answer key
+  Extracted Text:
+Q1: Q1. [No handwritten or typed text detected on page 1]
+
+Q2: Q2. [No handwritten or typed text detected on page 2]
+
+TEST L1 RESULT: PASS
+
+--- TEST L2: APPROVE ANSWER KEY & AUTOMATIC RE-QUEUE ---
+Created AnswerKey for L1 Exam ID: 6a97afe4419eae2a43660c30
+Approving AnswerKey...
+[2026-09-02 10:41:00:410] [32minfo[39m: [32mAnswer key 6a97afe4419eae2a43660c30 approved for exam 6a97afe3419eae2a43660c06: re-queued 1 answer sheet(s) that were awaiting the key.[39m
+AnswerKey approved. Waiting 3 seconds for background re-queue and AI evaluation...
+[2026-09-02 10:41:00:410] [32minfo[39m: [32mStarting AI Evaluation Pipeline run for answerSheetId = 6a97afe3419eae2a43660c13, attempt = 1, scope = FULL_SHEET...[39m
+[2026-09-02 10:41:02:412] [32minfo[39m: [32mAI Evaluation Pipeline complete: status = READY_FOR_FACULTY_REVIEW, percentage = 75%, failed = 0[39m
+L1 AnswerSheet Status after AnswerKey Approval & Auto Re-Queue:
+  evaluationStatus: READY_FOR_FACULTY_REVIEW
+  submissionStatus: Faculty Review
+  reviewStatus: READY_FOR_FACULTY_REVIEW
+  Evaluation Obtained Marks: 15/20
+  Evaluation Status: READY_FOR_FACULTY_REVIEW
+
+TEST L2 RESULT: PASS
+
+--- TEST L3: DIGITAL SUBMISSION WITH APPROVED ANSWER KEY ---
+Created AnswerSheet L3 ID: 6a97afe7419eae2a43660c7d
+Triggering HWR and AI Evaluation for L3...
+[2026-09-02 10:41:03:413] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a97afe7419eae2a43660c7d[39m
+[2026-09-02 10:41:03:413] [32minfo[39m: [32mSending 53 strokes of question 6a97afe3419eae2a43660c07 (Q1) to FastAPI for OCR...[39m
+[2026-09-02 10:41:03:413] [32minfo[39m: [32mSending 47 strokes of question 6a97afe3419eae2a43660c08 (Q2) to FastAPI for OCR...[39m
+[2026-09-02 10:41:03:413] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a97afe7419eae2a43660c7d[39m
+Waiting 3 seconds for AI evaluation pipeline to complete...
+[2026-09-02 10:41:03:413] [32minfo[39m: [32mStarting AI Evaluation Pipeline run for answerSheetId = 6a97afe7419eae2a43660c7d, attempt = 1, scope = FULL_SHEET...[39m
+[2026-09-02 10:41:05:415] [32minfo[39m: [32mAI Evaluation Pipeline complete: status = READY_FOR_FACULTY_REVIEW, percentage = 75%, failed = 0[39m
+L3 AnswerSheet Status:
+  ocrStatus: completed
+  evaluationStatus: READY_FOR_FACULTY_REVIEW
+  submissionStatus: Faculty Review
+  Evaluation Obtained Marks: 15/20
+  Evaluation Status: READY_FOR_FACULTY_REVIEW
+  Questions Evaluated: 2
+
+TEST L3 RESULT: PASS
+
+--- TEST L4: FACULTY REVIEW UI VERIFICATION ---
+Faculty Review Data Object verified:
+  Student: E2E Test Student
+  Answers Count: 2
+  Obtained Marks: 15
+
+TEST L4 RESULT: PASS
+
+=================================================
+   FINAL SUMMARY OF LIVE WORKFLOW VERIFICATION   
+=================================================
+L1 (AWAITING_ANSWER_KEY):       PASS
+L2 (ANSWER KEY APPROVAL & REQUEUE): PASS
+L3 (DIGITAL EVALUATION WITH KEY):  PASS
+L4 (FACULTY REVIEW UI DATA):      PASS

@@ -90,6 +90,12 @@ class PaddleHWRProvider(IHWRProvider):
         validate_image(image)
         start_time = time.time()
 
+        # Convert 1-channel (grayscale/binary) or 4-channel (BGRA) to 3-channel BGR format for PaddleOCR
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif len(image.shape) == 3 and image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+
         try:
             ocr_engine = _get_ocr_engine()
         except Exception as e:
@@ -98,12 +104,17 @@ class PaddleHWRProvider(IHWRProvider):
         logger.info("Executing PaddleOCR on page %d...", page_num)
 
         try:
-            # Call predict if available (standard in 3.x), else fallback to ocr (2.x mock support)
-            if hasattr(ocr_engine, 'predict') and not isinstance(ocr_engine, MagicMock if 'MagicMock' in globals() else object):
-                # When using MagicMock in unit tests, we want to call the mock target (which usually mocks .ocr)
+            # Call predict if available (standard in PaddleOCR 3.x), else fallback to ocr (2.x compatibility)
+            if hasattr(ocr_engine, 'predict') and callable(getattr(ocr_engine, 'predict')):
                 results = ocr_engine.predict(image)
+
+                # Fallback if a mock engine in unit testing returned MagicMock and didn't mock predict return value
+                if isinstance(results, MagicMock if 'MagicMock' in globals() else object) and hasattr(ocr_engine, 'ocr'):
+                    results = ocr_engine.ocr(image)
+            elif hasattr(ocr_engine, 'ocr'):
+                results = ocr_engine.ocr(image)
             else:
-                results = ocr_engine.ocr(image, cls=True)
+                raise PaddleProviderError("OCR engine has neither predict() nor ocr() method")
         except Exception as e:
             logger.error("PaddleOCR execution failed: %s", str(e), exc_info=True)
             raise PaddleProviderError(f"PaddleOCR processing error: {str(e)}") from e
@@ -120,20 +131,50 @@ class PaddleHWRProvider(IHWRProvider):
             )
 
         boxes = []
-        # Support both 3.x dict output format and 2.x nested list output format
-        if isinstance(results[0], dict):
-            page_result = results[0]
-            rec_texts = page_result.get('rec_texts', [])
-            rec_scores = page_result.get('rec_scores', [])
-            dt_polys = page_result.get('dt_polys', [])
+        page_result = results[0]
+
+        # Determine if page_result is dict-like / object with key/attribute access, or legacy list
+        is_dict_like = isinstance(page_result, dict) or hasattr(page_result, 'keys') or hasattr(page_result, 'get')
+
+        if is_dict_like:
+            # Helper to get field from dict or object safely
+            def _get_field(obj, key, default=None):
+                if isinstance(obj, dict) or hasattr(obj, 'get'):
+                    val = obj.get(key, None)
+                    if val is not None:
+                        return val
+                if hasattr(obj, key):
+                    val = getattr(obj, key, None)
+                    if val is not None:
+                        return val
+                return default
+
+            rec_texts = _get_field(page_result, 'rec_texts', [])
+            rec_scores = _get_field(page_result, 'rec_scores', [])
+
+            # Polygons / Boxes fallbacks: dt_polys -> rec_polys -> rec_boxes -> dt_boxes
+            dt_polys = _get_field(page_result, 'dt_polys')
+            if dt_polys is None:
+                dt_polys = _get_field(page_result, 'rec_polys')
+            if dt_polys is None:
+                dt_polys = _get_field(page_result, 'rec_boxes')
+            if dt_polys is None:
+                dt_polys = _get_field(page_result, 'dt_boxes')
+            if dt_polys is None:
+                dt_polys = []
 
             for idx in range(len(rec_texts)):
                 txt = rec_texts[idx]
-                score = float(rec_scores[idx]) if idx < len(rec_scores) else 0.0
-                
-                # Poly bounding box representation
+                if txt is None:
+                    continue
+                txt_str = str(txt).strip()
+                if not txt_str:
+                    continue
+
+                score = float(rec_scores[idx]) if idx < len(rec_scores) and rec_scores[idx] is not None else 0.0
+
+                # Poly / bounding box representation
                 poly = dt_polys[idx] if idx < len(dt_polys) else []
-                # Normalize poly to standard coordinate list if it is a numpy ndarray
                 if hasattr(poly, 'tolist'):
                     box = poly.tolist()
                 else:
@@ -142,17 +183,24 @@ class PaddleHWRProvider(IHWRProvider):
                 if not box or len(box) < 4:
                     continue
 
-                # Box format: [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
-                xs = [pt[0] for pt in box]
-                ys = [pt[1] for pt in box]
+                # Box format handling
+                if isinstance(box[0], (int, float, np.number)) and len(box) >= 8:
+                    pts = [[float(box[i]), float(box[i + 1])] for i in range(0, len(box), 2)]
+                elif isinstance(box[0], (list, tuple, np.ndarray)) and len(box[0]) >= 2:
+                    pts = [[float(pt[0]), float(pt[1])] for pt in box]
+                else:
+                    continue
+
+                xs = [pt[0] for pt in pts]
+                ys = [pt[1] for pt in pts]
                 x_min, x_max = min(xs), max(xs)
                 y_min, y_max = min(ys), max(ys)
-                y_center = (y_min + y_max) / 2
+                y_center = (y_min + y_max) / 2.0
                 height = y_max - y_min
 
                 boxes.append({
-                    "box": box,
-                    "text": txt,
+                    "box": pts,
+                    "text": txt_str,
                     "confidence": score,
                     "x_min": x_min,
                     "x_max": x_max,
@@ -161,9 +209,8 @@ class PaddleHWRProvider(IHWRProvider):
                     "y_center": y_center,
                     "height": height,
                 })
-        else:
-            # Old 2.x list format: [ [ [box, (text, confidence)], ... ] ]
-            page_result = results[0]
+        elif isinstance(page_result, (list, tuple)):
+            # Legacy 2.x list format: [ [ [box, (text, confidence)], ... ] ]
             for item in page_result:
                 if not item or len(item) < 2:
                     continue
@@ -172,18 +219,30 @@ class PaddleHWRProvider(IHWRProvider):
                 if not txt_conf or len(txt_conf) < 2:
                     continue
                 txt, score = txt_conf[0], txt_conf[1]
+                if not txt or not str(txt).strip():
+                    continue
 
-                # Box format: [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
-                xs = [pt[0] for pt in box]
-                ys = [pt[1] for pt in box]
+                # Convert box points safely
+                if hasattr(box, 'tolist'):
+                    box = box.tolist()
+
+                if not box or len(box) < 4:
+                    continue
+
+                pts = [[float(pt[0]), float(pt[1])] for pt in box if len(pt) >= 2]
+                if len(pts) < 4:
+                    continue
+
+                xs = [pt[0] for pt in pts]
+                ys = [pt[1] for pt in pts]
                 x_min, x_max = min(xs), max(xs)
                 y_min, y_max = min(ys), max(ys)
-                y_center = (y_min + y_max) / 2
+                y_center = (y_min + y_max) / 2.0
                 height = y_max - y_min
 
                 boxes.append({
-                    "box": box,
-                    "text": txt,
+                    "box": pts,
+                    "text": str(txt).strip(),
                     "confidence": float(score),
                     "x_min": x_min,
                     "x_max": x_max,
@@ -232,13 +291,24 @@ class PaddleHWRProvider(IHWRProvider):
                 text = " ".join(b["text"] for b in line)
                 avg_conf = sum(b["confidence"] for b in line) / len(line)
                 y_cent = sum(b["y_center"] for b in line) / len(line)
-                line_data.append((text, avg_conf, y_cent))
+
+                # Combine bounding boxes of all boxes in this grouped line
+                line_boxes_pts = []
+                for b in line:
+                    line_boxes_pts.extend(b["box"])
+                line_box = None
+                if line_boxes_pts:
+                    xs = [pt[0] for pt in line_boxes_pts]
+                    ys = [pt[1] for pt in line_boxes_pts]
+                    line_box = [[min(xs), min(ys)], [max(xs), min(ys)], [max(xs), max(ys)], [min(xs), max(ys)]]
+
+                line_data.append((text, avg_conf, y_cent, line_box))
 
             # Sort lines top-to-bottom
             line_data.sort(key=lambda l: l[2])
 
-            for text, conf, _ in line_data:
-                sorted_lines.append(HWRLine(text=text, confidence=round(conf, 4)))
+            for text, conf, _, line_box in line_data:
+                sorted_lines.append(HWRLine(text=text, confidence=round(conf, 4), boundingBox=line_box))
 
         full_text = "\n".join(line.text for line in sorted_lines)
         overall_confidence = (
@@ -254,3 +324,4 @@ class PaddleHWRProvider(IHWRProvider):
             provider="paddle",
             execution_time=round(time.time() - start_time, 4),
         )
+

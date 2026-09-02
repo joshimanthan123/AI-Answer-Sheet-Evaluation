@@ -39,6 +39,7 @@ interface ResultDetail {
   percentage: number;
   grade?: string;
   status: string;
+  publicationStatus?: string;
   finalizedAt?: string;
   strengths?: string;
   weaknesses?: string;
@@ -52,6 +53,42 @@ export const IndividualResult: React.FC = () => {
 
   const [result, setResult] = useState<ResultDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+  const [publicationComment, setPublicationComment] = useState('');
+  const [showPublishModal, setShowPublishModal] = useState(false);
+
+  const handlePublish = async () => {
+    if (!evaluationId || !result) return;
+    setPublishing(true);
+    try {
+      await resultsService.publishResult(result.answerSheetId, publicationComment);
+      addToast('Result published successfully!', 'success');
+      const data = await resultsService.getIndividualResult(evaluationId);
+      setResult(data);
+      setShowPublishModal(false);
+      setPublicationComment('');
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to publish result.', 'error');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!evaluationId || !result) return;
+    if (!window.confirm('Are you sure you want to unpublish this result? This will immediately hide it from student view.')) return;
+    setPublishing(true);
+    try {
+      await resultsService.unpublishResult(result.answerSheetId, 'Unpublished by faculty.');
+      addToast('Result unpublished successfully!', 'success');
+      const data = await resultsService.getIndividualResult(evaluationId);
+      setResult(data);
+    } catch (err: any) {
+      addToast(err.response?.data?.message || 'Failed to unpublish result.', 'error');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -131,6 +168,29 @@ export const IndividualResult: React.FC = () => {
             <span className="material-symbols-outlined text-sm">print</span>
             Print Report
           </button>
+          {result.status === 'finalized' && (
+            <div className="flex gap-2">
+              {result.publicationStatus === 'RESULT_PUBLISHED' ? (
+                <button
+                  onClick={handleUnpublish}
+                  disabled={publishing}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-xs">unpublished</span>
+                  Unpublish
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowPublishModal(true)}
+                  disabled={publishing}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-xs">publish</span>
+                  Publish
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -320,6 +380,41 @@ export const IndividualResult: React.FC = () => {
         </div>
 
       </div>
+
+      {showPublishModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white dark:bg-surface-container p-6 rounded-2xl max-w-md w-full mx-4 space-y-4 border border-outline-variant/10 shadow-lg text-left">
+            <h3 className="font-bold text-sm text-on-surface">Publish Candidate Result</h3>
+            <p className="text-xs text-outline leading-relaxed">
+              Publishing this result will release the finalized grades and question-wise faculty feedback to the student's dashboard immediately.
+            </p>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase">Publication Announcement / Comment</label>
+              <textarea
+                value={publicationComment}
+                onChange={(e) => setPublicationComment(e.target.value)}
+                placeholder="Excellent work! Results are released."
+                className="border border-outline-variant/35 p-2 rounded-xl text-xs bg-surface-container-lowest focus:border-primary focus:outline-none min-h-[80px]"
+              />
+            </div>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="px-4 py-2 border border-outline-variant/35 hover:bg-surface-container-low text-xs font-bold rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={publishing}
+                className="px-4 py-2 bg-primary hover:bg-primary/95 text-on-primary text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1"
+              >
+                Confirm Release
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

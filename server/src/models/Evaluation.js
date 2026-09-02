@@ -23,7 +23,16 @@ const questionEvaluationSchema = new mongoose.Schema({
     default: 0,
     min: [0, "Marks cannot be negative"],
   },
+  maximumMarks: {
+    type: Number,
+    required: [true, "Maximum marks for question is required"],
+    min: [0, "Maximum marks cannot be negative"],
+  },
   facultyMarks: {
+    type: Number,
+    min: [0, "Marks cannot be negative"],
+  },
+  facultyAwardedMarks: {
     type: Number,
     min: [0, "Marks cannot be negative"],
   },
@@ -84,6 +93,18 @@ const questionEvaluationSchema = new mongoose.Schema({
   evaluationMetadata: {
     type: mongoose.Schema.Types.Mixed,
   },
+  warnings: [
+    {
+      code: { type: String, trim: true },
+      message: { type: String, trim: true },
+    }
+  ],
+  provider: { type: String, trim: true },
+  model: { type: String, trim: true },
+  evaluationAttempt: { type: Number },
+  startedAt: { type: Date },
+  completedAt: { type: Date },
+  errorMessage: { type: String, trim: true },
 });
 
 const evaluationSchema = new mongoose.Schema(
@@ -150,6 +171,17 @@ const evaluationSchema = new mongoose.Schema(
           "reviewed",
           "finalized",
           "failed",
+          // Phase 5 Lifecycle addition status mappings
+          "READY_FOR_EVALUATION",
+          "QUEUED_FOR_EVALUATION",
+          "LOADING_ANSWER_KEY",
+          "BUILDING_PROMPT",
+          "AI_EVALUATING",
+          "VALIDATING_RESULT",
+          "EVALUATION_COMPLETED",
+          "EVALUATION_FAILED",
+          "PARTIALLY_EVALUATED",
+          "READY_FOR_FACULTY_REVIEW",
         ],
         message: "Invalid evaluation status",
       },
@@ -188,6 +220,68 @@ const evaluationSchema = new mongoose.Schema(
       type: [questionEvaluationSchema],
       default: [],
     },
+    evaluationHistory: [
+      {
+        attempt: { type: Number, required: true },
+        scope: { type: String, enum: ["FULL_SHEET", "QUESTION"], required: true },
+        questionNumber: { type: String, default: null },
+        provider: { type: String, default: null },
+        model: { type: String, default: null },
+        startedAt: { type: Date, default: Date.now },
+        completedAt: { type: Date, default: Date.now },
+        status: { type: String, required: true },
+        summary: { type: String, default: "" },
+        error: { type: String, default: null },
+      }
+    ],
+    overallComment: {
+      type: String,
+      trim: true,
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    reviewStartedAt: {
+      type: Date,
+    },
+    reviewedAt: {
+      type: Date,
+    },
+    finalizedAt: {
+      type: Date,
+    },
+    finalizedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    auditHistory: [
+      {
+        action: {
+          type: String,
+          enum: [
+            "REVIEW_STARTED",
+            "QUESTION_REVIEWED",
+            "MARK_OVERRIDDEN",
+            "COMMENT_ADDED",
+            "COMMENT_UPDATED",
+            "RE_EVALUATION_REQUESTED",
+            "REVISION_REQUESTED",
+            "REVIEW_APPROVED",
+            "EVALUATION_FINALIZED",
+            "RESULT_PUBLISHED",
+            "RESULT_UNPUBLISHED",
+          ],
+          required: true,
+        },
+        questionNumber: { type: String, default: null },
+        previousValue: { type: mongoose.Schema.Types.Mixed, default: null },
+        newValue: { type: mongoose.Schema.Types.Mixed, default: null },
+        comment: { type: String, default: null },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        changedAt: { type: Date, default: Date.now },
+      }
+    ],
     isDeleted: {
       type: Boolean,
       default: false,

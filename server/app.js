@@ -74,12 +74,30 @@ app.use(
   createProxyMiddleware({
     target: "http://127.0.0.1:8000",
     changeOrigin: true,
-    pathFilter: [
-      "/api/student/answer-sheets",
-      "/api/v1/student/answer-sheets",
-      "/api/faculty/answer-sheets",
-      "/api/v1/faculty/answer-sheets",
-    ],
+    pathFilter: (pathname, req) => {
+      const url = req.originalUrl || req.url || pathname;
+      const matchPrefixes = [
+        "/api/student/answer-sheets",
+        "/api/v1/student/answer-sheets",
+        "/api/faculty/answer-sheets",
+        "/api/v1/faculty/answer-sheets",
+      ];
+      const matchesPrefix = matchPrefixes.some(prefix => url.startsWith(prefix));
+      if (!matchesPrefix) return false;
+
+      // Do NOT proxy Express-specific review and publication routes
+      const isExpressRoute =
+        url.includes("review") ||
+        url.includes("publish") ||
+        url.includes("unpublish") ||
+        url.includes("finalize") ||
+        url.includes("approve") ||
+        url.includes("start-review") ||
+        url.includes("re-evaluation") ||
+        url.includes("revision");
+
+      return !isExpressRoute;
+    },
     pathRewrite: (path) => {
       if (path.startsWith("/api/student/answer-sheets")) {
         return path.replace("/api/student/answer-sheets", "/api/v1/student/answer-sheets");

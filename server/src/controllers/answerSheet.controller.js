@@ -13,6 +13,11 @@ export const getAnswerSheetById = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Answer sheet retrieved successfully", result);
 });
 
+export const getDigitalAnswers = asyncHandler(async (req, res) => {
+  const result = await answerSheetService.getDigitalAnswers(req.params.id);
+  return sendSuccess(res, STATUS_CODES.OK, "Digital data retrieved.", result);
+});
+
 export const getAllAnswerSheets = asyncHandler(async (req, res) => {
   const result = await answerSheetService.getAllAnswerSheets(req.query);
   return sendSuccess(
@@ -109,6 +114,7 @@ export const retryAnswerSheet = asyncHandler(async (req, res) => {
 export default {
   createAnswerSheet,
   getAnswerSheetById,
+  getDigitalAnswers,
   getAllAnswerSheets,
   updateAnswerSheet,
   deleteAnswerSheet,

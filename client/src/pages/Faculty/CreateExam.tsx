@@ -101,14 +101,33 @@ export const CreateExam: React.FC = () => {
         if (ex.examDate) {
           setDate(ex.examDate.split('T')[0]);
         }
-        setStartTime(ex.startTime || '');
-        setEndTime(ex.endTime || '');
+        if (ex.startTime) {
+          const dateObj = new Date(ex.startTime);
+          const hh = String(dateObj.getHours()).padStart(2, '0');
+          const mm = String(dateObj.getMinutes()).padStart(2, '0');
+          setStartTime(`${hh}:${mm}`);
+        } else {
+          setStartTime('');
+        }
+        if (ex.endTime) {
+          const dateObj = new Date(ex.endTime);
+          const hh = String(dateObj.getHours()).padStart(2, '0');
+          const mm = String(dateObj.getMinutes()).padStart(2, '0');
+          setEndTime(`${hh}:${mm}`);
+        } else {
+          setEndTime('');
+        }
         setDuration(ex.duration || 180);
         setTotalMarks(ex.totalMarks || 100);
         setInstructions(ex.instructions || '');
         setPassingMarks(ex.passingMarks || 40);
         setStatus(ex.examStatus || 'Draft');
-        setAllowedMaterials(ex.allowedMaterials || []);
+        
+        let materialsVal = ex.allowedMaterials;
+        if (typeof materialsVal === 'string') {
+          materialsVal = (materialsVal as string).split(',').map((m: string) => m.trim()).filter(Boolean);
+        }
+        setAllowedMaterials(materialsVal || []);
 
         if (ex.questions && ex.questions.length > 0) {
           const qs = ex.questions.map((q: any, idx: number) => ({
@@ -119,7 +138,7 @@ export const CreateExam: React.FC = () => {
             questionType: q.questionType,
             difficulty: q.difficulty,
             bloomsLevel: q.bloomsLevel,
-            keywords: q.keywords || '',
+            keywords: Array.isArray(q.keywords) ? q.keywords.join(', ') : (q.keywords || ''),
             rubric: q.rubric || '',
             modelAnswer: q.modelAnswer || '',
             isCollapsed: true,
@@ -327,13 +346,13 @@ export const CreateExam: React.FC = () => {
       semester,
       examType,
       examDate: date,
-      startTime,
-      endTime,
+      startTime: startTime ? new Date(`${date}T${startTime}`).toISOString() : undefined,
+      endTime: endTime ? new Date(`${date}T${endTime}`).toISOString() : undefined,
       duration,
       totalMarks,
       passingMarks,
       instructions,
-      allowedMaterials,
+      allowedMaterials: allowedMaterials.join(', '),
       examStatus: status,
       questions: questions.map((q) => ({
         questionNumber: q.questionNumber,
@@ -342,7 +361,7 @@ export const CreateExam: React.FC = () => {
         questionType: q.questionType,
         difficulty: q.difficulty,
         bloomsLevel: q.bloomsLevel,
-        keywords: q.keywords,
+        keywords: q.keywords ? q.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
         rubric: q.rubric,
         modelAnswer: q.modelAnswer,
       })),

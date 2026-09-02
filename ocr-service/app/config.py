@@ -128,8 +128,8 @@ class Settings(BaseModel):
     @classmethod
     def validate_provider(cls, v: str) -> str:
         prov = v.lower().strip()
-        if prov not in ("mock", "azure", "paddle", "google_vision"):
-            raise ValueError(f"Unsupported OCR provider: {v}. Must be 'mock', 'azure', 'paddle', or 'google_vision'")
+        if prov not in ("mock", "azure", "paddle", "google_vision", "easyocr"):
+            raise ValueError(f"Unsupported OCR provider: {v}. Must be 'mock', 'azure', 'paddle', 'google_vision', or 'easyocr'")
         return prov
 
     @field_validator("LLM_PROVIDER")
