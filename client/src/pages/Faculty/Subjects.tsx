@@ -75,8 +75,8 @@ export const FacultySubjects: React.FC = () => {
     e.preventDefault();
     setErrorMsg('');
     
-    if (!formData.name.trim() || !formData.code.trim() || !formData.courseId) {
-      setErrorMsg('Subject Name, Code, and Department/Course are required.');
+    if (!formData.name.trim() || !formData.code.trim()) {
+      setErrorMsg('Subject Name and Code are required.');
       return;
     }
 
@@ -86,7 +86,7 @@ export const FacultySubjects: React.FC = () => {
         code: formData.code.toUpperCase(),
         semester: formData.semester,
         credits: formData.credits,
-        course: formData.courseId,
+        course: formData.courseId || undefined,
         description: formData.description,
       });
 
@@ -105,7 +105,7 @@ export const FacultySubjects: React.FC = () => {
 
       fetchData();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Error occurred while saving subject.');
+      setErrorMsg(err.response?.data?.message || err.message || 'Error occurred while saving subject.');
     }
   };
 
@@ -403,6 +403,7 @@ export const FacultySubjects: React.FC = () => {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2.5 border border-outline-variant/60 rounded-xl bg-white dark:bg-surface-container text-on-surface focus:outline-none focus:border-primary"
                   >
+                    <option value="">Default / Auto-Assign Course</option>
                     {courses.map(course => (
                       <option key={course.id} value={course.id}>{course.name}</option>
                     ))}

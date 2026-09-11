@@ -24,8 +24,12 @@ export const subjectService = {
     };
   },
 
-  createSubject: async (subjectData: Omit<Subject, 'id'>): Promise<Subject> => {
-    const response = await apiClient.post<any, any>('/subjects', subjectData);
+  createSubject: async (subjectData: any): Promise<Subject> => {
+    const payload = { ...subjectData };
+    if (!payload.course || payload.course === '') {
+      delete payload.course;
+    }
+    const response = await apiClient.post<any, any>('/subjects', payload);
     const data = response.data || response;
     return {
       ...data,
@@ -33,8 +37,12 @@ export const subjectService = {
     };
   },
 
-  updateSubject: async (id: string, subjectData: Partial<Subject>): Promise<Subject> => {
-    const response = await apiClient.put<any, any>(`/subjects/${id}`, subjectData);
+  updateSubject: async (id: string, subjectData: any): Promise<Subject> => {
+    const payload = { ...subjectData };
+    if (payload.course === '') {
+      delete payload.course;
+    }
+    const response = await apiClient.put<any, any>(`/subjects/${id}`, payload);
     const data = response.data || response;
     return {
       ...data,

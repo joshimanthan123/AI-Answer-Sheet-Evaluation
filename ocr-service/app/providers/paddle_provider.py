@@ -43,21 +43,24 @@ def _get_ocr_engine():
                 _ocr_engine = PaddleOCR(
                     lang="ch",
                     device="cpu",
-                    ocr_version="PP-OCRv5"
+                    ocr_version="PP-OCRv5",
+                    use_angle_cls=False
                 )
             elif paddle_model == "en_PP-OCRv5_mobile_rec":
                 # Mobile English recognition model
                 _ocr_engine = PaddleOCR(
                     lang="en",
                     device="cpu",
-                    ocr_version="PP-OCRv5"
+                    ocr_version="PP-OCRv5",
+                    use_angle_cls=False
                 )
             else:
                 # Generic model name override fallback
                 _ocr_engine = PaddleOCR(
                     text_recognition_model_name=paddle_model,
                     text_detection_model_name="PP-OCRv5_server_det",
-                    device="cpu"
+                    device="cpu",
+                    use_angle_cls=False
                 )
         except Exception as e:
             logger.error("Failed to initialize PaddleOCR engine: %s", str(e), exc_info=True)
@@ -73,8 +76,11 @@ class PaddleHWRProvider(IHWRProvider):
     """
 
     def __init__(self) -> None:
-        # Pre-validate setup - any setup/download occurs lazily in _get_ocr_engine on first print/parse call
-        pass
+        # Pre-warm PaddleOCR engine at startup so first HTTP request has 0 loading latency
+        try:
+            _get_ocr_engine()
+        except Exception as e:
+            logger.warning("PaddleOCR pre-warming skipped during initialization: %s", str(e))
 
     def recognize(self, image: np.ndarray, page_num: int = 1) -> HWRResult:
         """

@@ -5,7 +5,18 @@ import OpenAiLlmProvider from "./openai.provider.js";
 export class LlmProviderFactory {
   static getProvider() {
     const apiKey = env.AI?.OPENAI_API_KEY;
-    // Fallback to Mock if key is missing or is the default dev key
+    const isLiveE2E = process.env.LIVE_E2E === "true";
+
+    if (isLiveE2E) {
+      if (!apiKey || apiKey === "mock-api-key-for-development") {
+        throw new Error(
+          "[LIVE_E2E ENFORCEMENT] OpenAI API Key is missing or invalid ('mock-api-key-for-development'). Fallback to MockLlmProvider is strictly forbidden during LIVE E2E validation."
+        );
+      }
+      return new OpenAiLlmProvider();
+    }
+
+    // Fallback to Mock if key is missing or is default dev key in non-E2E environments
     if (!apiKey || apiKey === "mock-api-key-for-development") {
       return new MockLlmProvider();
     }
@@ -14,3 +25,4 @@ export class LlmProviderFactory {
 }
 
 export default LlmProviderFactory;
+

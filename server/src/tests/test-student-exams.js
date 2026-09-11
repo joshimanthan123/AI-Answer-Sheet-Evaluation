@@ -367,6 +367,7 @@ async function runTest() {
     console.log("\nChecking Scenario 9 (Student with no exams)...");
     const unauthResults = await studentExamService.getStudentExams(unauthorizedStudent._id);
     if (unauthResults.exams.length !== 0) {
+      console.log("Returned exams for unauth student:", unauthResults.exams);
       throw new Error(`Expected 0 exams for unauth student, got ${unauthResults.exams.length}`);
     }
     console.log("✓ Scenario 9 passed!");

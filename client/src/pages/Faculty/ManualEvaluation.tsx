@@ -344,7 +344,25 @@ export const FacultyManualEvaluation: React.FC = () => {
                           <div className="flex flex-col gap-1.5">
                             <label className="font-bold text-[10px] text-outline uppercase select-none">OCR Digitized Text</label>
                             <div className="w-full px-4 py-3 border border-outline-variant/30 rounded-xl bg-surface-container-lowest text-xs text-on-surface-variant font-semibold leading-relaxed min-h-[60px]">
-                              {q.recognizedText || <span className="italic text-outline">No handwriting detected for this question.</span>}
+                              {(() => {
+                                const qObj: any = q;
+                                const qIdStr = String(qObj.questionId?._id || qObj.questionId || '');
+                                const sheetAns = sheet?.answers?.find((a: any) => 
+                                  String(a.questionId?._id || a.questionId || '') === qIdStr ||
+                                  String(a.questionNumber || a.question_number || '') === String(qObj.questionNumber || '')
+                                );
+                                const rawTxt = (
+                                  qObj.recognizedText ||
+                                  qObj.studentAnswer ||
+                                  qObj.text ||
+                                  qObj.answer_text ||
+                                  sheetAns?.recognizedText ||
+                                  sheetAns?.extractedText ||
+                                  sheetAns?.text ||
+                                  ''
+                                ).trim();
+                                return rawTxt ? `"${rawTxt}"` : <span className="italic text-outline">No OCR text available.</span>;
+                              })()}
                             </div>
                           </div>
                         </div>

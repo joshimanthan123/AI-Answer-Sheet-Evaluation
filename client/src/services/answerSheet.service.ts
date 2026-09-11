@@ -30,6 +30,13 @@ const getAuthHeaders = () => {
   };
 };
 
+const normalizeUrl = (url: any): string => {
+  if (typeof url !== 'string') return '';
+  let clean = url.replace(/\\/g, '/');
+  if (clean.startsWith('./')) clean = clean.substring(2);
+  return clean;
+};
+
 const normalizeSheetData = (sheet: any) => {
   if (!sheet) return sheet;
 
@@ -175,8 +182,8 @@ const normalizeSheetData = (sheet: any) => {
   if (pages && Array.isArray(pages) && pages.length > 0) {
     pages = pages.map((p: any) => ({
       page_number: p.pageNumber || p.page_number,
-      original_file_reference: p.originalFileReference || p.original_file_reference,
-      processed_file_reference: p.processedFileReference || p.processed_file_reference,
+      original_file_reference: normalizeUrl(p.originalFileReference || p.original_file_reference),
+      processed_file_reference: normalizeUrl(p.processedFileReference || p.processed_file_reference),
       width: p.width,
       height: p.height,
       processing_status: p.processingStatus || p.processing_status
@@ -185,7 +192,7 @@ const normalizeSheetData = (sheet: any) => {
     pages = [];
   }
 
-  const uploadedUrl = sheet.uploadedFileUrl || sheet.fileUrl || sheet.uploadedFileRef || sheet.original_file_reference;
+  const uploadedUrl = normalizeUrl(sheet.uploadedFileUrl || sheet.fileUrl || sheet.uploadedFileRef || sheet.original_file_reference);
   if (pages.length === 0 && uploadedUrl) {
     pages = [
       {
@@ -321,19 +328,34 @@ export const answerSheetService = {
     }
     const headers = getAuthHeaders();
     const isUuid = UUID_REGEX.test(id);
-    const endpoint = isUuid ? `/v1/student/answer-sheets/${id}` : `/v1/answer-sheets/${id}`;
-    const res: any = await apiClient.get(endpoint, { headers });
-    if (res && res.success && res.data) {
-      res.data = normalizeSheetData(res.data);
-      return res;
-    } else if (res && res.data) {
-      res.data = normalizeSheetData(res.data);
-      return res;
-    } else if (res) {
-      const normalized = normalizeSheetData(res);
-      return { success: true, data: normalized };
+    const primaryEndpoint = isUuid ? `/v1/student/answer-sheets/${id}` : `/v1/answer-sheets/${id}`;
+    
+    try {
+      const res: any = await apiClient.get(primaryEndpoint, { headers });
+      const rawData = res?.data || res;
+      if (rawData) {
+        const normalized = normalizeSheetData(rawData);
+        return { success: true, data: normalized };
+      }
+    } catch (err) {
+      console.warn(`[getStudentSheetDetail] Primary endpoint ${primaryEndpoint} failed for ${id}, attempting fallback endpoint.`);
     }
-    return res;
+
+    // Fallback to Express MongoDB route if primary endpoint failed
+    if (isUuid) {
+      try {
+        const fallbackRes: any = await apiClient.get(`/v1/answer-sheets/${id}`, { headers });
+        const rawData = fallbackRes?.data || fallbackRes;
+        if (rawData) {
+          const normalized = normalizeSheetData(rawData);
+          return { success: true, data: normalized };
+        }
+      } catch (fallbackErr) {
+        console.error(`[getStudentSheetDetail] Fallback endpoint /v1/answer-sheets/${id} failed:`, fallbackErr);
+      }
+    }
+    
+    throw new Error('Answer sheet metadata could not be fetched.');
   },
 
   getStudentSheetDigitalAnswers: async (id: string) => {
@@ -452,19 +474,34 @@ export const answerSheetService = {
     }
     const headers = getAuthHeaders();
     const isUuid = UUID_REGEX.test(id);
-    const endpoint = isUuid ? `/v1/faculty/answer-sheets/${id}` : `/v1/answer-sheets/${id}`;
-    const res: any = await apiClient.get(endpoint, { headers });
-    if (res && res.success && res.data) {
-      res.data = normalizeSheetData(res.data);
-      return res;
-    } else if (res && res.data) {
-      res.data = normalizeSheetData(res.data);
-      return res;
-    } else if (res) {
-      const normalized = normalizeSheetData(res);
-      return { success: true, data: normalized };
+    const primaryEndpoint = isUuid ? `/v1/faculty/answer-sheets/${id}` : `/v1/answer-sheets/${id}`;
+    
+    try {
+      const res: any = await apiClient.get(primaryEndpoint, { headers });
+      const rawData = res?.data || res;
+      if (rawData) {
+        const normalized = normalizeSheetData(rawData);
+        return { success: true, data: normalized };
+      }
+    } catch (err) {
+      console.warn(`[getFacultySheetDetail] Primary endpoint ${primaryEndpoint} failed for ${id}, attempting fallback endpoint.`);
     }
-    return res;
+
+    // Fallback to Express MongoDB route if primary endpoint failed
+    if (isUuid) {
+      try {
+        const fallbackRes: any = await apiClient.get(`/v1/answer-sheets/${id}`, { headers });
+        const rawData = fallbackRes?.data || fallbackRes;
+        if (rawData) {
+          const normalized = normalizeSheetData(rawData);
+          return { success: true, data: normalized };
+        }
+      } catch (fallbackErr) {
+        console.error(`[getFacultySheetDetail] Fallback endpoint /v1/answer-sheets/${id} failed:`, fallbackErr);
+      }
+    }
+
+    throw new Error('Answer sheet metadata could not be fetched.');
   },
 
   getFacultySheetDigitalAnswers: async (id: string) => {
@@ -499,44 +536,53 @@ export const answerSheetService = {
     }
     const headers = getAuthHeaders();
     const prefix = isFaculty ? 'faculty' : 'student';
+    const isUuid = UUID_REGEX.test(id);
 
-    try {
-      const response = await apiClient.get(`/v1/${prefix}/answer-sheets/${id}/pages/${pageNumber}?type=${type}`, {
-        headers,
-        responseType: 'blob',
-      });
-      return URL.createObjectURL(response as unknown as Blob);
-    } catch (err) {
-      console.warn(`[getPageImageObjectURL] FastAPI page endpoint failed for ID ${id}, attempting static uploaded file fallback.`);
+    // Only attempt FastAPI page endpoint directly if ID is a valid UUID
+    if (isUuid) {
       try {
-        const detailRes: any = isFaculty
-          ? await answerSheetService.getFacultySheetDetail(id)
-          : await answerSheetService.getStudentSheetDetail(id);
-        const sheetData = detailRes?.data || detailRes;
-        
-        let refUrl = sheetData?.pages?.[pageNumber - 1]?.original_file_reference ||
-                     sheetData?.uploadedFileUrl || 
-                     sheetData?.uploadedFileRef ||
-                     sheetData?.original_file_reference;
-        
-        if (refUrl) {
-          if (refUrl.startsWith('http://') || refUrl.startsWith('https://') || refUrl.startsWith('data:')) {
-            return refUrl;
-          }
-          const serverBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : 'http://localhost:5000';
-          const finalUrl = `${serverBase}${refUrl.startsWith('/') ? '' : '/'}${refUrl}`;
-          
-          // Fetch static file as blob
-          const staticBlobRes = await apiClient.get(finalUrl.replace(/^http:\/\/localhost:5000\/api/, ''), {
-            responseType: 'blob'
-          });
-          return URL.createObjectURL(staticBlobRes as unknown as Blob);
-        }
-      } catch (fallbackErr) {
-        console.error('[getPageImageObjectURL] Static fallback failed:', fallbackErr);
+        const response = await apiClient.get(`/v1/${prefix}/answer-sheets/${id}/pages/${pageNumber}?type=${type}`, {
+          headers,
+          responseType: 'blob',
+        });
+        return URL.createObjectURL(response as unknown as Blob);
+      } catch (err) {
+        console.warn(`[getPageImageObjectURL] FastAPI page endpoint failed for UUID ${id}, attempting static file fallback.`);
       }
-      throw err;
     }
+
+    // Static uploaded file fallback logic for both MongoDB ObjectIds and failed FastAPI UUIDs
+    try {
+      const detailRes: any = isFaculty
+        ? await answerSheetService.getFacultySheetDetail(id)
+        : await answerSheetService.getStudentSheetDetail(id);
+      const sheetData = detailRes?.data || detailRes;
+      
+      let refUrl = sheetData?.pages?.[pageNumber - 1]?.original_file_reference ||
+                   sheetData?.uploadedFileUrl || 
+                   sheetData?.uploadedFileRef ||
+                   sheetData?.original_file_reference;
+      
+      if (refUrl) {
+        const cleanRef = normalizeUrl(refUrl);
+        if (cleanRef.startsWith('http://') || cleanRef.startsWith('https://') || cleanRef.startsWith('data:')) {
+          return cleanRef;
+        }
+
+        const relativePath = cleanRef.replace(/^[/\\]+/, '');
+        const requestPath = relativePath.startsWith('uploads/') ? `/${relativePath}` : `/uploads/${relativePath}`;
+        
+        const staticBlobRes = await apiClient.get(requestPath, {
+          headers,
+          responseType: 'blob'
+        });
+        return URL.createObjectURL(staticBlobRes as unknown as Blob);
+      }
+    } catch (fallbackErr) {
+      console.error('[getPageImageObjectURL] Static fallback failed for ID ' + id + ':', fallbackErr);
+    }
+    
+    throw new Error(`Unable to load scanned page ${pageNumber} for sheet ${id}.`);
   }
 };
 

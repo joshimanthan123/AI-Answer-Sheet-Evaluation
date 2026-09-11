@@ -55,10 +55,13 @@ export const AnswerSheetViewer: React.FC<AnswerSheetViewerProps> = ({
           }
 
           // Check if processing is still in progress
-          const status = String(sheetData.processing_status || sheetData.processingStatus || sheetData.uploadStatus || '').toUpperCase();
-          const inProgressStatuses = ['QUEUED', 'PROCESSING', 'PREPROCESSING', 'OCR_PROCESSING', 'SEGMENTING', 'HWR PROCESSING', 'UPLOADED'];
+          const status = String(sheetData.processing_status || sheetData.processingStatus || sheetData.ocrStatus || sheetData.uploadStatus || '').toUpperCase();
+          const subStatus = String(sheetData.submissionStatus || '').toUpperCase();
+          const inProgressStatuses = ['QUEUED', 'PROCESSING', 'PREPROCESSING', 'OCR_PROCESSING', 'SEGMENTING', 'HWR PROCESSING', 'UPLOADED', 'IN_PROGRESS'];
           
-          if (inProgressStatuses.includes(status)) {
+          const isBackgroundOcrActive = inProgressStatuses.includes(status) || (subStatus === 'SUBMITTED' && status !== 'COMPLETED' && status !== 'FAILED');
+
+          if (isBackgroundOcrActive) {
             timerId = setTimeout(() => fetchSheetData(false), 2500);
           }
         } else {
@@ -494,14 +497,11 @@ const StrokeCanvas: React.FC<{ strokes: any[]; questionNumber?: string; height?:
                 <span className="text-[10px] font-bold text-outline block uppercase mb-1">OCR Digitized Text</span>
                 <p className="text-on-surface font-body-md whitespace-pre-wrap leading-relaxed select-text font-serif italic text-sm">
                   {(() => {
-                    const txt = (ans.text || ans.answer_text || ans.recognizedText || ans.extracted_text || ans.extractedText || '').trim();
-                    if (txt.length > 0) {
-                      return `"${txt}"`;
+                    const rawTxt = (ans.text || ans.answer_text || ans.recognizedText || ans.extracted_text || ans.extractedText || '').trim();
+                    if (rawTxt.length > 0) {
+                      return `"${rawTxt}"`;
                     }
-                    if (strokesList && strokesList.length > 0) {
-                      return <span className="text-outline not-italic font-sans">Handwritten canvas strokes captured.</span>;
-                    }
-                    return <span className="text-outline not-italic font-sans">No OCR text transcribed.</span>;
+                    return <span className="text-outline not-italic font-sans">No OCR text available.</span>;
                   })()}
                 </p>
               </div>

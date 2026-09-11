@@ -78,7 +78,7 @@ export const createAnswerSheet = async (data, userId) => {
   return answerSheet;
 };
 
-export const getAnswerSheetById = async (id) => {
+export const getAnswerSheetById = async (id, userId, userRole) => {
   const query = mongoose.Types.ObjectId.isValid(id)
     ? { _id: id, isDeleted: false }
     : { $or: [{ _id: id }, { fastapiSheetId: id }], isDeleted: false };
@@ -99,22 +99,52 @@ export const getAnswerSheetById = async (id) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Answer sheet not found");
   }
 
+  // Enforce student ownership isolation
+  if (userRole === ROLES.STUDENT && userId) {
+    const studentOwnerId = answerSheet.student && (answerSheet.student._id ? answerSheet.student._id.toString() : answerSheet.student.toString());
+    if (studentOwnerId !== userId.toString()) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this answer sheet.");
+    }
+  }
+
   const sheetObj = answerSheet.toObject ? answerSheet.toObject() : { ...answerSheet };
 
   // Ensure digital_answers exists and is populated for frontend UI consumption
   if (!sheetObj.digital_answers || sheetObj.digital_answers.length === 0 || sheetObj.uploadStatus === "FAILED") {
     let populatedFromAnswers = false;
     if (sheetObj.answers && sheetObj.answers.length > 0) {
-      const mapped = sheetObj.answers.map((ans, idx) => ({
-        question_number: String(ans.question_number || idx + 1),
-        question_id: ans.questionId,
-        text: (ans.recognizedText || ans.text || ans.answer_text || "").trim(),
-        answer_text: (ans.recognizedText || ans.text || ans.answer_text || "").trim(),
-        recognizedText: (ans.recognizedText || "").trim(),
-        handwrittenData: ans.handwrittenData || "",
-        confidence: ans.confidence !== undefined ? ans.confidence : 1.0,
-      }));
-      const hasContent = mapped.some(a => a.text.length > 0 || a.handwrittenData.length > 0);
+      const examQuestions = sheetObj.exam?.questions || [];
+      const mapped = sheetObj.answers.map((ans, idx) => {
+        const matchedQ = examQuestions.find(q => q._id && ans.questionId && q._id.toString() === ans.questionId.toString());
+        const qNum = ans.question_number || (matchedQ ? matchedQ.questionNumber : idx + 1);
+        const qText = ans.question_text || (matchedQ ? matchedQ.questionText : "");
+        const maxMarks = ans.max_marks || (matchedQ ? (matchedQ.maximumMarks || matchedQ.marks || 10) : 10);
+        let strokes = ans.strokes || [];
+        if ((!strokes || strokes.length === 0) && ans.handwrittenData) {
+          try {
+            const parsed = typeof ans.handwrittenData === "string" ? JSON.parse(ans.handwrittenData) : ans.handwrittenData;
+            if (parsed && Array.isArray(parsed.strokes)) strokes = parsed.strokes;
+          } catch (e) {}
+        }
+        let textVal = (ans.recognizedText || ans.text || ans.answer_text || "").trim();
+        if (textVal.startsWith("Transcribed canvas response") || textVal.startsWith("Digitized canvas answer")) {
+          textVal = "";
+        }
+        return {
+          question_number: String(qNum),
+          question_id: ans.questionId,
+          question_text: qText,
+          max_marks: maxMarks,
+          text: textVal,
+          answer_text: textVal,
+          recognizedText: textVal,
+          handwrittenData: ans.handwrittenData || "",
+          strokes,
+          page_number: ans.page_number || ans.pageNumber || 1,
+          confidence: ans.confidence !== undefined ? ans.confidence : 1.0,
+        };
+      });
+      const hasContent = mapped.some(a => a.text.length > 0 || (a.strokes && a.strokes.length > 0) || a.handwrittenData.length > 0);
       if (hasContent) {
         sheetObj.digital_answers = mapped;
         populatedFromAnswers = true;
@@ -163,16 +193,12 @@ export const getAnswerSheetById = async (id) => {
   return sheetObj;
 };
 
-export const getDigitalAnswers = async (id) => {
-  try {
-    const sheet = await getAnswerSheetById(id);
-    return sheet.digital_answers || [];
-  } catch (err) {
-    return [];
-  }
+export const getDigitalAnswers = async (id, userId, userRole) => {
+  const sheet = await getAnswerSheetById(id, userId, userRole);
+  return sheet.digital_answers || [];
 };
 
-export const getAllAnswerSheets = async (query = {}) => {
+export const getAllAnswerSheets = async (query = {}, userId, userRole) => {
   const {
     page = 1,
     limit = 10,
@@ -186,7 +212,10 @@ export const getAllAnswerSheets = async (query = {}) => {
 
   const mongoQuery = { isDeleted: false };
 
-  if (student) {
+  if (userRole === ROLES.STUDENT && userId) {
+    // Force ownership filter for student users
+    mongoQuery.student = userId;
+  } else if (student) {
     mongoQuery.student = student;
   }
 
@@ -327,6 +356,14 @@ export const getExamAnswerSheets = async (examId, userId, userRole) => {
     throw new ApiError(STATUS_CODES.FORBIDDEN, "You do not own this exam");
   }
 
+  // Self-healing: Ensure all answer sheets for this exam have facultyId set to exam.createdBy
+  if (exam.createdBy) {
+    await AnswerSheet.updateMany(
+      { exam: examId, $or: [{ facultyId: { $exists: false } }, { facultyId: null }], isDeleted: false },
+      { $set: { facultyId: exam.createdBy } }
+    );
+  }
+
   const sheets = await AnswerSheet.find({ exam: examId, isDeleted: false })
     .populate("student", "name email rollNo department semester")
     .sort("-createdAt")
@@ -341,6 +378,10 @@ export const getExamAnswerSheets = async (examId, userId, userRole) => {
   }).lean();
 
   sheets.forEach((sheet) => {
+    if (!sheet.uploadedFileName) {
+      sheet.uploadedFileName = sheet.submissionType === "UPLOAD" ? "Uploaded Scan" : "Digital Slate Submission";
+    }
+
     const matchingEval = evaluations.find(
       (ev) => ev.answerSheet.toString() === sheet._id.toString()
     );
@@ -451,6 +492,7 @@ export const uploadAnswerSheets = async (examId, files, studentIdentifier, userI
         isDeleted: false,
       });
 
+      const normalizedFilePath = file.path ? file.path.replace(/\\/g, "/") : "";
       if (!answerSheet) {
         answerSheet = await AnswerSheet.create({
           student: student._id,
@@ -459,7 +501,7 @@ export const uploadAnswerSheets = async (examId, files, studentIdentifier, userI
           facultyId: userId,
           submissionType: "UPLOAD",
           uploadedFileName: file.originalname,
-          uploadedFileUrl: file.path, // Store local uploaded path
+          uploadedFileUrl: normalizedFilePath, // Store normalized local uploaded path
           fileType: file.mimetype,
           fileSize: file.size,
           uploadStatus: "Uploaded",
@@ -473,7 +515,7 @@ export const uploadAnswerSheets = async (examId, files, studentIdentifier, userI
         });
       } else {
         answerSheet.uploadedFileName = file.originalname;
-        answerSheet.uploadedFileUrl = file.path;
+        answerSheet.uploadedFileUrl = normalizedFilePath;
         answerSheet.fileType = file.mimetype;
         answerSheet.fileSize = file.size;
         answerSheet.uploadStatus = "Uploaded";
@@ -770,6 +812,7 @@ export const startExam = async (examId, userId) => {
     student: userId,
     subject: exam.subject,
     exam: examId,
+    facultyId: exam.createdBy,
     submissionStatus: "Started",
     answers,
     totalQuestions: exam.questions.length,
@@ -869,6 +912,9 @@ export const submitExam = async (examId, userId) => {
 
   answerSheet.submissionStatus = "Submitted";
   answerSheet.submittedAt = new Date();
+  if (!answerSheet.facultyId && answerSheet.exam && answerSheet.exam.createdBy) {
+    answerSheet.facultyId = answerSheet.exam.createdBy;
+  }
   answerSheet.updatedBy = userId;
 
   await answerSheet.save();
@@ -953,6 +999,7 @@ export const getReviewStatus = async (examId, userId) => {
 export default {
   createAnswerSheet,
   getAnswerSheetById,
+  getDigitalAnswers,
   getAllAnswerSheets,
   updateAnswerSheet,
   deleteAnswerSheet,

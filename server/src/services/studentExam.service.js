@@ -34,29 +34,80 @@ export const getStudentEligibleSubjectIds = async (student) => {
   let filtered = allSubjects;
 
   if (student.semester) {
-    const semMatches = allSubjects.filter(
-      sub => sub.semester && sub.semester.toString() === student.semester.toString()
-    );
-    if (semMatches.length > 0) {
-      filtered = semMatches;
-    }
+    const studentSemStr = student.semester.toString().trim();
+    filtered = filtered.filter(sub => {
+      if (!sub.semester) return true;
+      return sub.semester.toString().trim() === studentSemStr;
+    });
   }
 
   if (student.department) {
-    const studentDeptStr = student.department.toString().toLowerCase();
-    const deptMatches = filtered.filter(sub => {
+    const studentDeptStr = student.department.toString().toLowerCase().trim();
+    
+    // Helper to get common abbreviations/aliases
+    const getAliases = (str) => {
+      const aliases = new Set([str]);
+      if (str.includes("computer") || str.includes("ce") || str === "cs") {
+        aliases.add("computer");
+        aliases.add("engineering");
+        aliases.add("ce");
+        aliases.add("cs");
+      }
+      if (str.includes("information") || str.includes("it")) {
+        aliases.add("information");
+        aliases.add("technology");
+        aliases.add("it");
+      }
+      return Array.from(aliases);
+    };
+
+    const studentAliases = getAliases(studentDeptStr);
+
+    filtered = filtered.filter(sub => {
       const course = sub.course;
       if (!course || !course.department) return true;
       const dept = course.department;
-      return (
-        (dept._id && dept._id.toString().toLowerCase() === studentDeptStr) ||
-        (dept.name && dept.name.toLowerCase() === studentDeptStr) ||
-        (dept.code && dept.code.toLowerCase() === studentDeptStr)
-      );
+      const deptIdStr = typeof dept === "object" && dept._id ? dept._id.toString().toLowerCase() : (typeof dept === "string" ? dept.toLowerCase() : "");
+      const deptNameStr = typeof dept === "object" && dept.name ? dept.name.toLowerCase() : "";
+      const deptCodeStr = typeof dept === "object" && dept.code ? dept.code.toLowerCase() : "";
+
+      // General / Default course subjects are open to all students
+      if (
+        deptNameStr.includes("general") ||
+        deptCodeStr.includes("gen") ||
+        deptCodeStr.includes("get")
+      ) {
+        return true;
+      }
+
+      if (deptIdStr === studentDeptStr) return true;
+
+      // Check if any alias matches name or code
+      for (const alias of studentAliases) {
+        if (alias.length <= 2) {
+          // Short code (e.g. "ce", "ec", "it", "cs"): match exact code or word boundary
+          const regex = new RegExp(`\\b${alias}\\b`, "i");
+          if (
+            deptCodeStr === alias ||
+            deptCodeStr.startsWith(alias + "-") ||
+            deptCodeStr.startsWith(alias + "_") ||
+            regex.test(deptNameStr)
+          ) {
+            return true;
+          }
+        } else {
+          // Longer terms (e.g. "computer", "engineering", "information"): substring match is safe
+          if (
+            (deptNameStr && deptNameStr.includes(alias)) ||
+            (deptCodeStr && deptCodeStr.includes(alias))
+          ) {
+            return true;
+          }
+        }
+      }
+
+      return false;
     });
-    if (deptMatches.length > 0) {
-      filtered = deptMatches;
-    }
   }
 
   return filtered.map(sub => sub._id.toString());
@@ -77,15 +128,12 @@ export const getExamStatusAndEligibility = (exam, submission, evaluation, now = 
   const start = exam.startTime ? new Date(exam.startTime) : examDate;
   const end = exam.endTime ? new Date(exam.endTime) : (start ? new Date(start.getTime() + (exam.duration || 60) * 60 * 1000) : null);
 
-  const isInsideWindow = start && end && now >= start && now <= end;
-  const isActiveStatus = exam.examStatus === "Active" || exam.examStatus === "Published";
-
   let status = "expired";
   let canEnter = false;
   let reason = null;
 
-  // Determine stage and status based on recommended priority list
-  if (evalStatus === "PUBLISHED" || evalStatus === "published" || subStatus === "Published" || uploadStr === "Published") {
+  // Determine stage and status based on priority list
+  if (evalStatus === "PUBLISHED" || evalStatus === "published" || subStatus === "Published" || uploadStr === "Published" || submission?.resultPublication?.status === "RESULT_PUBLISHED") {
     status = "published";
     canEnter = false;
     reason = "Results have been published.";
@@ -108,17 +156,14 @@ export const getExamStatusAndEligibility = (exam, submission, evaluation, now = 
   } else if (alreadyStarted && (!end || now <= end)) {
     status = "in_progress";
     canEnter = true;
+  } else if (start && now < start) {
+    status = "upcoming";
+    canEnter = false;
+    reason = "Exam has not started yet.";
   } else if (end && now > end) {
     status = "expired";
     canEnter = false;
     reason = "Exam duration has expired.";
-  } else if (start && start > now && !isActiveStatus) {
-    status = "upcoming";
-    canEnter = false;
-    reason = "Exam has not started yet.";
-  } else if (isInsideWindow || isActiveStatus || !start) {
-    status = "active";
-    canEnter = true;
   } else {
     status = "active";
     canEnter = true;
@@ -147,15 +192,21 @@ export const getStudentExams = async (studentId, query = {}) => {
     subject: subjectMatch,
   };
 
-  if (search) {
-    mongoQuery.title = { $regex: search, $options: "i" };
-  }
-
-  // Fetch candidate exams after eligibility filter
-  const candidateExams = await Exam.find(mongoQuery)
+  // Fetch candidate exams after eligibility filter (newest first)
+  let candidateExams = await Exam.find(mongoQuery)
     .populate("subject", "name code semester")
-    .sort({ examDate: 1, startTime: 1 })
+    .sort({ startTime: -1, examDate: -1, createdAt: -1 })
     .lean();
+
+  if (search && search.trim() !== "") {
+    const sTerm = search.trim().toLowerCase();
+    candidateExams = candidateExams.filter(exam => {
+      const titleMatch = exam.title && exam.title.toLowerCase().includes(sTerm);
+      const subNameMatch = exam.subject && exam.subject.name && exam.subject.name.toLowerCase().includes(sTerm);
+      const subCodeMatch = exam.subject && exam.subject.code && exam.subject.code.toLowerCase().includes(sTerm);
+      return titleMatch || subNameMatch || subCodeMatch;
+    });
+  }
 
   const now = new Date();
 
@@ -204,8 +255,30 @@ export const getStudentExams = async (studentId, query = {}) => {
       submissionStatus: normSubmissionStatus,
       canEnter,
       reason,
+      createdAt: exam.createdAt,
     });
   }
+
+  // Sort mapped exams by status priority then by startTime/createdAt descending
+  const statusPriorityMap = {
+    active: 1,
+    in_progress: 2,
+    upcoming: 3,
+    processing: 4,
+    reviewed: 5,
+    published: 6,
+    submitted: 7,
+    expired: 8,
+  };
+
+  mappedExams.sort((a, b) => {
+    const pA = statusPriorityMap[a.status] || 99;
+    const pB = statusPriorityMap[b.status] || 99;
+    if (pA !== pB) return pA - pB;
+    const dateA = a.startTime ? new Date(a.startTime).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const dateB = b.startTime ? new Date(b.startTime).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return dateB - dateA;
+  });
 
   // Filter based on status parameter if provided
   let filteredExams = mappedExams;
@@ -743,34 +816,58 @@ export const processDigitalExamHWRBackground = async (sheetId, studentId, userId
         page_num: qNum
       };
 
-      logger.info(`Sending ${payload.strokes.length} strokes of question ${ansItem.questionId} (Q${qNum}) to FastAPI for OCR...`);
+      let recognizedText = "";
+      let confidence = 1.0;
+      let ocrQualityStatus = "HIGH";
+      let needsReview = false;
+      let provider = "paddle";
+      let qualityReasons = [];
 
-      const response = await fetch(uvicornUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        logger.info(`Sending ${payload.strokes.length} strokes of question ${ansItem.questionId} (Q${qNum}) to FastAPI for OCR...`);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`FastAPI strokes OCR returned status ${response.status}: ${errorText}`);
+        const response = await fetch(uvicornUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`FastAPI strokes OCR returned status ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("OCR response:", result.data);
+        if (!result.success || !result.data) {
+          throw new Error(result.message || "Failed to process strokes in python service");
+        }
+
+        const hwrResult = result.data;
+        recognizedText = (hwrResult.text || "").trim();
+        console.log("Extracted OCR text:", recognizedText);
+        confidence = hwrResult.confidence ?? 1.0;
+        ocrQualityStatus = hwrResult.ocrQualityStatus || "HIGH";
+        needsReview = hwrResult.needsReview ?? false;
+        provider = hwrResult.provider || "paddle";
+        qualityReasons = hwrResult.qualityReasons || [];
+      } catch (ocrErr) {
+        logger.warn(`FastAPI stroke recognition bypassed/failed for Q${qNum}: ${ocrErr.message}`);
+        const fallbackCandidate = ansItem.recognizedText || ansItem.text || "";
+        if (fallbackCandidate.startsWith("Transcribed canvas response") || fallbackCandidate.startsWith("Digitized canvas answer")) {
+          recognizedText = "";
+        } else {
+          recognizedText = fallbackCandidate;
+        }
+        provider = "fallback";
       }
-
-      const result = await response.json();
-      if (!result.success || !result.data) {
-        throw new Error(result.message || "Failed to process strokes in python service");
-      }
-
-      const hwrResult = result.data;
-      const recognizedText = hwrResult.text || "";
-      const confidence = hwrResult.confidence ?? 1.0;
 
       let confidenceLevel = "HIGH";
-      if (confidence < 0.6) {
+      if (confidence < 0.6 || needsReview || ocrQualityStatus === "NEEDS_REVIEW") {
         confidenceLevel = "LOW";
-      } else if (confidence < 0.85) {
+      } else if (confidence < 0.85 || ocrQualityStatus === "MEDIUM") {
         confidenceLevel = "MEDIUM";
       }
 
@@ -781,13 +878,45 @@ export const processDigitalExamHWRBackground = async (sheetId, studentId, userId
         hwrStatus: "Completed",
         confidence,
         confidenceLevel,
+        ocrQualityStatus,
+        needsReview,
+        provider,
+        qualityReasons,
         submissionTime: ansItem.submissionTime || new Date(),
       });
 
       rawTextParts.push(`Q${qNum}: ${recognizedText}`);
     }
 
+    const digitalAnswers = updatedAnswers.map((ans, idx) => {
+      const matchedQ = exam.questions ? exam.questions.find(q => q._id.toString() === ans.questionId.toString()) : null;
+      const qNum = matchedQ ? matchedQ.questionNumber : (idx + 1);
+      const qText = matchedQ ? matchedQ.questionText : "";
+      const maxMarks = matchedQ ? (matchedQ.maximumMarks || matchedQ.marks || 10) : 10;
+      let strokes = [];
+      if (ans.handwrittenData) {
+        try {
+          const parsed = typeof ans.handwrittenData === "string" ? JSON.parse(ans.handwrittenData) : ans.handwrittenData;
+          if (parsed && Array.isArray(parsed.strokes)) strokes = parsed.strokes;
+        } catch (e) {}
+      }
+      return {
+        question_id: ans.questionId,
+        question_number: String(qNum),
+        question_text: qText,
+        max_marks: maxMarks,
+        text: ans.recognizedText || "",
+        answer_text: ans.recognizedText || "",
+        recognizedText: ans.recognizedText || "",
+        handwrittenData: ans.handwrittenData || "",
+        strokes,
+        page_number: 1,
+        confidence: ans.confidence ?? 1.0,
+      };
+    });
+
     answerSheet.answers = updatedAnswers;
+    answerSheet.digital_answers = digitalAnswers;
     answerSheet.extractedText = rawTextParts.join("\n\n");
     answerSheet.processingStatus = "completed";
     answerSheet.ocrStatus = "completed";
@@ -1033,7 +1162,15 @@ export const getStudentExamResult = async (studentId, examId) => {
     isDeleted: false,
   }).lean();
 
-  if (!evaluation || !["PUBLISHED", "published", "finalized"].includes(evaluation.evaluationStatus)) {
+  if (
+    !evaluation ||
+    submission.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "FAILED" ||
+    evaluation.evaluationStatus === "failed" ||
+    submission.resultPublication?.status !== "RESULT_PUBLISHED" ||
+    !["PUBLISHED", "published", "RESULT_PUBLISHED"].includes(evaluation.evaluationStatus)
+  ) {
     throw new ApiError(STATUS_CODES.FORBIDDEN, "Result is not available yet.");
   }
 

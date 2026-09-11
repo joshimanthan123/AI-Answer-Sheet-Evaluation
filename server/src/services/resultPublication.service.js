@@ -185,6 +185,14 @@ export const publishResult = async (answerSheetId, facultyId, comment = "") => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "RESULT_NOT_FINALIZED: Results can only be published after review is fully finalized.");
   }
 
+  if (
+    ansSheet.evaluationStatus === "EVALUATION_FAILED" ||
+    ansSheet.ocrStatus === "failed" ||
+    ansSheet.processingStatus === "failed"
+  ) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "CANNOT_PUBLISH_FAILED_EVALUATION: Evaluation or OCR failed for this answer sheet.");
+  }
+
   if (ansSheet.resultPublication?.status === "RESULT_PUBLISHED") {
     throw new ApiError(STATUS_CODES.CONFLICT, "RESULT_ALREADY_PUBLISHED: The result has already been published.");
   }
@@ -192,6 +200,18 @@ export const publishResult = async (answerSheetId, facultyId, comment = "") => {
   const evaluation = await Evaluation.findOne({ answerSheet: answerSheetId, isDeleted: false });
   if (!evaluation) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Associated evaluation not found.");
+  }
+
+  if (evaluation.answerSheet.toString() !== answerSheetId.toString()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "EVALUATION_SUBMISSION_MISMATCH: Evaluation does not belong to this submission.");
+  }
+
+  if (
+    evaluation.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "FAILED" ||
+    evaluation.evaluationStatus === "failed"
+  ) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "CANNOT_PUBLISH_FAILED_EVALUATION: Cannot publish results for an evaluation that failed or was not completed.");
   }
 
   // Set publication values

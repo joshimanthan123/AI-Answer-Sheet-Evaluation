@@ -35,6 +35,24 @@ const answerItemSchema = new mongoose.Schema({
     max: 1,
     default: 1.0,
   },
+  ocrQualityStatus: {
+    type: String,
+    enum: ["HIGH", "MEDIUM", "LOW", "NEEDS_REVIEW"],
+    default: "HIGH",
+    trim: true,
+  },
+  needsReview: {
+    type: Boolean,
+    default: false,
+  },
+  provider: {
+    type: String,
+    default: "paddle",
+  },
+  qualityReasons: {
+    type: [String],
+    default: [],
+  },
 });
 
 const answerSheetSchema = new mongoose.Schema(
@@ -181,6 +199,21 @@ const answerSheetSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    digital_answers: [
+      {
+        question_number: String,
+        question_id: mongoose.Schema.Types.ObjectId,
+        question_text: String,
+        max_marks: Number,
+        text: String,
+        answer_text: String,
+        recognizedText: String,
+        handwrittenData: String,
+        strokes: Array,
+        page_number: Number,
+        confidence: Number,
+      },
+    ],
     evaluationStatus: {
       type: String,
       enum: [

@@ -1,8 +1,9 @@
+import asyncio
 import cv2
 import numpy as np
 import base64
 import logging
-from typing import List, Union
+from typing import List, Union, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Request
 from app.config import Settings
 from app.dependencies import get_settings, get_preprocessor, get_hwr_service, get_segmentation_service
@@ -93,10 +94,13 @@ async def preprocess_image(
     """
     Runs the OpenCV cleanup operations and returns Base64 representations.
     """
+    logger.info("OCR PREPROCESS: Request received - filename=%s", file.filename)
     content = await validate_uploaded_image(file, settings)
+    logger.info("OCR PREPROCESS: Validation passed - bytes=%d", len(content))
     img = run_image_read_and_size_validation(content, preprocessor)
     
-    preprocess_result = preprocessor.preprocess(img, PreprocessConfig())
+    preprocess_result = await asyncio.to_thread(preprocessor.preprocess, img, PreprocessConfig())
+    logger.info("OCR PREPROCESS: Preprocessing complete")
     
     orig_b64 = encode_to_base64(preprocess_result.original)
     proc_b64 = encode_to_base64(preprocess_result.processed)
@@ -126,14 +130,23 @@ async def recognize_image(
     """
     Preprocess image and transcribe handwritten text lines.
     """
+    logger.info("OCR RECOGNIZE: Request received - filename=%s", file.filename)
     content = await validate_uploaded_image(file, settings)
+    logger.info("OCR RECOGNIZE: File validation passed - content_size=%d bytes", len(content))
+    
     img = run_image_read_and_size_validation(content, preprocessor)
+    logger.info("OCR RECOGNIZE: Image decoding complete - shape=%s", img.shape)
     
-    preprocess_result = preprocessor.preprocess(img, PreprocessConfig())
+    logger.info("OCR RECOGNIZE: Preprocessing started")
+    preprocess_result = await asyncio.to_thread(preprocessor.preprocess, img, PreprocessConfig())
+    logger.info("OCR RECOGNIZE: Preprocessing complete - processed_shape=%s", preprocess_result.processed.shape)
     
+    logger.info("OCR RECOGNIZE: HWR inference started")
     try:
-        hwr_result = hwr_service.recognize_handwriting(preprocess_result.processed)
+        hwr_result = await asyncio.to_thread(hwr_service.recognize_handwriting, preprocess_result.processed)
+        logger.info("OCR RECOGNIZE: HWR inference complete - text_lines=%d, confidence=%.4f", len(hwr_result.lines), hwr_result.confidence)
     except HWRServiceError as hse:
+        logger.error("OCR RECOGNIZE: HWR service failure: %s", str(hse))
         if "timeout" in str(hse).lower() or "gate" in str(hse).lower():
             raise AzureTimeoutException(str(hse))
         raise OCRProviderFailureException(str(hse))
@@ -194,12 +207,12 @@ async def run_pipeline(
     content = await validate_uploaded_image(file, settings)
     img = run_image_read_and_size_validation(content, preprocessor)
     
-    preprocess_result = preprocessor.preprocess(img, PreprocessConfig())
+    preprocess_result = await asyncio.to_thread(preprocessor.preprocess, img, PreprocessConfig())
     prep_time = preprocess_result.metadata["processing_time"]
     
     # 2. HWR
     try:
-        hwr_result = hwr_service.recognize_handwriting(preprocess_result.processed)
+        hwr_result = await asyncio.to_thread(hwr_service.recognize_handwriting, preprocess_result.processed)
     except HWRServiceError as hse:
         if "timeout" in str(hse).lower() or "gate" in str(hse).lower():
             raise AzureTimeoutException(str(hse))
@@ -208,7 +221,7 @@ async def run_pipeline(
     
     # 3. Segment
     try:
-        segment_result = segmentation_service.segment_answers(hwr_result)
+        segment_result = await asyncio.to_thread(segmentation_service.segment_answers, hwr_result)
     except Exception as e:
         raise SegmentationFailureException(f"Answer segmentation failed in pipeline: {str(e)}")
     seg_time = segment_result.execution_time
@@ -261,7 +274,7 @@ async def run_pipeline(
     )
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class StrokePoint(BaseModel):
     x: float
@@ -274,9 +287,12 @@ class Stroke(BaseModel):
 
 class StrokesPayload(BaseModel):
     strokes: List[Stroke]
-    width: int = 800
-    height: int = 600
+    width: Optional[int] = Field(default=800, alias="canvasWidth")
+    height: Optional[int] = Field(default=600, alias="canvasHeight")
     page_num: int = 1
+    
+    class Config:
+        populate_by_name = True
 
 @router.post("/recognize-strokes", response_model=ApiResponse, tags=["Recognition"])
 async def recognize_strokes(
@@ -284,11 +300,17 @@ async def recognize_strokes(
     hwr_service: HandwritingRecognitionService = Depends(get_hwr_service)
 ):
     """
-    Renders student digital canvas strokes into a clean white numpy image matrix
-    with bounding box normalization and padding, saves diagnostic images,
-    and performs handwriting recognition using the configured provider.
+    Renders student digital canvas strokes into a high-contrast white numpy image matrix
+    with ink bounding box normalization, padding, dynamic line width scaling,
+    saves structured diagnostic debug images, and evaluates results via OCRQualityGate.
     """
-    # 1. Collect points to calculate bounding box
+    import os
+    from app.services.ocr_quality_gate import quality_gate
+
+    debug_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "debug")
+    os.makedirs(debug_dir, exist_ok=True)
+
+    # 1. Collect points to calculate ink bounding box
     all_x = []
     all_y = []
     
@@ -299,13 +321,18 @@ async def recognize_strokes(
             all_x.append(pt.x)
             all_y.append(pt.y)
             
-    padding = 50
-    target_min_height = 250
-    stroke_thickness = 5
+    padding = 40
+    target_height = 100
     
     if not all_x or not all_y:
-        # Fallback to white canvas if empty
-        img = np.ones((payload.height or 400, payload.width or 800, 3), dtype=np.uint8) * 255
+        # Fallback to empty white canvas if no stroke points provided
+        canvas_w = payload.width or 800
+        canvas_h = payload.height or 400
+        raw_img = np.ones((canvas_h, canvas_w, 3), dtype=np.uint8) * 255
+        upscaled_img = raw_img.copy()
+        gray_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2GRAY)
+        contrast_img = gray_img.copy()
+        final_img = raw_img.copy()
     else:
         min_x, max_x = min(all_x), max(all_x)
         min_y, max_y = min(all_y), max(all_y)
@@ -313,42 +340,63 @@ async def recognize_strokes(
         bbox_w = max(max_x - min_x, 10)
         bbox_h = max(max_y - min_y, 10)
         
-        # Scale to ensure handwriting is clearly visible and reasonably sized
-        scale = max(target_min_height / bbox_h, 1.5)
+        # 01. Render original raw canvas at 1:1 scale
+        raw_w = int(bbox_w + padding * 2)
+        raw_h = int(bbox_h + padding * 2)
+        raw_img = np.ones((raw_h, raw_w, 3), dtype=np.uint8) * 255
+        for stroke in payload.strokes:
+            if not stroke.points or len(stroke.points) < 2:
+                continue
+            raw_pts = [(int(p.x - min_x + padding), int(p.y - min_y + padding)) for p in stroke.points]
+            for i in range(len(raw_pts) - 1):
+                cv2.line(raw_img, raw_pts[i], raw_pts[i+1], (0, 0, 0), stroke.width or 3, lineType=cv2.LINE_AA)
+
+        # 02. Upscale with aspect-ratio preservation to target height
+        scale = max(target_height / bbox_h, 1.0)
+        max_canvas_w = 1600
         
-        canvas_w = int(bbox_w * scale + padding * 2)
-        canvas_h = int(bbox_h * scale + padding * 2)
+        scaled_w = int(bbox_w * scale)
+        scaled_h = int(bbox_h * scale)
         
-        img = np.ones((canvas_h, canvas_w, 3), dtype=np.uint8) * 255
+        canvas_w = min(max(scaled_w + padding * 2, 400), max_canvas_w)
+        canvas_h = scaled_h + padding * 2
+        
+        upscaled_img = np.ones((canvas_h, canvas_w, 3), dtype=np.uint8) * 255
+        stroke_w = max(int(round(4 * (scale ** 0.5))), 4)
         
         for stroke in payload.strokes:
             if not stroke.points or len(stroke.points) < 2:
                 continue
-            
             scaled_pts = []
             for p in stroke.points:
                 sx = int((p.x - min_x) * scale + padding)
                 sy = int((p.y - min_y) * scale + padding)
                 scaled_pts.append((sx, sy))
-                
             for i in range(len(scaled_pts) - 1):
-                cv2.line(img, scaled_pts[i], scaled_pts[i+1], (0, 0, 0), stroke_thickness, lineType=cv2.LINE_AA)
+                cv2.line(upscaled_img, scaled_pts[i], scaled_pts[i+1], (0, 0, 0), stroke_w, lineType=cv2.LINE_AA)
+
+        # 03. Grayscale
+        gray_img = cv2.cvtColor(upscaled_img, cv2.COLOR_BGR2GRAY)
+        
+        # 04. Contrast enhancement
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        contrast_img = clahe.apply(gray_img)
+
+        # 05. Final image for OCR
+        final_img = upscaled_img.copy()
 
     # 2. Save diagnostic debug images
-    import os
-    debug_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "debug")
-    os.makedirs(debug_dir, exist_ok=True)
-    
-    out_png = os.path.join(debug_dir, "generated_student_handwriting.png")
-    orig_png = os.path.join(debug_dir, "01-original.png")
-    
-    cv2.imwrite(out_png, img)
-    cv2.imwrite(orig_png, img)
-    logger.info("Saved diagnostic stroke image to %s", out_png)
+    cv2.imwrite(os.path.join(debug_dir, "01_original_canvas_render.png"), raw_img)
+    cv2.imwrite(os.path.join(debug_dir, "02_upscaled.png"), upscaled_img)
+    cv2.imwrite(os.path.join(debug_dir, "03_grayscale.png"), gray_img)
+    cv2.imwrite(os.path.join(debug_dir, "04_contrast_enhanced.png"), contrast_img)
+    cv2.imwrite(os.path.join(debug_dir, "05_final_ocr_input.png"), final_img)
+    cv2.imwrite(os.path.join(debug_dir, "generated_student_handwriting.png"), final_img)
+    logger.info("Saved diagnostic stroke pipeline debug images to %s", debug_dir)
 
     # 3. Transcribe handwriting
     try:
-        hwr_result = hwr_service.recognize_handwriting(img, page_num=payload.page_num)
+        hwr_result = await asyncio.to_thread(hwr_service.recognize_handwriting, final_img, page_num=payload.page_num)
         
         from app.services.hwr_postprocessor import postprocess_hwr_text
         raw_text = hwr_result.text
@@ -357,6 +405,13 @@ async def recognize_strokes(
         hwr_result.raw_text = raw_text
         hwr_result.processed_text = proc_text
         hwr_result.text = proc_text
+
+        # 4. Evaluate quality gate
+        qg_result = quality_gate.evaluate(proc_text, hwr_result.confidence, hwr_result.lines)
+        hwr_result.ocrQualityStatus = qg_result.ocrQualityStatus
+        hwr_result.needsReview = qg_result.needsReview
+        hwr_result.qualityReasons = qg_result.qualityReasons
+
     except HWRServiceError as hse:
         if "timeout" in str(hse).lower() or "gate" in str(hse).lower():
             raise AzureTimeoutException(str(hse))
@@ -367,4 +422,5 @@ async def recognize_strokes(
         message="Handwriting strokes recognized successfully.",
         data=hwr_result.model_dump()
     )
+
 

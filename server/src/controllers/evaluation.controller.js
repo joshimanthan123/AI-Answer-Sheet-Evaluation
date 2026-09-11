@@ -64,6 +64,14 @@ export const getEvaluationStatus = asyncHandler(async (req, res) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "ANSWER_SHEET_NOT_FOUND");
   }
 
+  // Enforce student data isolation
+  if (req.user?.role === "student") {
+    const studentOwnerId = sheet.student && (sheet.student._id ? sheet.student._id.toString() : sheet.student.toString());
+    if (studentOwnerId !== req.user._id.toString()) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this answer sheet.");
+    }
+  }
+
   const evaluation = await Evaluation.findOne({ answerSheet: sheet._id, isDeleted: false });
   let questionsCompleted = 0;
   let totalQuestions = 0;
@@ -101,6 +109,18 @@ export const getEvaluationResults = asyncHandler(async (req, res) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "ANSWER_SHEET_NOT_FOUND");
   }
 
+  // Enforce student data isolation & result publication check
+  if (req.user?.role === "student") {
+    const studentOwnerId = sheet.student && (sheet.student._id ? sheet.student._id.toString() : sheet.student.toString());
+    if (studentOwnerId !== req.user._id.toString()) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this answer sheet.");
+    }
+    const isPublished = sheet.resultPublication?.status === "RESULT_PUBLISHED" || sheet.submissionStatus === "Published" || sheet.evaluationStatus === "PUBLISHED";
+    if (!isPublished) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, "Evaluation results have not been published by faculty yet.");
+    }
+  }
+
   const evaluation = await Evaluation.findOne({ answerSheet: sheet._id, isDeleted: false })
     .populate("answerSheet")
     .lean();
@@ -120,6 +140,18 @@ export const getQuestionEvaluation = asyncHandler(async (req, res) => {
   const sheet = await AnswerSheet.findOne({ _id: req.params.id, isDeleted: false });
   if (!sheet) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "ANSWER_SHEET_NOT_FOUND");
+  }
+
+  // Enforce student data isolation & result publication check
+  if (req.user?.role === "student") {
+    const studentOwnerId = sheet.student && (sheet.student._id ? sheet.student._id.toString() : sheet.student.toString());
+    if (studentOwnerId !== req.user._id.toString()) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this answer sheet.");
+    }
+    const isPublished = sheet.resultPublication?.status === "RESULT_PUBLISHED" || sheet.submissionStatus === "Published" || sheet.evaluationStatus === "PUBLISHED";
+    if (!isPublished) {
+      throw new ApiError(STATUS_CODES.FORBIDDEN, "Evaluation results have not been published by faculty yet.");
+    }
   }
 
   const exam = await Exam.findById(sheet.exam);

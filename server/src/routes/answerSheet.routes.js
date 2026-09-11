@@ -59,11 +59,11 @@ router
 
 router
   .route("/:id/digital")
-  .get(answerSheetController.getDigitalAnswers);
+  .get(authorize(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN), answerSheetController.getDigitalAnswers);
 
 router
   .route("/:id")
-  .get(answerSheetController.getAnswerSheetById)
+  .get(authorize(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN), answerSheetController.getAnswerSheetById)
   .put(
     authorize(ROLES.FACULTY, ROLES.ADMIN),
     answerSheetValidator,

@@ -9,17 +9,17 @@ export const createAnswerSheet = asyncHandler(async (req, res) => {
 });
 
 export const getAnswerSheetById = asyncHandler(async (req, res) => {
-  const result = await answerSheetService.getAnswerSheetById(req.params.id);
+  const result = await answerSheetService.getAnswerSheetById(req.params.id, req.user?._id, req.user?.role);
   return sendSuccess(res, STATUS_CODES.OK, "Answer sheet retrieved successfully", result);
 });
 
 export const getDigitalAnswers = asyncHandler(async (req, res) => {
-  const result = await answerSheetService.getDigitalAnswers(req.params.id);
+  const result = await answerSheetService.getDigitalAnswers(req.params.id, req.user?._id, req.user?.role);
   return sendSuccess(res, STATUS_CODES.OK, "Digital data retrieved.", result);
 });
 
 export const getAllAnswerSheets = asyncHandler(async (req, res) => {
-  const result = await answerSheetService.getAllAnswerSheets(req.query);
+  const result = await answerSheetService.getAllAnswerSheets(req.query, req.user?._id, req.user?.role);
   return sendSuccess(
     res,
     STATUS_CODES.OK,

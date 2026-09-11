@@ -207,15 +207,6 @@ export const AnswerSheets: React.FC = () => {
   };
 
   const renderEvaluationStatus = (sheet: AnswerSheet) => {
-    // If not OCR completed yet, show none
-    if (sheet.processingStatus !== 'completed' && sheet.processingStatus !== 'ready_for_evaluation') {
-      return (
-        <span className="text-[10px] text-outline italic">
-          Waiting for layouts
-        </span>
-      );
-    }
-
     if (!sheet.evaluation) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-surface-container text-outline border border-outline-variant/30">
@@ -270,7 +261,6 @@ export const AnswerSheets: React.FC = () => {
 
   const renderTableActions = (sheet: AnswerSheet) => {
     const isOCRProcessing = sheet.processingStatus === 'uploaded' || sheet.processingStatus === 'processing';
-    const isReady = sheet.processingStatus === 'completed' || sheet.processingStatus === 'ready_for_evaluation';
     
     return (
       <div className="py-3 text-right space-x-1 shrink-0 whitespace-nowrap inline-flex items-center justify-end">
@@ -285,7 +275,7 @@ export const AnswerSheets: React.FC = () => {
           </button>
         )}
         
-        {isReady && !sheet.evaluation && (
+        {!sheet.evaluation && (
           <button
             onClick={() => handleEvaluate(sheet._id)}
             disabled={evaluatingSheetId === sheet._id}
@@ -306,16 +296,14 @@ export const AnswerSheets: React.FC = () => {
           </Link>
         )}
 
-        {isReady && (
-          <Link
-            to={`/faculty/answer-sheets/${sheet._id}`}
-            className="px-2 py-1 border border-outline-variant/35 text-on-surface rounded font-bold uppercase text-[9px] hover:bg-surface-container-low transition inline-flex items-center gap-0.5"
-            title="Inspect scan file layouts"
-          >
-            <span className="material-symbols-outlined text-[10px]">visibility</span>
-            Scan
-          </Link>
-        )}
+        <Link
+          to={`/faculty/answer-sheets/${sheet._id}`}
+          className="px-2 py-1 border border-outline-variant/35 text-on-surface rounded font-bold uppercase text-[9px] hover:bg-surface-container-low transition inline-flex items-center gap-0.5"
+          title="Inspect scan file layouts"
+        >
+          <span className="material-symbols-outlined text-[10px]">visibility</span>
+          Scan / View
+        </Link>
 
         <button
           onClick={() => handleDelete(sheet._id)}
@@ -473,8 +461,8 @@ export const AnswerSheets: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 pr-2">
-                          <p className="font-semibold text-[11px] max-w-[150px] truncate" title={sheet.uploadedFileName}>
-                            {sheet.uploadedFileName}
+                          <p className="font-semibold text-[11px] max-w-[150px] truncate" title={sheet.uploadedFileName || 'Digital Slate Submission'}>
+                            {sheet.uploadedFileName || 'Digital Slate Submission'}
                           </p>
                           <p className="text-[9px] text-outline mt-0.5">
                             {formatBytes(sheet.fileSize)} • {new Date(sheet.createdAt).toLocaleDateString()}

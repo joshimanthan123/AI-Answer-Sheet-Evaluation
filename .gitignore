@@ -52,3 +52,9 @@ $RECYCLE.BIN/
 # Credentials
 google-credentials/
 gcp-credentials*.json
+
+# Temporary scratch files & test dumps
+tmp/
+*.tmp
+tmp_db_dump.json
+viewer_error.txt

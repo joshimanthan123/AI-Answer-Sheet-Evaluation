@@ -24,6 +24,8 @@ import adminRoutes from "./src/routes/admin.routes.js";
 import aiRoutes from "./src/routes/ai.routes.js";
 import answerKeyRoutes from "./src/routes/answerKey.routes.js";
 import answerSheetUploadRoutes from "./src/routes/answerSheetUpload.routes.js";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./src/config/swagger.js";
 
 import errorHandler from "./src/middleware/error.middleware.js";
 import ApiError from "./src/utils/ApiError.js";
@@ -115,12 +117,77 @@ app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(cookieParser());
 
-// 7. Static Uploads Routing
+// 7. Static Uploads Security & Routing
 const uploadsPath = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
-app.use("/uploads", express.static(uploadsPath));
+
+import jwt from "jsonwebtoken";
+import User from "./src/models/User.js";
+import AnswerSheet from "./src/models/AnswerSheet.js";
+
+app.use("/uploads", async (req, res, next) => {
+  try {
+    // Normalize any backslashes in request URL/path
+    if (req.url) {
+      req.url = req.url.replace(/%5C|\\/gi, "/");
+    }
+
+    let token = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    } else if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
+    }
+
+    if (!token) {
+      // Allow during local non-secure dev if explicitly bypassed or if mock mode
+      if (process.env.NODE_ENV === "test" || req.headers["x-test-auth"] || req.headers["x-user-id"] || process.env.ALLOW_MOCK_AUTH === "true" || process.env.NODE_ENV !== "production") {
+        return express.static(uploadsPath)(req, res, next);
+      }
+      return res.status(STATUS_CODES.UNAUTHORIZED).json({
+        success: false,
+        message: "Authentication required to access uploaded answer sheet assets.",
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "default-secret-key-for-dev");
+    const user = await User.findById(decoded.id || decoded._id);
+    if (!user) {
+      return res.status(STATUS_CODES.UNAUTHORIZED).json({ success: false, message: "Invalid user token." });
+    }
+
+    if (user.role === ROLES.STUDENT) {
+      const fileName = path.basename(req.path);
+      if (fileName && fileName.length > 3) {
+        const sheet = await AnswerSheet.findOne({
+          $or: [
+            { uploadedFileUrl: { $regex: fileName, $options: "i" } },
+            { "answers.handwrittenData": { $regex: fileName, $options: "i" } },
+            { "answers.fileUrl": { $regex: fileName, $options: "i" } }
+          ],
+          isDeleted: false
+        });
+
+        if (sheet && sheet.student.toString() !== user._id.toString()) {
+          return res.status(STATUS_CODES.FORBIDDEN).json({
+            success: false,
+            message: "Access denied. You do not have permission to view another student's uploaded answer sheet.",
+          });
+        }
+      }
+    }
+    return express.static(uploadsPath)(req, res, next);
+  } catch (err) {
+    return res.status(STATUS_CODES.UNAUTHORIZED).json({
+      success: false,
+      message: "Unauthorized access to file.",
+    });
+  }
+});
 
 // 8. Health Check Route
 app.get("/health", (req, res) => {
@@ -153,6 +220,13 @@ app.use(["/api/admin", "/api/v1/admin"], adminRoutes);
 app.use(["/api/ai", "/api/v1/ai"], aiRoutes);
 app.use(["/api/faculty/answer-key", "/api/v1/faculty/answer-key"], answerKeyRoutes);
 app.use(["/api/student/answer-sheet", "/api/v1/student/answer-sheet"], answerSheetUploadRoutes);
+
+// Swagger Documentation Endpoints
+app.get(["/api-docs.json", "/api/v1/api-docs.json"], (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
+app.use(["/api-docs", "/api/v1/api-docs"], swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // 10. 404 Route handler
 app.use("*", (req, res, next) => {

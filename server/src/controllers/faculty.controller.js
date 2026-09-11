@@ -19,6 +19,13 @@ export const getFacultySubmissions = asyncHandler(async (req, res) => {
 
   const mongoQuery = { isDeleted: false };
 
+  if (req.user.role === "faculty") {
+    const Exam = (await import("../models/Exam.js")).default;
+    const facultyExams = await Exam.find({ createdBy: req.user._id, isDeleted: false }).select("_id");
+    const facultyExamIds = facultyExams.map((e) => e._id);
+    mongoQuery.$or = [{ facultyId: req.user._id }, { exam: { $in: facultyExamIds } }];
+  }
+
   if (exam) mongoQuery.exam = exam;
   if (subject) mongoQuery.subject = subject;
   if (student) mongoQuery.student = student;

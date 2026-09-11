@@ -87,10 +87,11 @@ export const getReviewQueue = async (filters = {}, userId) => {
   if (filters.status) {
     mongoQuery.reviewStatus = filters.status;
   } else {
-    // Default review queue statuses
-    mongoQuery.reviewStatus = {
-      $in: ["READY_FOR_FACULTY_REVIEW", "FACULTY_REVIEW_IN_PROGRESS", "REVISION_REQUIRED"],
-    };
+    // Include all submitted answer sheets ready or pending review
+    mongoQuery.$or = [
+      { reviewStatus: { $in: ["READY_FOR_FACULTY_REVIEW", "FACULTY_REVIEW_IN_PROGRESS", "REVISION_REQUIRED"] } },
+      { submissionStatus: { $in: ["Submitted", "Pending AI Evaluation", "Faculty Review"] } }
+    ];
   }
 
   const page = parseInt(filters.page) || 1;
@@ -105,9 +106,21 @@ export const getReviewQueue = async (filters = {}, userId) => {
     .populate("student", "name email rollNo department")
     .populate("exam", "title totalMarks");
 
-  const data = [];
-  for (const as of answerSheets) {
-    const evaluation = await Evaluation.findOne({ answerSheet: as._id, isDeleted: false });
+  const sheetIds = answerSheets.map((as) => as._id);
+  const evaluations = await Evaluation.find({
+    answerSheet: { $in: sheetIds },
+    isDeleted: false,
+  }).select("answerSheet questions").lean();
+
+  const evalMap = new Map();
+  evaluations.forEach((ev) => {
+    if (ev.answerSheet) {
+      evalMap.set(ev.answerSheet.toString(), ev);
+    }
+  });
+
+  const data = answerSheets.map((as) => {
+    const evaluation = evalMap.get(as._id.toString());
     let lowConfidenceWarningCount = 0;
     if (evaluation && evaluation.questions) {
       lowConfidenceWarningCount = evaluation.questions.filter((q) => {
@@ -119,7 +132,7 @@ export const getReviewQueue = async (filters = {}, userId) => {
       }).length;
     }
 
-    data.push({
+    return {
       answerSheetId: as._id,
       student: as.student
         ? {
@@ -144,8 +157,8 @@ export const getReviewQueue = async (filters = {}, userId) => {
       percentage: as.evaluationSummary?.percentage || 0,
       lowConfidenceWarningCount,
       evaluationCompletedAt: as.evaluationCompletedAt || as.updatedAt,
-    });
-  }
+    };
+  });
 
   return {
     data,
@@ -198,6 +211,15 @@ export const startReview = async (answerSheetId, userId) => {
 
   await validateAccess(ansSheet, userId);
 
+  // Status check: Cannot start review if AI evaluation failed or OCR failed
+  if (
+    ansSheet.evaluationStatus === "EVALUATION_FAILED" ||
+    ansSheet.ocrStatus === "failed" ||
+    ansSheet.processingStatus === "failed"
+  ) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "CANNOT_REVIEW_FAILED_EVALUATION: Evaluation or OCR failed for this answer sheet.");
+  }
+
   // Status check: Cannot start review unless AI evaluation has run (ready or completed)
   if (
     ansSheet.evaluationStatus !== "READY_FOR_FACULTY_REVIEW" &&
@@ -219,6 +241,15 @@ export const startReview = async (answerSheetId, userId) => {
   const evaluation = await Evaluation.findOne({ answerSheet: answerSheetId, isDeleted: false });
   if (!evaluation) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation not found.");
+  }
+
+  // Verify same submission binding
+  if (evaluation.answerSheet.toString() !== answerSheetId.toString()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "EVALUATION_SUBMISSION_MISMATCH: Evaluation does not belong to this submission.");
+  }
+
+  if (evaluation.evaluationStatus === "EVALUATION_FAILED" || evaluation.evaluationStatus === "FAILED" || evaluation.evaluationStatus === "failed") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "CANNOT_REVIEW_FAILED_EVALUATION: Evaluation failed for this submission.");
   }
 
   // If already in progress by current user, just return status
@@ -532,6 +563,20 @@ export const approveReview = async (answerSheetId, userId) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation not found.");
   }
 
+  // Verify same submission binding
+  if (evaluation.answerSheet.toString() !== answerSheetId.toString()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "EVALUATION_SUBMISSION_MISMATCH: Evaluation does not belong to this submission.");
+  }
+
+  if (
+    ansSheet.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "FAILED" ||
+    evaluation.evaluationStatus === "failed"
+  ) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "CANNOT_APPROVE_FAILED_EVALUATION: Cannot approve evaluation that failed or was not completed.");
+  }
+
   // Final totals verify and save
   const summary = evaluationValidator.calculateEvaluationSummary(evaluation.questions);
 
@@ -583,6 +628,20 @@ export const finalizeReview = async (answerSheetId, userId) => {
   const evaluation = await Evaluation.findOne({ answerSheet: answerSheetId, isDeleted: false });
   if (!evaluation) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation not found.");
+  }
+
+  // Verify same submission binding
+  if (evaluation.answerSheet.toString() !== answerSheetId.toString()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "EVALUATION_SUBMISSION_MISMATCH: Evaluation does not belong to this submission.");
+  }
+
+  if (
+    ansSheet.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "EVALUATION_FAILED" ||
+    evaluation.evaluationStatus === "FAILED" ||
+    evaluation.evaluationStatus === "failed"
+  ) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "CANNOT_FINALIZE_FAILED_EVALUATION: Cannot finalize evaluation that failed or was not completed.");
   }
 
   // Recalculate and validate totals

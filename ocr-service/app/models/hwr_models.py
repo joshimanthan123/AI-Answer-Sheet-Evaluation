@@ -22,3 +22,7 @@ class HWRResult(BaseModel):
     lines: List[HWRLine] = Field(description="Segmented lines of text preserving original reading order.")
     provider: str = Field(description="The name of the OCR engine that produced the result.")
     execution_time: float = Field(description="Time elapsed during the recognition process (seconds).")
+    ocrQualityStatus: str = Field(default="HIGH", description="Quality ranking: HIGH, MEDIUM, LOW, NEEDS_REVIEW")
+    needsReview: bool = Field(default=False, description="Flag indicating if OCR quality warrants human faculty review.")
+    qualityReasons: List[str] = Field(default_factory=list, description="List of quality gate check flags or warning reasons.")
+

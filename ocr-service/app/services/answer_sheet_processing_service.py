@@ -1,4 +1,5 @@
 import os
+import asyncio
 import uuid
 import logging
 import traceback
@@ -287,7 +288,7 @@ class AnswerSheetProcessingService:
 
                 # Preprocess image copy
                 orig_cv_img = self.preprocessor.load(img_bytes)
-                preprocess_result = self.preprocessor.preprocess(orig_cv_img, PreprocessConfig())
+                preprocess_result = await asyncio.to_thread(self.preprocessor.preprocess, orig_cv_img, PreprocessConfig())
 
                 _, processed_buffer = cv2.imencode(".png", preprocess_result.processed)
                 processed_bytes = processed_buffer.tobytes()
@@ -333,7 +334,7 @@ class AnswerSheetProcessingService:
 
                 try:
                     # Run HWR recognition
-                    hwr_result = self.hwr_service.recognize_handwriting(processed_cv_img, page_num=page_num)
+                    hwr_result = await asyncio.to_thread(self.hwr_service.recognize_handwriting, processed_cv_img, page_num=page_num)
                     
                     page_completed = datetime.now(timezone.utc)
                     all_confs = [line.confidence for line in hwr_result.lines]
@@ -386,7 +387,7 @@ class AnswerSheetProcessingService:
             })
 
             logger.info("Running segmentation on %d pages for sheet: %s", len(hwr_results_by_page), sheet_id)
-            segmentation_result = self.segmentation_service.segment_answers(hwr_results_by_page)
+            segmentation_result = await asyncio.to_thread(self.segmentation_service.segment_answers, hwr_results_by_page)
             
             # Progress 90%
             current_progress = 90
@@ -520,7 +521,7 @@ class AnswerSheetProcessingService:
 
             img_bytes = self.storage.download(orig_page_ref)
             orig_cv_img = self.preprocessor.load(img_bytes)
-            preprocess_result = self.preprocessor.preprocess(orig_cv_img, PreprocessConfig())
+            preprocess_result = await asyncio.to_thread(self.preprocessor.preprocess, orig_cv_img, PreprocessConfig())
 
             _, processed_buffer = cv2.imencode(".png", preprocess_result.processed)
             processed_bytes = processed_buffer.tobytes()
@@ -532,7 +533,7 @@ class AnswerSheetProcessingService:
             target_page.error = None
 
             # Re-run HWR
-            hwr_result = self.hwr_service.recognize_handwriting(preprocess_result.processed, page_num=page_number)
+            hwr_result = await asyncio.to_thread(self.hwr_service.recognize_handwriting, preprocess_result.processed, page_num=page_number)
             tag_completed = datetime.now(timezone.utc)
 
             all_confs = [line.confidence for line in hwr_result.lines]
@@ -585,7 +586,7 @@ class AnswerSheetProcessingService:
                 "current_step": "Re-segmenting answers"
             })
 
-            segmentation_result = self.segmentation_service.segment_answers(hwr_results_by_page)
+            segmentation_result = await asyncio.to_thread(self.segmentation_service.segment_answers, hwr_results_by_page)
 
             # Map results
             digital_answers = []
