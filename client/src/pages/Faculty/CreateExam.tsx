@@ -5,6 +5,13 @@ import { subjectService } from '../../services/subject.service';
 import { examService } from '../../services/exam.service';
 import { Subject } from '../../types';
 
+export interface RubricItemInput {
+  _id?: string;
+  criterion: string;
+  description: string;
+  maxMarks: number;
+}
+
 interface QuestionInput {
   tempId: string;
   questionNumber: number;
@@ -15,6 +22,7 @@ interface QuestionInput {
   bloomsLevel: 'Remember' | 'Understand' | 'Apply' | 'Analyze' | 'Evaluate' | 'Create';
   keywords: string;
   rubric: string;
+  rubricItems?: RubricItemInput[];
   modelAnswer: string;
   isCollapsed: boolean;
 }
@@ -338,6 +346,28 @@ export const CreateExam: React.FC = () => {
       return;
     }
 
+    // Validate questions and rubric totals
+    for (const q of questions) {
+      if (!q.questionText || !q.questionText.trim()) {
+        addToast(`Question Q${q.questionNumber}: Question text is required.`, 'error');
+        return;
+      }
+      if (!q.maximumMarks || q.maximumMarks <= 0) {
+        addToast(`Question Q${q.questionNumber}: Maximum marks must be greater than 0.`, 'error');
+        return;
+      }
+      if (Array.isArray(q.rubricItems) && q.rubricItems.length > 0) {
+        const rubricTotal = q.rubricItems.reduce((sum, r) => sum + (Number(r.maxMarks) || 0), 0);
+        if (rubricTotal !== q.maximumMarks) {
+          addToast(
+            `Question Q${q.questionNumber}: Total rubric marks (${rubricTotal}) must equal maximum marks (${q.maximumMarks}).`,
+            'error'
+          );
+          return;
+        }
+      }
+    }
+
     const payload: any = {
       title: name,
       examCode: examCode,
@@ -358,11 +388,13 @@ export const CreateExam: React.FC = () => {
         questionNumber: q.questionNumber,
         questionText: q.questionText,
         maximumMarks: q.maximumMarks,
+        maxMarks: q.maximumMarks,
         questionType: q.questionType,
         difficulty: q.difficulty,
         bloomsLevel: q.bloomsLevel,
-        keywords: q.keywords ? q.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
+        keywords: q.keywords ? (typeof q.keywords === 'string' ? q.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : q.keywords) : [],
         rubric: q.rubric,
+        rubricItems: q.rubricItems || [],
         modelAnswer: q.modelAnswer,
       })),
     };
@@ -894,39 +926,118 @@ export const CreateExam: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="font-bold text-outline tracking-wider uppercase text-[9px]">Keywords (For AI Semantic Matching)</label>
-                              <input 
-                                type="text"
-                                placeholder="Separated by comma, e.g. recursion, complexity"
-                                value={q.keywords}
-                                onChange={(e) => handleUpdateQuestion(q.tempId, { keywords: e.target.value })}
-                                className="px-3 py-1.5 bg-surface-container rounded-xl border border-outline-variant/30"
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="font-bold text-outline tracking-wider uppercase text-[9px]">Rubric Guidance</label>
-                              <input 
-                                type="text"
-                                placeholder="e.g. 5 Marks for formula, 5 Marks explanation"
-                                value={q.rubric}
-                                onChange={(e) => handleUpdateQuestion(q.tempId, { rubric: e.target.value })}
-                                className="px-3 py-1.5 bg-surface-container rounded-xl border border-outline-variant/30"
-                              />
-                            </div>
-                          </div>
-
                           <div className="flex flex-col gap-1.5">
-                            <label className="font-bold text-outline tracking-wider uppercase text-[9px]">Model Reference Answer (Optional)</label>
+                            <label className="font-bold text-outline tracking-wider uppercase text-[9px]">Model Answer (Reference Text for AI Evaluation)</label>
                             <textarea
-                              placeholder="Expected solution detail..."
+                              placeholder="Expected model answer detail..."
                               value={q.modelAnswer}
                               onChange={(e) => handleUpdateQuestion(q.tempId, { modelAnswer: e.target.value })}
                               rows={2}
                               className="px-3 py-1.5 bg-surface-container rounded-xl border border-outline-variant/30 focus:outline-none"
                             />
+                          </div>
+
+                          {/* Structured Rubric Criteria Editor */}
+                          <div className="space-y-3 pt-2 border-t border-outline-variant/20">
+                            <div className="flex flex-wrap justify-between items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <label className="font-bold text-outline tracking-wider uppercase text-[9px]">Structured Rubric Criteria</label>
+                                {q.rubricItems && q.rubricItems.length > 0 && (
+                                  <span className={`px-2 py-0.5 text-[9px] font-black rounded border ${
+                                    q.rubricItems.reduce((sum, r) => sum + (Number(r.maxMarks) || 0), 0) === q.maximumMarks
+                                      ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                                      : 'bg-red-100 text-red-700 border-red-300 animate-pulse'
+                                  }`}>
+                                    {q.rubricItems.reduce((sum, r) => sum + (Number(r.maxMarks) || 0), 0) === q.maximumMarks
+                                      ? `✓ Rubric total matches Max Marks (${q.maximumMarks})`
+                                      : `⚠️ Rubric total (${q.rubricItems.reduce((sum, r) => sum + (Number(r.maxMarks) || 0), 0)}) must equal Max Marks (${q.maximumMarks})`}
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentItems = q.rubricItems || [];
+                                  const newItem: RubricItemInput = {
+                                    criterion: '',
+                                    description: '',
+                                    maxMarks: 5
+                                  };
+                                  handleUpdateQuestion(q.tempId, { rubricItems: [...currentItems, newItem] });
+                                }}
+                                className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-bold rounded-lg transition border border-primary/20 flex items-center gap-1"
+                              >
+                                <span className="material-symbols-outlined text-xs">add</span>
+                                Add Rubric Criterion
+                              </button>
+                            </div>
+
+                            {(!q.rubricItems || q.rubricItems.length === 0) ? (
+                              <p className="text-[10px] text-outline italic">No rubric criteria added yet. Click "Add Rubric Criterion" to define structured evaluation rules.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {q.rubricItems.map((rItem, rIdx) => (
+                                  <div key={rIdx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-2.5 bg-surface-container rounded-xl border border-outline-variant/20 items-center">
+                                    <div className="sm:col-span-4 flex flex-col gap-0.5">
+                                      <span className="text-[8px] font-bold uppercase text-outline">Criterion *</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Correct formula derivation"
+                                        value={rItem.criterion}
+                                        onChange={(e) => {
+                                          const nextItems = [...(q.rubricItems || [])];
+                                          nextItems[rIdx] = { ...nextItems[rIdx], criterion: e.target.value };
+                                          handleUpdateQuestion(q.tempId, { rubricItems: nextItems });
+                                        }}
+                                        className="px-2 py-1 bg-white rounded border border-outline-variant/30 text-xs"
+                                      />
+                                    </div>
+                                    <div className="sm:col-span-5 flex flex-col gap-0.5">
+                                      <span className="text-[8px] font-bold uppercase text-outline">Description</span>
+                                      <input
+                                        type="text"
+                                        placeholder="Details/key points required"
+                                        value={rItem.description}
+                                        onChange={(e) => {
+                                          const nextItems = [...(q.rubricItems || [])];
+                                          nextItems[rIdx] = { ...nextItems[rIdx], description: e.target.value };
+                                          handleUpdateQuestion(q.tempId, { rubricItems: nextItems });
+                                        }}
+                                        className="px-2 py-1 bg-white rounded border border-outline-variant/30 text-xs"
+                                      />
+                                    </div>
+                                    <div className="sm:col-span-2 flex flex-col gap-0.5">
+                                      <span className="text-[8px] font-bold uppercase text-outline">Max Marks *</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={rItem.maxMarks}
+                                        onChange={(e) => {
+                                          const nextItems = [...(q.rubricItems || [])];
+                                          nextItems[rIdx] = { ...nextItems[rIdx], maxMarks: Number(e.target.value) || 0 };
+                                          handleUpdateQuestion(q.tempId, { rubricItems: nextItems });
+                                        }}
+                                        className="px-2 py-1 bg-white rounded border border-outline-variant/30 text-xs font-bold text-center"
+                                      />
+                                    </div>
+                                    <div className="sm:col-span-1 flex items-center justify-center pt-2 sm:pt-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nextItems = (q.rubricItems || []).filter((_, i) => i !== rIdx);
+                                          handleUpdateQuestion(q.tempId, { rubricItems: nextItems });
+                                        }}
+                                        className="text-error hover:text-error/80 text-xs font-bold p-1"
+                                        title="Remove criterion"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

@@ -33,6 +33,16 @@ interface EvaluationQuestionDetail {
   questionNumber?: number;
   questionText?: string;
   maxMarks?: number;
+  status?: string;
+  evaluationStatus?: string;
+  errorMessage?: string;
+  aiEvaluation?: {
+    confidence?: number;
+    matchedConcepts?: string[];
+    missingConcepts?: string[];
+    criteria?: Array<any>;
+    feedback?: string;
+  };
 }
 
 export const FacultyManualEvaluation: React.FC = () => {
@@ -350,6 +360,9 @@ export const FacultyManualEvaluation: React.FC = () => {
                                 const sheetAns = sheet?.answers?.find((a: any) => 
                                   String(a.questionId?._id || a.questionId || '') === qIdStr ||
                                   String(a.questionNumber || a.question_number || '') === String(qObj.questionNumber || '')
+                                ) || sheet?.digital_answers?.find((da: any) =>
+                                  String(da.question_id?._id || da.question_id || da.questionId || '') === qIdStr ||
+                                  String(da.question_number || da.questionNumber || '') === String(qObj.questionNumber || '')
                                 );
                                 const rawTxt = (
                                   qObj.recognizedText ||
@@ -359,9 +372,16 @@ export const FacultyManualEvaluation: React.FC = () => {
                                   sheetAns?.recognizedText ||
                                   sheetAns?.extractedText ||
                                   sheetAns?.text ||
+                                  sheetAns?.answer_text ||
                                   ''
                                 ).trim();
-                                return rawTxt ? `"${rawTxt}"` : <span className="italic text-outline">No OCR text available.</span>;
+                                if (rawTxt) return `"${rawTxt}"`;
+                                const status = String(sheet?.processing_status || sheet?.processingStatus || sheet?.ocrStatus || '').toUpperCase();
+                                const isProcessing = ['QUEUED', 'PROCESSING', 'PREPROCESSING', 'OCR_PROCESSING', 'SEGMENTING', 'HWR PROCESSING', 'UPLOADED'].includes(status);
+                                if (isProcessing) {
+                                  return <span className="text-primary not-italic font-sans animate-pulse">Loading OCR text...</span>;
+                                }
+                                return <span className="italic text-outline">No OCR text available for this answer.</span>;
                               })()}
                             </div>
                           </div>
@@ -373,57 +393,92 @@ export const FacultyManualEvaluation: React.FC = () => {
                           <p className="text-on-surface-variant font-semibold mt-1 leading-relaxed">{q.modelAnswer || 'No model answer provided.'}</p>
                         </div>
 
-                        {/* Keyword Mapping List */}
-                        {((q.matchedKeywords && q.matchedKeywords.length > 0) || (q.missingKeywords && q.missingKeywords.length > 0)) && (
-                          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 space-y-2">
-                            <p className="font-bold text-[9px] text-outline uppercase select-none">Concept Keyword Audits</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {q.matchedKeywords?.map((kw, i) => (
-                                <span key={`match-${i}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-250">
-                                  ✓ {kw}
-                                </span>
-                              ))}
-                              {q.missingKeywords?.map((kw, i) => (
-                                <span key={`miss-${i}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-50 text-rose-800 border border-rose-250">
-                                  ✗ {kw}
-                                </span>
-                              ))}
+                        {/* Concept Keyword Mapping List */}
+                        {(() => {
+                          const matched = q.aiEvaluation?.matchedConcepts || q.matchedKeywords || [];
+                          const missing = q.aiEvaluation?.missingConcepts || q.missingKeywords || [];
+                          if (matched.length === 0 && missing.length === 0) return null;
+                          return (
+                            <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 space-y-2">
+                              <p className="font-bold text-[9px] text-outline uppercase select-none">Concept Keyword Audits</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {matched.map((kw: string, i: number) => (
+                                  <span key={`match-${i}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    ✓ {kw}
+                                  </span>
+                                ))}
+                                {missing.map((kw: string, i: number) => (
+                                  <span key={`miss-${i}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-50 text-rose-800 border border-rose-200">
+                                    ✗ {kw}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
-                        {/* Criteria Breakdowns list */}
-                        {q.criteriaScores && q.criteriaScores.length > 0 && (
-                          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 space-y-2">
-                            <p className="font-bold text-[9px] text-outline uppercase select-none">Grading Criteria Match</p>
-                            <div className="space-y-1.5">
-                              {q.criteriaScores.map((cs, i) => (
-                                <div key={i} className="flex justify-between items-center text-[10px] font-semibold">
-                                  <span className="text-on-surface-variant">{cs.criterion}</span>
-                                  <span className="text-primary font-black">{cs.marksAwarded} / {cs.maxMarks} Marks</span>
-                                </div>
-                              ))}
+                        {/* Criteria Breakdown list */}
+                        {(() => {
+                          const criteriaList = q.aiEvaluation?.criteria || q.criteriaScores || [];
+                          if (criteriaList.length === 0) return null;
+                          return (
+                            <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 space-y-2">
+                              <p className="font-bold text-[9px] text-outline uppercase select-none">Grading Rubric Criteria Breakdown</p>
+                              <div className="space-y-2">
+                                {criteriaList.map((cs: any, i: number) => {
+                                  const status = cs.status || (cs.marksAwarded >= cs.maxMarks && cs.maxMarks > 0 ? "matched" : cs.marksAwarded > 0 ? "partial" : "missing");
+                                  const badgeBg =
+                                    status === "matched" || status === "met"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : status === "partial"
+                                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                                      : "bg-rose-50 text-rose-700 border-rose-200";
+                                  return (
+                                    <div key={i} className="flex flex-col gap-1 text-[10px] p-2 bg-white dark:bg-surface-container-low rounded-lg border border-outline-variant/20">
+                                      <div className="flex justify-between items-center font-bold">
+                                        <span className="flex items-center gap-2">
+                                          <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black border ${badgeBg}`}>
+                                            {status}
+                                          </span>
+                                          <span className="text-on-surface">{cs.criterion}</span>
+                                        </span>
+                                        <span className="text-primary font-black">{cs.marksAwarded} / {cs.maxMarks} Marks</span>
+                                      </div>
+                                      {cs.reason && (
+                                        <p className="text-outline text-[9px] italic ml-1">{cs.reason}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {/* Recommended AI Score and justification */}
                         <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15 text-[11px] space-y-1">
-                          <div>
-                            <span className="text-outline font-bold">Concept Alignment:</span>
-                            <span className="ml-2 font-black text-secondary">{q.similarityScore}%</span>
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="text-outline font-bold">Evaluation Status:</span>
+                              <span className="ml-2 font-black text-secondary uppercase text-[10px]">
+                                {q.status || q.evaluationStatus || (q.errorMessage ? "FAILED" : "COMPLETED")}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-outline font-bold">AI Confidence:</span>
+                              <span className="ml-2 font-black text-secondary">
+                                {Math.round(((q.aiEvaluation?.confidence !== undefined ? q.aiEvaluation.confidence : q.confidence) || 0.85) * 100)}%
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-outline font-bold">Confidence score:</span>
-                            <span className="ml-2 font-black text-secondary">{Math.round((q.confidence || 0.85) * 100)}%</span>
-                          </div>
-                          <div>
-                            <span className="text-outline font-bold">Quantitative Justification:</span>
+                          <div className="mt-1">
+                            <span className="text-outline font-bold">Academic Feedback:</span>
                             <p className="text-on-surface-variant font-medium mt-1 leading-normal italic">
-                              {q.feedback || 'Evaluated out of partial answers.'}
+                              {q.aiEvaluation?.feedback || q.feedback || (q.errorMessage ? `Error: ${q.errorMessage}` : 'Evaluated against model answer.')}
                             </p>
                           </div>
                         </div>
+
 
                         {/* Marks override inputs */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mt-2 pt-2 border-t border-outline-variant/20">

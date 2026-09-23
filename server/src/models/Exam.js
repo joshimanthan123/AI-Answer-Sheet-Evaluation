@@ -23,10 +23,25 @@ const questionSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-  rubric: {
-    type: String,
-    trim: true,
-  },
+  rubricItems: [
+    {
+      criterion: {
+        type: String,
+        required: [true, "Rubric criterion name is required"],
+        trim: true,
+      },
+      description: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      maxMarks: {
+        type: Number,
+        required: [true, "Rubric item maxMarks is required"],
+        min: [0, "Rubric item maxMarks cannot be negative"],
+      },
+    },
+  ],
   bloomsLevel: {
     type: String,
     enum: {
@@ -44,10 +59,52 @@ const questionSchema = new mongoose.Schema({
   questionType: {
     type: String,
     enum: {
-      values: ["Descriptive", "Short Answer", "Long Answer", "MCQ", "True/False"],
+      values: [
+        "descriptive",
+        "numerical",
+        "programming",
+        "mcq",
+        "diagram",
+        "Descriptive",
+        "Short Answer",
+        "Long Answer",
+        "MCQ",
+        "True/False",
+      ],
       message: "Invalid Question Type",
     },
-    default: "Descriptive",
+    default: "descriptive",
+  },
+  evaluationConfig: {
+    version: {
+      type: Number,
+      default: 1,
+      min: [1, "Version must be at least 1"],
+    },
+    modelAnswer: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    rubric: [
+      {
+        criterion: {
+          type: String,
+          required: [true, "Rubric criterion name is required"],
+          trim: true,
+        },
+        description: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+        maxMarks: {
+          type: Number,
+          required: [true, "Rubric item maxMarks is required"],
+          min: [0.01, "Rubric item maxMarks must be greater than 0"],
+        },
+      },
+    ],
   },
   evaluationCriteria: {
     conceptualUnderstanding: { type: Number, default: 0 },
@@ -67,6 +124,51 @@ const questionSchema = new mongoose.Schema({
     enum: ["short", "medium", "long"],
     default: "medium",
   },
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+});
+
+questionSchema.virtual("maxMarks").get(function () {
+  return this.maximumMarks;
+}).set(function (val) {
+  this.maximumMarks = val;
+});
+
+// Custom validation rule for rubricItems / evaluationConfig sum against maximumMarks
+questionSchema.pre("validate", function (next) {
+  if (this.maxMarks === undefined && this.maximumMarks !== undefined) {
+    // Already synced via virtual
+  }
+  // Validate legacy rubricItems if populated
+  if (Array.isArray(this.rubricItems) && this.rubricItems.length > 0) {
+    const totalRubricMarks = this.rubricItems.reduce(
+      (sum, item) => sum + (Number(item.maxMarks) || 0),
+      0
+    );
+    if (totalRubricMarks !== this.maximumMarks) {
+      this.invalidate(
+        "rubricItems",
+        `Total rubric marks (${totalRubricMarks}) must equal question maximum marks (${this.maximumMarks})`
+      );
+    }
+  }
+
+  // Validate evaluationConfig.rubric if populated
+  if (this.evaluationConfig && Array.isArray(this.evaluationConfig.rubric) && this.evaluationConfig.rubric.length > 0) {
+    const totalEvalRubricMarks = this.evaluationConfig.rubric.reduce(
+      (sum, item) => sum + (Number(item.maxMarks) || 0),
+      0
+    );
+    if (totalEvalRubricMarks !== this.maximumMarks) {
+      this.invalidate(
+        "evaluationConfig.rubric",
+        `Total rubric marks (${totalEvalRubricMarks}) must equal question maximum marks (${this.maximumMarks})`
+      );
+    }
+  }
+
+  next();
 });
 
 const examSchema = new mongoose.Schema(
@@ -91,6 +193,15 @@ const examSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Total marks is required"],
       min: [1, "Total marks must be at least 1"],
+    },
+    passingMarks: {
+      type: Number,
+      min: [0, "Passing marks cannot be negative"],
+    },
+    passingPercentage: {
+      type: Number,
+      min: [0, "Passing percentage cannot be negative"],
+      max: [100, "Passing percentage cannot exceed 100"],
     },
     duration: {
       type: Number,

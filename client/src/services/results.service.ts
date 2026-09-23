@@ -6,23 +6,32 @@ export interface ResultSummary {
   studentIdentifier: string;
   studentName: string;
   filename: string;
+  aiTotalMarks: number;
   obtainedMarks: number;
+  finalTotalMarks: number;
   totalMarks: number;
   percentage: number;
   status: 'pending' | 'queued' | 'processing' | 'completed' | 'reviewed' | 'finalized' | 'failed';
+  isFinalized: boolean;
+  resultStatus: 'PASS' | 'FAIL' | 'Not Configured' | 'Pending';
+  hasPassingRule: boolean;
+  passingMarks?: number | null;
   finalizedAt?: string;
 }
 
 export interface QuestionAnalytics {
   questionId: string;
   questionNumber: number;
+  questionText?: string;
   maxMarks: number;
   averageMarks: number;
+  aiAverageMarks?: number;
   averagePercentage: number;
   highestMarks: number;
   lowestMarks: number;
   zeroCount: number;
   fullMarksCount: number;
+  overriddenCount?: number;
   performanceDifficulty: 'easy' | 'moderate' | 'difficult';
 }
 
@@ -40,12 +49,28 @@ export interface ExamAnalytics {
   passCount: number;
   failCount: number;
   passPercentage: number;
+  hasPassingRule: boolean;
+  passingMarks?: number | null;
   distribution: {
     '0-20%': number;
     '21-40%': number;
     '41-60%': number;
     '61-80%': number;
     '81-100%': number;
+  };
+  aiFacultyComparison: {
+    averageAIMarks: number;
+    averageFinalMarks: number;
+    averageDifference: number;
+    aiAcceptedCount: number;
+    aiOverriddenCount: number;
+  };
+  facultyOverrideSummary: {
+    totalQuestions: number;
+    aiAccepted: number;
+    aiOverridden: number;
+    marksIncreased: number;
+    marksDecreased: number;
   };
   questionAnalytics: QuestionAnalytics[];
   insights: string[];

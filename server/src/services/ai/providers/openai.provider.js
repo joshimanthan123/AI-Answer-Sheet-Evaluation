@@ -35,7 +35,7 @@ export class OpenAiLlmProvider {
               {
                 role: "system",
                 content:
-                  "You are an assessment bot. Grade the student response accurately in JSON format. Return values: marks (float), similarity (float, 0-1), strengths (string), weaknesses (string), suggestions (string), justification (string). Do not exceed maxMarks. Round to 1 decimal place.",
+                  "You are a strict academic evaluation system. Grade student answers accurately according to the provided rubric and model answer. Output strictly valid JSON with fields: marksAwarded, maxMarks, percentage, criteria (array of {criterion, marksAwarded, maxMarks, status, reason}), matchedConcepts, missingConcepts, feedback, confidence.",
               },
               { role: "user", content: prompt },
             ],
@@ -59,33 +59,42 @@ export class OpenAiLlmProvider {
         }
 
         const parsed = JSON.parse(contentText);
-        if (
-          parsed.marks === undefined ||
-          parsed.similarity === undefined ||
-          !parsed.strengths ||
-          !parsed.weaknesses ||
-          !parsed.justification
-        ) {
-          throw new Error("Missing structural evaluation attributes in OpenAI response");
-        }
+
+        const rawMarks = parsed.marksAwarded !== undefined ? Number(parsed.marksAwarded) : (parsed.marks !== undefined ? Number(parsed.marks) : 0);
+        const marksAwarded = Math.min(Math.max(rawMarks, 0), maxMarks);
+        const maxMarksVal = parsed.maxMarks !== undefined ? Number(parsed.maxMarks) : maxMarks;
+        const percentage = maxMarksVal > 0 ? Number(((marksAwarded / maxMarksVal) * 100).toFixed(2)) : 0;
+        const confidence = parsed.confidence !== undefined ? Math.min(Math.max(Number(parsed.confidence), 0), 1) : 0.85;
+
+        const rawCriteria = Array.isArray(parsed.criteria) ? parsed.criteria : (Array.isArray(parsed.criteriaScores) ? parsed.criteriaScores : []);
+        const criteria = rawCriteria.map((c) => ({
+          criterion: String(c.criterion || c.criteria || "").trim(),
+          marksAwarded: Math.max(0, Number(c.marksAwarded !== undefined ? c.marksAwarded : c.marks || 0)),
+          maxMarks: Number(c.maxMarks || 0),
+          status: c.status || (Number(c.marksAwarded || 0) >= Number(c.maxMarks || 0) && Number(c.maxMarks || 0) > 0 ? "matched" : Number(c.marksAwarded || 0) > 0 ? "partial" : "missing"),
+          reason: String(c.reason || c.justification || "").trim(),
+        }));
+
+        const matchedConcepts = Array.isArray(parsed.matchedConcepts) ? parsed.matchedConcepts : (Array.isArray(parsed.matchedKeywords) ? parsed.matchedKeywords : []);
+        const missingConcepts = Array.isArray(parsed.missingConcepts) ? parsed.missingConcepts : (Array.isArray(parsed.missingKeywords) ? parsed.missingKeywords : []);
+        const feedback = String(parsed.feedback || parsed.justification || parsed.strengths || "Evaluation complete.").trim();
 
         return {
-          marks: Math.min(Math.max(Number(parsed.marks), 0), maxMarks),
-          similarity: Number(parsed.similarity),
-          strengths: parsed.strengths,
-          weaknesses: parsed.weaknesses,
-          suggestions: parsed.suggestions || "",
-          justification: parsed.justification,
-          confidence: Number(parsed.confidence) || 0.85,
-          criteriaScores: parsed.criteriaScores || [],
-          matchedKeywords: parsed.matchedKeywords || [],
-          missingKeywords: parsed.missingKeywords || [],
+          marksAwarded,
+          maxMarks: maxMarksVal,
+          percentage,
+          criteria,
+          matchedConcepts,
+          missingConcepts,
+          feedback,
+          confidence,
           tokensUsed: {
             promptTokens: data.usage?.prompt_tokens || 0,
             completionTokens: data.usage?.completion_tokens || 0,
             totalTokens: data.usage?.total_tokens || 0,
           },
         };
+
       } catch (err) {
         if (attempt >= maxRetries) {
           throw new ApiError(

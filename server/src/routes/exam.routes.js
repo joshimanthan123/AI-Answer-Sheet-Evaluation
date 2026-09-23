@@ -111,6 +111,21 @@ router
   );
 
 router
+  .route("/:examId/questions/:questionId/evaluation-config")
+  .get(
+    authorize(ROLES.FACULTY, ROLES.ADMIN),
+    examController.getEvaluationConfig
+  )
+  .put(
+    authorize(ROLES.FACULTY, ROLES.ADMIN),
+    examController.saveEvaluationConfig
+  )
+  .post(
+    authorize(ROLES.FACULTY, ROLES.ADMIN),
+    examController.saveEvaluationConfig
+  );
+
+router
   .route("/:examId/answer-key/finalize")
   .post(authorize(ROLES.FACULTY, ROLES.ADMIN), examController.finalizeAnswerKey);
 

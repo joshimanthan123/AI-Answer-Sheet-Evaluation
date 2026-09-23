@@ -144,8 +144,7 @@ export const getAnswerSheetById = async (id, userId, userRole) => {
           confidence: ans.confidence !== undefined ? ans.confidence : 1.0,
         };
       });
-      const hasContent = mapped.some(a => a.text.length > 0 || (a.strokes && a.strokes.length > 0) || a.handwrittenData.length > 0);
-      if (hasContent) {
+      if (mapped.length > 0) {
         sheetObj.digital_answers = mapped;
         populatedFromAnswers = true;
       }

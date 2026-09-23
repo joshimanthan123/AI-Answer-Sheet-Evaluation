@@ -41,6 +41,26 @@ export const questionValidator = [
   body("keywords.*").trim().notEmpty().withMessage("Keyword string cannot be empty"),
   body("modelAnswer").optional().trim(),
   body("rubric").optional().trim(),
+  body("rubricItems").optional().isArray().withMessage("rubricItems must be an array"),
+  body("rubricItems.*.criterion")
+    .if((val) => val !== undefined)
+    .trim()
+    .notEmpty()
+    .withMessage("Rubric criterion name is required"),
+  body("rubricItems.*.maxMarks")
+    .if((val) => val !== undefined)
+    .isFloat({ min: 0 })
+    .withMessage("Rubric item maxMarks must be a non-negative number"),
+  body().custom((reqBody) => {
+    if (Array.isArray(reqBody.rubricItems) && reqBody.rubricItems.length > 0) {
+      const qMax = reqBody.maximumMarks !== undefined ? reqBody.maximumMarks : reqBody.maxMarks;
+      const rubricTotal = reqBody.rubricItems.reduce((sum, r) => sum + (Number(r.maxMarks) || 0), 0);
+      if (qMax !== undefined && rubricTotal !== Number(qMax)) {
+        throw new Error(`Total rubric marks (${rubricTotal}) must equal question max marks (${qMax})`);
+      }
+    }
+    return true;
+  }),
   body("bloomsLevel")
     .optional()
     .isIn(["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"])

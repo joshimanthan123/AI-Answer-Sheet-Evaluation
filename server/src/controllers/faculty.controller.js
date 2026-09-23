@@ -303,6 +303,41 @@ export const finalizeReview = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Evaluation score finalized and locked", result);
 });
 
+export const acceptAiQuestion = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const targetQ = req.params.questionId || req.params.questionNumber;
+  const result = await facultyReviewService.acceptAiQuestion(targetId, targetQ, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "AI evaluation accepted successfully", result);
+});
+
+export const overrideQuestion = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const targetQ = req.params.questionId || req.params.questionNumber;
+  const { facultyMarks, overrideReason, comment } = req.body;
+  const result = await facultyReviewService.overrideQuestion(
+    targetId,
+    targetQ,
+    facultyMarks,
+    overrideReason,
+    comment,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Question mark overridden successfully", result);
+});
+
+export const finalizeSingleQuestion = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const targetQ = req.params.questionId || req.params.questionNumber;
+  const result = await facultyReviewService.finalizeSingleQuestion(targetId, targetQ, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Question evaluation finalized and locked", result);
+});
+
+export const finalizeStudentEvaluation = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const result = await facultyReviewService.finalizeStudentEvaluation(targetId, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Student evaluation finalized and sealed successfully", result);
+});
+
 export default {
   getFacultyDashboard,
   getFacultySubmissions,
@@ -319,4 +354,9 @@ export default {
   requestRevision,
   approveReview,
   finalizeReview,
+  acceptAiQuestion,
+  overrideQuestion,
+  finalizeSingleQuestion,
+  finalizeStudentEvaluation,
 };
+

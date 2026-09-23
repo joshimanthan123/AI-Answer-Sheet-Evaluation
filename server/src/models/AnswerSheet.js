@@ -53,6 +53,47 @@ const answerItemSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  evaluation: {
+    status: {
+      type: String,
+      enum: ["pending", "evaluating", "completed", "failed"],
+      default: "pending",
+    },
+    aiEvaluation: {
+      marksAwarded: { type: Number, default: 0 },
+      maxMarks: { type: Number, default: 0 },
+      percentage: { type: Number, default: 0 },
+      criteria: [
+        {
+          criterion: { type: String, trim: true },
+          marksAwarded: { type: Number, default: 0 },
+          maxMarks: { type: Number, default: 0 },
+          status: {
+            type: String,
+            enum: ["met", "partial", "missing", "pending"],
+            default: "pending",
+          },
+          reason: { type: String, trim: true, default: "" },
+        },
+      ],
+      matchedConcepts: { type: [String], default: [] },
+      missingConcepts: { type: [String], default: [] },
+      feedback: { type: String, trim: true, default: "" },
+      confidence: { type: Number, default: 1.0 },
+      evaluatedAt: { type: Date },
+    },
+    facultyEvaluation: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "modified", "re_evaluation_requested"],
+        default: "pending",
+      },
+      finalMarks: { type: Number },
+      comment: { type: String, trim: true, default: "" },
+      reviewedAt: { type: Date },
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
+  },
 });
 
 const answerSheetSchema = new mongoose.Schema(
@@ -212,6 +253,31 @@ const answerSheetSchema = new mongoose.Schema(
         strokes: Array,
         page_number: Number,
         confidence: Number,
+        evaluation: {
+          status: {
+            type: String,
+            enum: ["pending", "evaluating", "completed", "failed"],
+            default: "pending",
+          },
+          aiEvaluation: {
+            marksAwarded: { type: Number, default: 0 },
+            maxMarks: { type: Number, default: 0 },
+            percentage: { type: Number, default: 0 },
+            criteria: Array,
+            matchedConcepts: Array,
+            missingConcepts: Array,
+            feedback: String,
+            confidence: Number,
+            evaluatedAt: Date,
+          },
+          facultyEvaluation: {
+            status: { type: String, enum: ["pending", "approved", "modified", "re_evaluation_requested"], default: "pending" },
+            finalMarks: Number,
+            comment: String,
+            reviewedAt: Date,
+            reviewedBy: mongoose.Schema.Types.ObjectId,
+          },
+        },
       },
     ],
     evaluationStatus: {
@@ -228,6 +294,9 @@ const answerSheetSchema = new mongoose.Schema(
         "EVALUATION_FAILED",
         "PARTIALLY_EVALUATED",
         "READY_FOR_FACULTY_REVIEW",
+        "ready_for_finalization",
+        "finalized",
+        "FINALIZED",
       ],
       default: "READY_FOR_EVALUATION",
       index: true,

@@ -1,17 +1,31 @@
 import apiClient from '../api/axios';
 
+export interface RubricItem {
+  _id?: string;
+  criterion: string;
+  description: string;
+  maxMarks: number;
+}
+
+export interface EvaluationConfig {
+  version: number;
+  modelAnswer: string;
+  rubric: RubricItem[];
+}
+
 export interface Question {
   id?: string;
   _id?: string;
   questionNumber: number;
   questionText: string;
   maximumMarks: number;
-  questionType: 'Descriptive' | 'Short Answer' | 'Long Answer' | 'MCQ' | 'True/False';
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  bloomsLevel: 'Remember' | 'Understand' | 'Apply' | 'Analyze' | 'Evaluate' | 'Create';
+  questionType: 'descriptive' | 'numerical' | 'programming' | 'mcq' | 'diagram' | 'Descriptive' | 'Short Answer' | 'Long Answer' | 'MCQ' | 'True/False' | string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  bloomsLevel?: 'Remember' | 'Understand' | 'Apply' | 'Analyze' | 'Evaluate' | 'Create';
   keywords?: string | string[];
   rubric?: string;
   modelAnswer?: string;
+  evaluationConfig?: EvaluationConfig;
   evaluationCriteria?: {
     conceptualUnderstanding: number;
     keywordAccuracy: number;
@@ -104,6 +118,18 @@ export const examService = {
       ...finalData,
       id: finalData._id || finalData.id,
     };
+  },
+
+  getEvaluationConfig: async (examId: string, questionId: string): Promise<any> => {
+    const response = await apiClient.get<any, any>(`/exams/${examId}/questions/${questionId}/evaluation-config`);
+    const resData = response.data || response;
+    return resData.data || resData;
+  },
+
+  saveEvaluationConfig: async (examId: string, questionId: string, data: any): Promise<any> => {
+    const response = await apiClient.put<any, any>(`/exams/${examId}/questions/${questionId}/evaluation-config`, data);
+    const resData = response.data || response;
+    return resData.data || resData;
   },
 
   finalizeAnswerKey: async (examId: string): Promise<Exam> => {

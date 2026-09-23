@@ -16,6 +16,7 @@ import subjectRoutes from "./src/routes/subject.routes.js";
 import examRoutes from "./src/routes/exam.routes.js";
 import answerSheetRoutes from "./src/routes/answerSheet.routes.js";
 import evaluationRoutes from "./src/routes/evaluation.routes.js";
+import evaluationV1Routes from "./src/routes/evaluation.v1.routes.js";
 import feedbackRoutes from "./src/routes/feedback.routes.js";
 import notificationRoutes from "./src/routes/notification.routes.js";
 import studentRoutes from "./src/routes/student.routes.js";
@@ -24,6 +25,7 @@ import adminRoutes from "./src/routes/admin.routes.js";
 import aiRoutes from "./src/routes/ai.routes.js";
 import answerKeyRoutes from "./src/routes/answerKey.routes.js";
 import answerSheetUploadRoutes from "./src/routes/answerSheetUpload.routes.js";
+import historicalEvaluationRoutes from "./src/routes/historicalEvaluation.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/config/swagger.js";
 
@@ -211,6 +213,7 @@ app.use(["/api/subjects", "/api/v1/subjects"], subjectRoutes);
 app.use(["/api/exams", "/api/v1/exams"], examRoutes);
 app.use(["/api/answer-sheets", "/api/v1/answer-sheets"], answerSheetRoutes);
 app.use(["/api/evaluations", "/api/v1/evaluations"], evaluationRoutes);
+app.use(["/api/evaluation", "/api/v1/evaluation"], evaluationV1Routes);
 app.use(["/api/feedback", "/api/v1/feedback"], feedbackRoutes);
 app.use(["/api/notifications", "/api/v1/notifications"], notificationRoutes);
 
@@ -220,6 +223,7 @@ app.use(["/api/admin", "/api/v1/admin"], adminRoutes);
 app.use(["/api/ai", "/api/v1/ai"], aiRoutes);
 app.use(["/api/faculty/answer-key", "/api/v1/faculty/answer-key"], answerKeyRoutes);
 app.use(["/api/student/answer-sheet", "/api/v1/student/answer-sheet"], answerSheetUploadRoutes);
+app.use(["/api/historical-evaluations", "/api/v1/historical-evaluations"], historicalEvaluationRoutes);
 
 // Swagger Documentation Endpoints
 app.get(["/api-docs.json", "/api/v1/api-docs.json"], (req, res) => {

@@ -32,10 +32,13 @@ export const FacultyLayout: React.FC = () => {
     {
       category: 'EVALUATION',
       items: [
+        { name: 'AI Evaluation Review', path: '/faculty/evaluations', icon: 'fact_check' },
         { name: 'Evaluation Queue', path: '/faculty/evaluation-queue', icon: 'playlist_play' },
-        { name: 'Review Evaluations', path: '/faculty/review-evaluations', icon: 'rate_review' }
+        { name: 'Review Evaluations', path: '/faculty/review-evaluations', icon: 'rate_review' },
+        { name: 'Historical References', path: '/faculty/historical-references', icon: 'bookmarks' }
       ]
     },
+
     {
       category: 'RESULTS & REPORTS',
       items: [

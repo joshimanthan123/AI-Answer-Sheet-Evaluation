@@ -48,10 +48,13 @@ import FacultySettings from '../pages/Faculty/Settings';
 import FacultySubjects from '../pages/Faculty/Subjects';
 import AnswerSheets from '../pages/Faculty/AnswerSheets';
 import FacultyAnswerSheetViewerPage from '../pages/Faculty/AnswerSheetViewerPage';
+import FacultyHistoricalReferences from '../pages/Faculty/HistoricalReferencesPage';
 import ResultsDashboard from '../pages/Faculty/ResultsDashboard';
 import IndividualResult from '../pages/Faculty/IndividualResult';
+import AIEvaluationReviewDashboard from '../pages/Faculty/AIEvaluationReviewDashboard';
 
 // Admin Pages
+
 import AdminDashboard from '../pages/Admin/Dashboard';
 import AdminUsers from '../pages/Admin/Users';
 import AdminRegistries from '../pages/Admin/Registries';
@@ -111,8 +114,11 @@ export const AppRoutes: React.FC = () => {
           <Route path="question-bank" element={<FacultyQuestionBank />} />
           <Route path="model-answers" element={<FacultyModelAnswers />} />
           <Route path="upload-answer-key" element={<FacultyUploadAnswerKey />} />
+          <Route path="evaluations" element={<AIEvaluationReviewDashboard />} />
           <Route path="evaluation-queue" element={<FacultyEvaluationQueue />} />
           <Route path="review-evaluations" element={<FacultyPending />} />
+
+          <Route path="historical-references" element={<FacultyHistoricalReferences />} />
           <Route path="pending/:id" element={<FacultyManualEvaluation />} />
           <Route path="students" element={<FacultyStudents />} />
           <Route path="reports" element={<FacultyReports />} />

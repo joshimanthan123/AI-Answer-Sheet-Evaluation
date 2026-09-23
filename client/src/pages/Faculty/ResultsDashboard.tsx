@@ -113,7 +113,7 @@ export const ResultsDashboard: React.FC = () => {
   const passingMarks = exam?.passingMarks || Math.round((exam?.totalMarks || 0) * 0.4);
 
   return (
-    <div className="flex flex-col gap-6 text-left max-w-5xl mx-auto py-6 animate-fade-in font-sans">
+    <div className="flex flex-col gap-6 text-left max-w-6xl mx-auto py-6 animate-fade-in font-sans">
       
       {/* Breadcrumb Navigation header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-outline-variant/20 pb-4">
@@ -123,28 +123,28 @@ export const ResultsDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
             {exam && <Link to={`/faculty/exams/${exam.id || exam._id}`} className="hover:text-primary">{exam.title}</Link>}
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-            <span className="text-on-surface">Exam Analytics & Reports</span>
+            <span className="text-on-surface">Phase 4C — Results & Academic Reports</span>
           </div>
           <h2 className="text-2xl font-black text-on-surface font-display mt-1">Results & Analytics</h2>
-          <p className="text-xs text-outline">Verify candidate evaluation performance distributions and download audit reports.</p>
+          <p className="text-xs text-outline">Faculty-approved official results, AI vs Faculty comparison metrics, and downloadable academic reports.</p>
         </div>
 
         {/* Action downloads buttons */}
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleCSVExport}
-            className="px-3.5 py-2 border border-outline-variant/35 text-on-surface hover:bg-surface-container-low text-xs font-bold rounded-xl transition flex items-center gap-1.5 active:scale-95"
-            title="Download class scores as CSV"
+            className="px-3.5 py-2 border border-outline-variant/35 text-on-surface hover:bg-surface-container-low text-xs font-bold rounded-xl transition flex items-center gap-1.5 active:scale-95 shadow-sm"
+            title="Export Excel / CSV result file"
           >
-            <span className="material-symbols-outlined text-sm">download</span>
-            Export CSV
+            <span className="material-symbols-outlined text-sm text-emerald-600">file_download</span>
+            Export Excel/CSV
           </button>
           <button
             onClick={handleSummaryReport}
             className="px-3.5 py-2 bg-primary text-on-primary hover:bg-primary-dark text-xs font-bold rounded-xl transition flex items-center gap-1.5 hover:shadow active:scale-95"
           >
             <span className="material-symbols-outlined text-sm">print</span>
-            Summary Report
+            Summary Report (PDF)
           </button>
         </div>
       </div>
@@ -153,46 +153,136 @@ export const ResultsDashboard: React.FC = () => {
         <>
           {/* Dashboard Metrics grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1">
-              <span className="text-[10px] text-outline uppercase font-black tracking-wide">Ingested Sheets</span>
+            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1 shadow-sm">
+              <span className="text-[10px] text-outline uppercase font-black tracking-wide">Total Candidates</span>
               <p className="text-2xl font-black text-on-surface">{analytics.totalAnswerSheets}</p>
               <div className="text-[9px] text-outline flex justify-between">
-                <span>Finalized: {analytics.finalizedResults}</span>
-                <span>Failed: {analytics.failed}</span>
+                <span className="text-emerald-700 font-bold">Finalized: {analytics.finalizedResults}</span>
+                <span className="text-amber-700 font-bold">Pending: {analytics.pendingReview}</span>
               </div>
             </div>
 
-            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1">
-              <span className="text-[10px] text-outline uppercase font-black tracking-wide">Class Average</span>
+            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1 shadow-sm">
+              <span className="text-[10px] text-outline uppercase font-black tracking-wide">Class Average Score</span>
               <p className="text-2xl font-black text-primary">{analytics.averagePercentage}%</p>
               <div className="text-[9px] text-outline">
-                <span>Average Marks: {analytics.averageMarks} / {exam.totalMarks}</span>
+                <span>Faculty Final Avg: {analytics.averageMarks} / {exam.totalMarks}</span>
               </div>
             </div>
 
-            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1">
+            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1 shadow-sm">
               <span className="text-[10px] text-outline uppercase font-black tracking-wide">Highest & Lowest</span>
               <p className="text-2xl font-black text-emerald-700 dark:text-emerald-500">
                 {analytics.highestScore} <span className="text-sm font-normal text-outline">/ {analytics.lowestScore}</span>
               </p>
               <div className="text-[9px] text-outline">
-                <span>Score Range Spread</span>
+                <span>Maximum Marks: {exam.totalMarks}</span>
               </div>
             </div>
 
-            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1">
-              <span className="text-[10px] text-outline uppercase font-black tracking-wide">Passing Rate</span>
-              <p className="text-2xl font-black text-on-surface">{analytics.passPercentage}%</p>
-              <div className="text-[9px] text-outline flex justify-between">
-                <span>Passed: {analytics.passCount}</span>
-                <span>Fail count: {analytics.failCount}</span>
+            <div className="glass-card p-4 rounded-xl border border-outline-variant/25 bg-white dark:bg-surface-container text-left space-y-1 shadow-sm">
+              <span className="text-[10px] text-outline uppercase font-black tracking-wide">Pass / Fail Rule</span>
+              {analytics.hasPassingRule ? (
+                <>
+                  <p className="text-2xl font-black text-on-surface">{analytics.passPercentage}% Pass</p>
+                  <div className="text-[9px] text-outline flex justify-between">
+                    <span className="text-emerald-600 font-bold">Passed: {analytics.passCount}</span>
+                    <span className="text-rose-600 font-bold">Failed: {analytics.failCount}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-amber-600 mt-1">Not Configured</p>
+                  <div className="text-[9px] text-outline">
+                    <span>No passing rule set</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* AI vs Faculty Audit Summary & Faculty Override Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Card 1: AI vs Faculty Summary */}
+            <div className="glass-card p-5 rounded-2xl border border-outline-variant/20 bg-white dark:bg-surface-container space-y-3.5 shadow-sm">
+              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-2">
+                <h3 className="text-xs font-black text-outline uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-primary">auto_awesome</span>
+                  AI vs Faculty Comparison
+                </h3>
+                <span className="text-[10px] font-bold text-outline">Audit Metric</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                  <span className="text-[9.5px] text-outline uppercase font-bold block">Avg AI Marks</span>
+                  <span className="text-lg font-black text-on-surface">
+                    {analytics.aiFacultyComparison?.averageAIMarks ?? 0}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                  <span className="text-[9.5px] text-outline uppercase font-bold block">Avg Final Marks</span>
+                  <span className="text-lg font-black text-primary">
+                    {analytics.aiFacultyComparison?.averageFinalMarks ?? analytics.averageMarks}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                  <span className="text-[9.5px] text-outline uppercase font-bold block">Avg Difference</span>
+                  <span className={`text-lg font-black ${
+                    (analytics.aiFacultyComparison?.averageDifference ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                  }`}>
+                    {(analytics.aiFacultyComparison?.averageDifference ?? 0) >= 0 ? '+' : ''}
+                    {analytics.aiFacultyComparison?.averageDifference ?? 0}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-outline italic">
+                Official student results strictly use Faculty Final Marks. AI marks are preserved for comparison.
+              </p>
+            </div>
+
+            {/* Card 2: Faculty Review & Override Summary */}
+            <div className="glass-card p-5 rounded-2xl border border-outline-variant/20 bg-white dark:bg-surface-container space-y-3.5 shadow-sm">
+              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-2">
+                <h3 className="text-xs font-black text-outline uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-amber-600">rate_review</span>
+                  Faculty Review & Override Summary
+                </h3>
+                <span className="text-[10px] font-bold text-outline">Evaluation Decisions</span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 rounded-xl border border-emerald-200">
+                  <span className="text-[9px] uppercase font-black block">AI Accepted</span>
+                  <span className="text-base font-black">{analytics.facultyOverrideSummary?.aiAccepted ?? 0}</span>
+                </div>
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 rounded-xl border border-amber-200">
+                  <span className="text-[9px] uppercase font-black block">Overridden</span>
+                  <span className="text-base font-black">{analytics.facultyOverrideSummary?.aiOverridden ?? 0}</span>
+                </div>
+                <div className="p-2.5 bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 rounded-xl border border-blue-200">
+                  <span className="text-[9px] uppercase font-black block">Increased</span>
+                  <span className="text-base font-black">+{analytics.facultyOverrideSummary?.marksIncreased ?? 0}</span>
+                </div>
+                <div className="p-2.5 bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-300 rounded-xl border border-rose-200">
+                  <span className="text-[9px] uppercase font-black block">Decreased</span>
+                  <span className="text-base font-black">-{analytics.facultyOverrideSummary?.marksDecreased ?? 0}</span>
+                </div>
+              </div>
+
+              <div className="text-[10.5px] text-outline flex justify-between items-center border-t border-outline-variant/10 pt-2">
+                <span>Total Exam Questions Evaluated: <b>{analytics.facultyOverrideSummary?.totalQuestions ?? 0}</b></span>
+                <span className="font-semibold text-on-surface">Phase 4B Overrides Applied</span>
               </div>
             </div>
+
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            {/* Score Ranges Distribution chart (custom CSS widget) */}
+            {/* Score Ranges Distribution chart */}
             <div className="glass-card p-6 rounded-2xl border border-outline-variant/20 bg-white dark:bg-surface-container space-y-4">
               <h3 className="text-xs font-black text-outline uppercase tracking-wider">Score Distribution</h3>
               
@@ -221,7 +311,11 @@ export const ResultsDashboard: React.FC = () => {
               {/* Class passing definition marker */}
               <div className="border-t border-outline-variant/10 pt-4 flex gap-1.5 text-[10.5px] items-center text-outline">
                 <span className="material-symbols-outlined text-xs">info</span>
-                <span>Passing status resolved on score threshold of <b>{passingMarks} / {exam.totalMarks} Marks</b></span>
+                {analytics.hasPassingRule ? (
+                  <span>Passing status resolved on score threshold of <b>{analytics.passingMarks} / {exam.totalMarks} Marks</b></span>
+                ) : (
+                  <span>Pass/Fail status unavailable because no passing rule has been configured.</span>
+                )}
               </div>
             </div>
 
@@ -244,7 +338,7 @@ export const ResultsDashboard: React.FC = () => {
                   <span className="material-symbols-outlined text-sm mt-0.5">warning</span>
                   <div>
                     <strong className="block mb-0.5">No Finalized Records</strong>
-                    Please review student transcripts and click "Finalize & Lock" inside Pending Evaluations.
+                    Please review student transcripts in Phase 4B and click "Finalize Evaluation" to release official results.
                   </div>
                 </div>
               )}
@@ -254,13 +348,13 @@ export const ResultsDashboard: React.FC = () => {
 
           {/* Question-wise analytics performance list */}
           <div className="glass-card p-6 rounded-2xl border border-outline-variant/20 bg-white dark:bg-surface-container space-y-4">
-            <h3 className="text-xs font-black text-outline uppercase tracking-wider">Question Wise Analytics</h3>
+            <h3 className="text-xs font-black text-outline uppercase tracking-wider">Question Performance Analysis</h3>
             {analytics.questionAnalytics.length === 0 ? (
               <p className="text-xs text-outline italic text-center py-6">No question layout data found.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {analytics.questionAnalytics.map((q) => (
-                  <div key={q.questionId} className="border border-outline-variant/25 rounded-xl p-4 bg-surface-container-low space-y-3 font-sans">
+                  <div key={q.questionId} className="border border-outline-variant/25 rounded-xl p-4 bg-surface-container-low space-y-3 font-sans shadow-sm">
                     <div className="flex justify-between items-center select-none">
                       <span className="h-6 w-9 rounded-md bg-primary/10 text-primary text-[10px] font-black flex items-center justify-center">
                         Q{q.questionNumber}
@@ -276,15 +370,21 @@ export const ResultsDashboard: React.FC = () => {
                         <span className="font-bold text-on-surface">{q.maxMarks} Points</span>
                       </div>
                       <div className="flex justify-between text-outline">
-                        <span>Average Marks:</span>
-                        <span className="font-bold text-primary">{q.averageMarks} ({q.averagePercentage}%)</span>
+                        <span>AI Avg vs Final Avg:</span>
+                        <span className="font-semibold text-on-surface">
+                          AI: {q.aiAverageMarks ?? 0} | <span className="text-primary font-bold">Final: {q.averageMarks}</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-outline">
+                        <span>Average %:</span>
+                        <span className="font-bold text-primary">{q.averagePercentage}%</span>
                       </div>
                       <div className="flex justify-between text-outline">
                         <span>Score Spreads:</span>
                         <span className="font-semibold text-on-surface">High: {q.highestMarks} / Low: {q.lowestMarks}</span>
                       </div>
                       <div className="flex justify-between text-[11px] text-outline border-t border-outline-variant/10 pt-2">
-                        <span>Perfect Scores: {q.fullMarksCount}</span>
+                        <span>Faculty Overrides: <b>{q.overriddenCount ?? 0}</b></span>
                         <span>Zeros: {q.zeroCount}</span>
                       </div>
                     </div>
@@ -301,13 +401,15 @@ export const ResultsDashboard: React.FC = () => {
         
         {/* Status filtering tabs list */}
         <div className="flex flex-wrap items-center justify-between gap-4 select-none border-b border-outline-variant/10 pb-3">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {[
               { id: 'all', label: 'All Results', count: analytics?.totalAnswerSheets || 0 },
               { id: 'finalized', label: 'Finalized', count: analytics?.finalizedResults || 0 },
               { id: 'pending_finalization', label: 'Pending Review', count: analytics?.pendingReview || 0 },
-              { id: 'processing', label: 'Processing', count: analytics?.processing || 0 },
-              { id: 'failed', label: 'Failed', count: analytics?.failed || 0 }
+              ...(analytics?.hasPassingRule ? [
+                { id: 'pass', label: 'Pass', count: analytics?.passCount || 0 },
+                { id: 'fail', label: 'Fail', count: analytics?.failCount || 0 }
+              ] : [])
             ].map(tab => (
               <button
                 key={tab.id}
@@ -335,7 +437,7 @@ export const ResultsDashboard: React.FC = () => {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Student ID..."
+                placeholder="Search Student Name / ID..."
                 className="w-full text-xs pl-8 pr-7 py-2.5 rounded-xl border border-outline-variant/35 bg-surface-container-lowest focus:border-primary focus:outline-none transition font-semibold"
               />
               <span className="material-symbols-outlined text-[14px] text-outline absolute left-2.5 top-1/2 -translate-y-1/2">
@@ -381,36 +483,13 @@ export const ResultsDashboard: React.FC = () => {
               <table className="w-full text-xs text-left border-collapse font-sans">
                 <thead>
                   <tr className="border-b border-outline-variant/20 text-[10px] font-black uppercase text-outline tracking-wider select-none">
-                    <th className="py-2.5">
-                      <button 
-                        onClick={() => { setSortBy('studentIdentifier'); setOrder(prev => prev === 'asc' ? 'desc' : 'asc'); }}
-                        className="hover:text-primary inline-flex items-center gap-0.5"
-                      >
-                        Student ID
-                        <span className="material-symbols-outlined text-[10px]">swap_vert</span>
-                      </button>
-                    </th>
+                    <th className="py-2.5">Student ID</th>
                     <th className="py-2.5">Candidate Name</th>
-                    <th className="py-2.5">File Reference</th>
-                    <th className="py-2.5 text-right">
-                      <button 
-                        onClick={() => { setSortBy('obtainedMarks'); setOrder(prev => prev === 'asc' ? 'desc' : 'asc'); }}
-                        className="hover:text-primary inline-flex items-center gap-0.5"
-                      >
-                        Final Marks
-                        <span className="material-symbols-outlined text-[10px]">swap_vert</span>
-                      </button>
-                    </th>
-                    <th className="py-2.5 text-right">
-                      <button 
-                        onClick={() => { setSortBy('percentage'); setOrder(prev => prev === 'asc' ? 'desc' : 'asc'); }}
-                        className="hover:text-primary inline-flex items-center gap-0.5"
-                      >
-                        Percentage
-                        <span className="material-symbols-outlined text-[10px]">swap_vert</span>
-                      </button>
-                    </th>
-                    <th className="py-2.5">Status</th>
+                    <th className="py-2.5 text-right">AI Marks</th>
+                    <th className="py-2.5 text-right">Faculty Final Marks</th>
+                    <th className="py-2.5 text-right">Percentage</th>
+                    <th className="py-2.5 text-center">Result Status</th>
+                    <th className="py-2.5 text-center">Evaluation Status</th>
                     <th className="py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -419,12 +498,27 @@ export const ResultsDashboard: React.FC = () => {
                     <tr key={r.evaluationId} className="align-middle hover:bg-surface-container-lowest/30 transition">
                       <td className="py-3 font-bold text-xs">{r.studentIdentifier}</td>
                       <td className="py-3 font-semibold text-xs">{r.studentName}</td>
-                      <td className="py-3 text-[11px] text-outline font-medium max-w-[150px] truncate" title={r.filename}>
-                        {r.filename}
+                      <td className="py-3 text-right font-medium text-outline">{r.aiTotalMarks ?? '-'}</td>
+                      <td className="py-3 text-right font-black text-on-surface">
+                        {r.isFinalized ? `${r.obtainedMarks} / ${r.totalMarks}` : 'Pending'}
                       </td>
-                      <td className="py-3 text-right font-black text-on-surface">{r.obtainedMarks} / {r.totalMarks}</td>
-                      <td className="py-3 text-right font-bold text-on-surface">{r.percentage}%</td>
-                      <td className="py-3">
+                      <td className="py-3 text-right font-bold text-on-surface">
+                        {r.isFinalized ? `${r.percentage}%` : 'Pending'}
+                      </td>
+                      <td className="py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
+                          r.resultStatus === 'PASS'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : r.resultStatus === 'FAIL'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : r.resultStatus === 'Pending'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-gray-50 text-gray-700 border-gray-200'
+                        }`}>
+                          {r.resultStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 text-center">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border ${
                           r.status === 'finalized'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -441,7 +535,7 @@ export const ResultsDashboard: React.FC = () => {
                         {r.status === 'finalized' ? (
                           <Link
                             to={`/faculty/results/${r.evaluationId}`}
-                            className="px-2 py-1 bg-emerald-600 text-white rounded font-bold uppercase text-[9px] hover:bg-emerald-700 hover:shadow transition inline-flex items-center gap-0.5"
+                            className="px-2.5 py-1 bg-emerald-600 text-white rounded font-bold uppercase text-[9px] hover:bg-emerald-700 hover:shadow transition inline-flex items-center gap-0.5"
                           >
                             <span className="material-symbols-outlined text-[10px]">visibility</span>
                             View Result
@@ -449,10 +543,10 @@ export const ResultsDashboard: React.FC = () => {
                         ) : (
                           <Link
                             to={`/faculty/pending/${r.answerSheetId}`}
-                            className="px-2 py-1 border border-outline-variant/35 text-on-surface rounded font-bold uppercase text-[9px] hover:bg-surface-container-low transition inline-flex items-center gap-0.5"
+                            className="px-2.5 py-1 border border-outline-variant/35 text-on-surface rounded font-bold uppercase text-[9px] hover:bg-surface-container-low transition inline-flex items-center gap-0.5"
                           >
                             <span className="material-symbols-outlined text-[10px]">rate_review</span>
-                            Grade Audit
+                            Review Evaluation
                           </Link>
                         )}
                       </td>

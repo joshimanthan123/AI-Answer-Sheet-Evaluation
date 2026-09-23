@@ -779,6 +779,186 @@ export const unlockAnswerKey = async (examId, userId, userRole) => {
   return exam;
 };
 
+export const getEvaluationConfig = async (examId, questionId, userId, userRole) => {
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Verify authorization: faculty owner or admin
+  const currentUser = await User.findById(userId);
+  if (
+    userRole === ROLES.FACULTY &&
+    currentUser &&
+    exam.createdBy &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  const question = exam.questions.id(questionId);
+  if (!question) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Question not found in the exam");
+  }
+
+  const config = question.evaluationConfig && question.evaluationConfig.rubric && question.evaluationConfig.rubric.length > 0
+    ? question.evaluationConfig
+    : {
+        version: 1,
+        modelAnswer: question.modelAnswer || "",
+        rubric: (question.rubricItems || []).map((r) => ({
+          criterion: r.criterion,
+          description: r.description || "",
+          maxMarks: r.maxMarks,
+        })),
+      };
+
+  return {
+    examId: exam._id,
+    questionId: question._id,
+    questionNumber: question.questionNumber,
+    questionText: question.questionText,
+    questionType: question.questionType || "descriptive",
+    maximumMarks: question.maximumMarks,
+    evaluationConfig: config,
+  };
+};
+
+export const saveEvaluationConfig = async (examId, questionId, data, userId) => {
+  const exam = await Exam.findOne({ _id: examId, isDeleted: { $ne: true } });
+  if (!exam) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  // Validate ownership
+  const currentUser = await User.findById(userId);
+  if (
+    currentUser &&
+    currentUser.role === ROLES.FACULTY &&
+    exam.createdBy.toString() !== userId.toString()
+  ) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
+  }
+
+  // Check lock state
+  if (exam.answerKeyStatus === "locked") {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "This exam's answer key is locked and cannot be modified."
+    );
+  }
+
+  const question = exam.questions.id(questionId);
+  if (!question) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Question not found in the exam");
+  }
+
+  // 1. Question text required
+  const questionText = data.questionText !== undefined ? data.questionText : question.questionText;
+  if (!questionText || questionText.trim().length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Question text is required");
+  }
+
+  // 2. maxMarks must be > 0
+  const maxMarks = Number(data.maximumMarks !== undefined ? data.maximumMarks : (data.maxMarks !== undefined ? data.maxMarks : question.maximumMarks));
+  if (isNaN(maxMarks) || maxMarks <= 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Maximum marks must be greater than 0");
+  }
+
+  // 3. Model answer required when saving evaluationConfig
+  const modelAnswer = data.modelAnswer !== undefined ? data.modelAnswer : (data.evaluationConfig?.modelAnswer || question.modelAnswer || "");
+  if (!modelAnswer || modelAnswer.trim().length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Model answer is required for evaluation configuration");
+  }
+
+  // 4. Rubric criterion required, description required, maxMarks > 0
+  const rubricInput = data.rubric || data.evaluationConfig?.rubric || (Array.isArray(data.rubricItems) ? data.rubricItems : []);
+  if (!Array.isArray(rubricInput) || rubricInput.length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Evaluation rubric requires at least one criterion");
+  }
+
+  let rubricTotal = 0;
+  const cleanedRubric = [];
+  for (let i = 0; i < rubricInput.length; i++) {
+    const item = rubricInput[i];
+    if (!item.criterion || item.criterion.trim().length === 0) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, `Rubric item #${i + 1} criterion name is required`);
+    }
+    if (!item.description || item.description.trim().length === 0) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, `Rubric item #${i + 1} (${item.criterion}) description is required`);
+    }
+    const itemMarks = Number(item.maxMarks !== undefined ? item.maxMarks : item.marks);
+    if (isNaN(itemMarks) || itemMarks <= 0) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, `Rubric item #${i + 1} (${item.criterion}) marks must be greater than 0`);
+    }
+    rubricTotal += itemMarks;
+    cleanedRubric.push({
+      criterion: item.criterion.trim(),
+      description: item.description.trim(),
+      maxMarks: itemMarks,
+    });
+  }
+
+  // 5. Rubric total sum must equal maximumMarks
+  rubricTotal = Number(rubricTotal.toFixed(4));
+  const targetMaxMarks = Number(maxMarks.toFixed(4));
+
+  if (rubricTotal !== targetMaxMarks) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      `Rubric total (${rubricTotal}) must equal question maximum marks (${targetMaxMarks})`
+    );
+  }
+
+  // Determine Versioning:
+  // Initial save of evaluation config = version 1.
+  // Subsequent updates = version increment.
+  let newVersion = 1;
+  const hasExistingConfig =
+    question.evaluationConfig &&
+    (
+      (Array.isArray(question.evaluationConfig.rubric) && question.evaluationConfig.rubric.length > 0) ||
+      (question.evaluationConfig.modelAnswer && question.evaluationConfig.modelAnswer.trim().length > 0)
+    );
+
+  if (hasExistingConfig) {
+    const currentVersion = Number(question.evaluationConfig.version) || 1;
+    newVersion = currentVersion + 1;
+  } else {
+    newVersion = 1;
+  }
+
+  // Apply updates to question document
+  question.questionText = questionText.trim();
+  question.maximumMarks = maxMarks;
+  if (data.questionType) {
+    question.questionType = data.questionType;
+  }
+  question.modelAnswer = modelAnswer.trim();
+  question.rubricItems = cleanedRubric;
+
+  question.evaluationConfig = {
+    version: newVersion,
+    modelAnswer: modelAnswer.trim(),
+    rubric: cleanedRubric,
+  };
+
+  exam.updatedBy = userId;
+  await exam.save();
+
+  logger.info(`Evaluation config saved for question ${questionId} in exam ${examId} (Version ${newVersion}) by user ${userId}`);
+
+  return {
+    exam,
+    questionId: question._id,
+    questionNumber: question.questionNumber,
+    questionText: question.questionText,
+    questionType: question.questionType,
+    maximumMarks: question.maximumMarks,
+    evaluationConfig: question.evaluationConfig,
+  };
+};
+
 export default {
   createExam,
   getExamById,
@@ -793,4 +973,6 @@ export default {
   updateQuestionAnswerKey,
   finalizeAnswerKey,
   unlockAnswerKey,
+  getEvaluationConfig,
+  saveEvaluationConfig,
 };

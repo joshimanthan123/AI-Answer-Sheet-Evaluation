@@ -17,10 +17,18 @@ import {
   ACTIVE_EVALUATION_STATES,
   validateMarks,
   calculateEvaluationSummary,
+  validateAiEvaluationResponse,
 } from "../../utils/evaluationValidator.js";
 
+
 export class EvaluationPipelineService {
+  async triggerEvaluation(params) {
+    const { answerSheetId, userId, scope, questionNumber, reEvaluate } = params || {};
+    return this.queueEvaluation(answerSheetId, userId, { scope, questionNumber, reEvaluate });
+  }
+
   async queueEvaluation(answerSheetId, userId, options = {}) {
+
     const { scope = "FULL_SHEET", questionNumber = null, reEvaluate = false } = options;
 
     const answerSheet = await AnswerSheet.findOne({
@@ -51,16 +59,19 @@ export class EvaluationPipelineService {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "NO_DIGITAL_ANSWERS");
     }
 
-    // Check if an approved AnswerKey exists for this exam
+    // Check if an approved AnswerKey exists or exam questions have model answers configured
     const answerKey = await AnswerKey.findOne({
       examId: exam._id,
       isActive: true,
       uploadStatus: "Approved",
     });
 
-    if (!answerKey) {
+    const hasExamModelAnswers = exam.questions?.some((q) => q.modelAnswer || q.evaluationConfig?.modelAnswer);
+
+    if (!answerKey && !hasExamModelAnswers) {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "ANSWER_KEY_NOT_FOUND");
     }
+
 
     // Resolve question references & Validate max marks
     for (const q of exam.questions) {
@@ -204,9 +215,12 @@ export class EvaluationPipelineService {
         isActive: true,
         uploadStatus: "Approved",
       });
-      if (!answerKey) {
+      const hasExamModelAnswers = exam.questions?.some((q) => q.modelAnswer || q.evaluationConfig?.modelAnswer);
+
+      if (!answerKey && !hasExamModelAnswers) {
         throw new Error("ANSWER_KEY_NOT_FOUND");
       }
+
 
       const llmProvider = LlmProviderFactory.getProvider();
       const providerName = llmProvider.constructor.name === "MockLlmProvider" ? "Mock" : "OpenAI";
@@ -248,94 +262,101 @@ export class EvaluationPipelineService {
       for (const examQuestion of targetQuestions) {
         questionIndex++;
         const questionId = examQuestion._id;
-        const maxMarks = examQuestion.maximumMarks;
+        const maxMarks = examQuestion.maximumMarks || 10;
+        const configVersion = examQuestion.evaluationConfig?.version || 1;
+        const modelAnswer = examQuestion.evaluationConfig?.modelAnswer || examQuestion.modelAnswer || "";
+        const rubricList = examQuestion.evaluationConfig?.rubric || examQuestion.rubric || [];
+        const keywords = examQuestion.evaluationConfig?.keywords || [];
 
-        // Calculate progress dynamically: from 20% to 85%
-        const currentProgress = Math.round(20 + (questionIndex / totalQuestionsCount) * 65);
-        await updateProgress(
-          "AI_EVALUATING",
-          currentProgress,
-          `Evaluating question Q${examQuestion.questionNumber} (${questionIndex} of ${totalQuestionsCount})...`
-        );
+        const answerData =
+          answerSheet.answers.find(
+            (a) =>
+              (a.questionId && a.questionId.toString() === questionId.toString()) ||
+              (a.questionNumber && a.questionNumber === examQuestion.questionNumber)
+          ) ||
+          answerSheet.digital_answers?.find(
+            (da) =>
+              (da.question_id && da.question_id.toString() === questionId.toString()) ||
+              (da.question_number && String(da.question_number) === String(examQuestion.questionNumber))
+          );
 
-        // Find answer in answersheet
-        const answerData = answerSheet.answers.find(
-          (ans) =>
-            (ans.questionId && ans.questionId.toString() === questionId.toString()) ||
-            (ans.questionNumber && ans.questionNumber === examQuestion.questionNumber)
-        );
+        // Check for OCR Failure on answerSheet or answerData
+        const isOcrFailed =
+          answerSheet.ocrStatus === "failed" ||
+          (answerData && answerData.hwrStatus === "Failed") ||
+          (answerData && answerData.ocrQualityStatus === "NEEDS_REVIEW" && !answerData.recognizedText);
 
-        const parsedKeyAnswer = answerKey.parsedAnswers.find(
-          (pa) =>
-            (pa.questionId && pa.questionId.toString() === questionId.toString()) ||
-            pa.questionNumber === examQuestion.questionNumber
-        );
 
-        const modelAnswer = parsedKeyAnswer ? parsedKeyAnswer.answerText : examQuestion.modelAnswer;
-        const keywords =
-          parsedKeyAnswer && parsedKeyAnswer.keywords?.length > 0
-            ? parsedKeyAnswer.keywords
-            : examQuestion.keywords || [];
-
-        // Build criteria/rubrics array
-        const rubricList = [];
-        if (examQuestion.partialMarkingRules && examQuestion.partialMarkingRules.length > 0) {
-          examQuestion.partialMarkingRules.forEach((r) => {
-            rubricList.push({ criteria: r.criterion, marks: r.marks, description: r.description });
+        if (isOcrFailed) {
+          logger.warn(`OCR processing failed for question Q${examQuestion.questionNumber}. Marking review_required/failed.`);
+          newQuestionResults.push({
+            questionId,
+            questionNumber: examQuestion.questionNumber,
+            recognizedText: "",
+            studentAnswer: "",
+            modelAnswer: modelAnswer || "",
+            similarityScore: 0,
+            aiMarks: 0,
+            aiAwardedMarks: 0,
+            finalAwardedMarks: null,
+            status: "failed",
+            evaluationStatus: "failed",
+            reason: "OCR text unavailable; manual review required.",
+            errorMessage: "OCR text unavailable; manual review required.",
+            feedback: "OCR text unavailable; manual review required.",
+            confidence: 0,
+            criteriaScores: [],
+            criteria: [],
+            matchedConcepts: [],
+            missingConcepts: keywords,
+            matchedKeywords: [],
+            missingKeywords: keywords,
+            maximumMarks: maxMarks,
+            provider: providerName,
+            model: modelName,
+            evaluationConfigVersion: configVersion,
+            evaluationAttempt: attemptNo,
+            startedAt: new Date(),
+            completedAt: new Date(),
+            aiEvaluation: {
+              marksAwarded: 0,
+              maxMarks,
+              percentage: 0,
+              criteria: [],
+              matchedConcepts: [],
+              missingConcepts: keywords,
+              feedback: "OCR text unavailable; manual review required.",
+              confidence: 0,
+              evaluatedAt: new Date(),
+              modelName,
+              evaluationConfigVersion: configVersion,
+            },
+            facultyEvaluation: {
+              status: "pending",
+              finalMarks: null,
+              comment: null,
+              reviewedAt: null,
+              reviewedBy: null,
+            },
           });
-        } else if (examQuestion.evaluationCriteria) {
-          const ec = examQuestion.evaluationCriteria;
-          if (ec.conceptualUnderstanding > 0)
-            rubricList.push({
-              criteria: "Conceptual Understanding",
-              marks: ec.conceptualUnderstanding,
-            });
-          if (ec.keywordAccuracy > 0)
-            rubricList.push({ criteria: "Keyword Accuracy", marks: ec.keywordAccuracy });
-          if (ec.completeness > 0)
-            rubricList.push({ criteria: "Completeness", marks: ec.completeness });
-          if (ec.correctness > 0)
-            rubricList.push({ criteria: "Correctness", marks: ec.correctness });
-        }
-        if (rubricList.length === 0) {
-          const r =
-            parsedKeyAnswer && parsedKeyAnswer.rubric?.length > 0
-              ? parsedKeyAnswer.rubric
-              : examQuestion.rubric;
-          if (Array.isArray(r)) {
-            rubricList.push(...r);
-          } else if (r) {
-            rubricList.push({
-              criteria: "General Correctness",
-              marks: maxMarks,
-              description: String(r),
-            });
-          }
+          failedQuestionsCount++;
+          continue;
         }
 
-        const rubricText =
-          rubricList.length > 0
-            ? rubricList
-                .map(
-                  (r, i) =>
-                    `${i + 1}. Criteria: "${r.criteria || r.criterion}", Marks: ${r.marks || r.maxMarks}${r.description ? `, Description: ${r.description}` : ""}`
-                )
-                .join("\n")
-            : "No detailed grading rubric provided. Grade based on correct facts matching model answer.";
-
-        const keywordsText =
-          keywords.length > 0 ? `Expected keywords/concepts to check: ${keywords.join(", ")}` : "";
-
-        // Handle case where student answer is missing or completely blank
+        // Handle case where student answer is empty or whitespace-only
         if (!answerData || !answerData.recognizedText || !answerData.recognizedText.trim()) {
-          const defaultCriteriaScores = rubricList.map((rub) => ({
-            criterion: rub.criteria || rub.criterion,
+          logger.info(`Empty student answer for Q${examQuestion.questionNumber}. Skipping LLM call and assigning 0 marks.`);
+          const defaultCriteria = rubricList.map((rub) => ({
+            criterion: rub.criterion || rub.criteria || "General Correctness",
             marksAwarded: 0,
-            maxMarks: rub.marks || rub.maxMarks || 0,
+            maxMarks: rub.maxMarks || rub.marks || maxMarks,
+            status: "missing",
+            reason: "Unanswered question.",
           }));
 
           newQuestionResults.push({
             questionId,
+            questionNumber: examQuestion.questionNumber,
             recognizedText: "",
             studentAnswer: "",
             modelAnswer: modelAnswer || "",
@@ -343,9 +364,15 @@ export class EvaluationPipelineService {
             aiMarks: 0,
             aiAwardedMarks: 0,
             finalAwardedMarks: 0,
-            feedback: "No answer was detected for this question.",
+            status: "completed",
+            classification: "unanswered",
+            evaluationStatus: "completed",
+            feedback: "Unanswered question. No student response was detected.",
             confidence: 1.0,
-            criteriaScores: defaultCriteriaScores,
+            criteriaScores: defaultCriteria,
+            criteria: defaultCriteria,
+            matchedConcepts: [],
+            missingConcepts: keywords,
             matchedKeywords: [],
             missingKeywords: keywords,
             keywordScore: 0,
@@ -354,61 +381,46 @@ export class EvaluationPipelineService {
             maximumMarks: maxMarks,
             provider: providerName,
             model: modelName,
+            evaluationConfigVersion: configVersion,
             evaluationAttempt: attemptNo,
             startedAt: new Date(),
             completedAt: new Date(),
+            aiEvaluation: {
+              marksAwarded: 0,
+              maxMarks,
+              percentage: 0,
+              criteria: defaultCriteria,
+              matchedConcepts: [],
+              missingConcepts: keywords,
+              feedback: "Unanswered question. No student response was detected.",
+              confidence: 1.0,
+              evaluatedAt: new Date(),
+              modelName,
+              evaluationConfigVersion: configVersion,
+            },
+            facultyEvaluation: {
+              status: "pending",
+              finalMarks: null,
+              comment: null,
+              reviewedAt: null,
+              reviewedBy: null,
+            },
           });
           continue;
         }
 
         try {
-          // --- STAGE 2.1: BUILDING_PROMPT WITH DELIMITERS AND CONFIDENCE ---
+          // --- STAGE 2.1: BUILDING PROMPT & CALLING LLM ---
           const studentOCRText = answerData.recognizedText;
-          const sanitizedStudentText = `<StudentAnswer>\n${studentOCRText}\n</StudentAnswer>`;
 
-          const prompt = `
-You are an expert academic evaluator. Analyze the student's answer and grade it out of ${maxMarks} marks based on the model answer and rubric.
-
-QUESTION:
-"${examQuestion.questionText}"
-
-STUDENT ANSWER CONTENT:
-${sanitizedStudentText}
-
-MODEL ANSWER:
-"${modelAnswer}"
-
-${keywordsText}
-
-GRADING RUBRIC GUIDELINES:
-${rubricText}
-
-Provide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (${maxMarks}).
-Return your assessment strictly in the following JSON structure:
-{
-  "marks": <float_value_awarded>,
-  "similarity": <float_value_from_0_to_1>,
-  "strengths": <string_summarizing_good_details>,
-  "weaknesses": <string_summarizing_missing_details>,
-  "suggestions": <string_improvement_tips_or_comments>,
-  "justification": <string_reasoning_for_awarded_marks>,
-  "confidence": <float_value_from_0_to_1>,
-  "criteriaScores": [
-    {
-      "criterion": "<criterion_name_from_guidelines>",
-      "marksAwarded": <float_marks_awarded>,
-      "maxMarks": <float_max_marks>
-    }
-  ],
-  "matchedKeywords": [
-    "<matching_keyword_1>",
-    "<matching_keyword_2>"
-  ],
-  "missingKeywords": [
-    "<missing_keyword_1>"
-  ]
-}
-`;
+          const prompt = promptService.buildEvaluationPrompt({
+            questionText: examQuestion.questionText,
+            studentAnswer: studentOCRText,
+            modelAnswer,
+            rubric: rubricList,
+            maximumMarks: maxMarks,
+            keywords,
+          });
 
           totalPromptText += `[Q: ${examQuestion.questionNumber}] [Attempt #${attemptNo}] ${prompt}\n\n`;
 
@@ -421,70 +433,73 @@ Return your assessment strictly in the following JSON structure:
           promptTokensSum += llmResult.tokensUsed?.promptTokens || 0;
           completionTokensSum += llmResult.tokensUsed?.completionTokens || 0;
 
-          // --- STAGE 3: VALIDATING_RESULT (Marks checker) ---
+          // --- STAGE 3: VALIDATING STRUCTURED RESULT ---
           await updateProgress(
             "VALIDATING_RESULT",
             85,
             `Validating scoring for question Q${examQuestion.questionNumber}...`
           );
 
-          const validation = validateMarks(llmResult.marks, maxMarks);
+          const validation = validateAiEvaluationResponse(llmResult, rubricList, maxMarks);
           if (!validation.valid) {
-            throw new Error(`EVALUATION_VALIDATION_FAILED: ${validation.error}`);
+            throw new Error(`AI_RESPONSE_VALIDATION_FAILED: ${validation.errors.join("; ")}`);
           }
-          const finalScore = validation.marks;
 
-          // OCR Confidence warnings (Part 10)
+          const finalScore = validation.calculatedMarks;
+          const percentage = maxMarks > 0 ? Number(((finalScore / maxMarks) * 100).toFixed(2)) : 0;
+
+          // OCR Confidence warnings
           const warningsList = [];
           const ocrConfidence = answerData.confidenceLevel || answerData.confidence || "HIGH";
           if (ocrConfidence === "MEDIUM") {
             warningsList.push({
               code: "MEDIUM_OCR_CONFIDENCE",
-              message:
-                "Evaluation is based on medium-confidence OCR transcription. Flagged for review.",
+              message: "Evaluation is based on medium-confidence OCR transcription.",
             });
           } else if (ocrConfidence === "LOW") {
             warningsList.push({
               code: "LOW_OCR_CONFIDENCE",
-              message:
-                "Evaluation is based on low-confidence OCR transcription. Review is highly recommended.",
+              message: "Evaluation is based on low-confidence OCR transcription.",
             });
           }
 
-          if (validation.clamped && validation.warning) {
-            warningsList.push(validation.warning);
-          }
-
-          // Calculate similarity metrics
+          // Similarity metrics
           const similarityResult = similarityService.calculateSimilarity(
             studentOCRText,
             modelAnswer
           );
 
-          // Validate and clamp criteria values
-          const validatedCriteria = (llmResult.criteriaScores || []).map((cs) => {
-            const matchRub = rubricList.find(
-              (rub) =>
-                (rub.criteria && rub.criteria.toLowerCase() === cs.criterion.toLowerCase()) ||
-                (rub.criterion && rub.criterion.toLowerCase() === cs.criterion.toLowerCase())
-            );
-            const criterionMax = matchRub ? matchRub.marks || matchRub.maxMarks : cs.maxMarks || 0;
-            const csValidation = validateMarks(cs.marksAwarded, criterionMax);
-            return {
-              criterion: cs.criterion,
-              marksAwarded: csValidation.valid ? csValidation.marks : 0,
-              maxMarks: criterionMax,
-            };
-          });
+          const structuredCriteria = llmResult.criteria || [];
+          const matchedConcepts = llmResult.matchedConcepts || [];
+          const missingConcepts = llmResult.missingConcepts || [];
+          const feedbackText = llmResult.feedback || "Evaluation complete.";
+          const confidenceVal = llmResult.confidence !== undefined ? llmResult.confidence : 0.85;
 
-          const formattedFeedback = feedbackService.formatFeedback(
-            llmResult.strengths,
-            llmResult.weaknesses,
-            llmResult.suggestions
-          );
+          const aiEvalObj = {
+            marksAwarded: finalScore,
+            maxMarks,
+            percentage,
+            criteria: structuredCriteria,
+            matchedConcepts,
+            missingConcepts,
+            feedback: feedbackText,
+            confidence: confidenceVal,
+            evaluatedAt: new Date(),
+            modelName,
+            evaluationConfigVersion: configVersion,
+          };
+
+          const facultyEvalObj = {
+            status: "pending",
+            finalMarks: null,
+            comment: null,
+            reviewedAt: null,
+            reviewedBy: null,
+          };
 
           newQuestionResults.push({
             questionId,
+            questionNumber: examQuestion.questionNumber,
             recognizedText: studentOCRText,
             studentAnswer: studentOCRText,
             modelAnswer,
@@ -492,21 +507,29 @@ Return your assessment strictly in the following JSON structure:
             aiMarks: finalScore,
             aiAwardedMarks: finalScore,
             finalAwardedMarks: finalScore,
-            confidence: llmResult.confidence || 0.85,
-            feedback: `${formattedFeedback.strengths} | ${formattedFeedback.weaknesses} | ${formattedFeedback.suggestions}`,
-            criteriaScores: validatedCriteria,
-            matchedKeywords: llmResult.matchedKeywords || [],
-            missingKeywords: llmResult.missingKeywords || [],
-            keywordScore: (llmResult.matchedKeywords || []).length,
+            confidence: confidenceVal,
+            feedback: feedbackText,
+            criteriaScores: structuredCriteria,
+            criteria: structuredCriteria,
+            matchedConcepts,
+            missingConcepts,
+            matchedKeywords: matchedConcepts,
+            missingKeywords: missingConcepts,
+            keywordScore: matchedConcepts.length,
             semanticScore: Math.round(similarityResult.similarityScore * 100),
             wasOverridden: false,
             maximumMarks: maxMarks,
             provider: providerName,
             model: modelName,
+            evaluationConfigVersion: configVersion,
             evaluationAttempt: attemptNo,
             startedAt: new Date(qEvalStart),
             completedAt: new Date(),
+            status: "completed",
+            evaluationStatus: "completed",
             warnings: warningsList,
+            aiEvaluation: aiEvalObj,
+            facultyEvaluation: facultyEvalObj,
           });
         } catch (err) {
           logger.error(
@@ -516,6 +539,7 @@ Return your assessment strictly in the following JSON structure:
 
           newQuestionResults.push({
             questionId,
+            questionNumber: examQuestion.questionNumber,
             recognizedText: answerData ? answerData.recognizedText : "",
             studentAnswer: answerData ? answerData.recognizedText : "",
             modelAnswer: modelAnswer || "",
@@ -523,9 +547,14 @@ Return your assessment strictly in the following JSON structure:
             aiMarks: 0,
             aiAwardedMarks: 0,
             finalAwardedMarks: 0,
-            feedback: `Failed: ${err.message}`,
+            status: "failed",
+            evaluationStatus: "failed",
+            feedback: `Evaluation Failed: ${err.message}`,
             confidence: 0,
             criteriaScores: [],
+            criteria: [],
+            matchedConcepts: [],
+            missingConcepts: keywords,
             matchedKeywords: [],
             missingKeywords: keywords,
             keywordScore: 0,
@@ -534,13 +563,35 @@ Return your assessment strictly in the following JSON structure:
             maximumMarks: maxMarks,
             provider: providerName,
             model: modelName,
+            evaluationConfigVersion: configVersion,
             evaluationAttempt: attemptNo,
             startedAt: new Date(),
             completedAt: new Date(),
             errorMessage: err.message,
+            aiEvaluation: {
+              marksAwarded: 0,
+              maxMarks,
+              percentage: 0,
+              criteria: [],
+              matchedConcepts: [],
+              missingConcepts: keywords,
+              feedback: `Evaluation Failed: ${err.message}`,
+              confidence: 0,
+              evaluatedAt: new Date(),
+              modelName,
+              evaluationConfigVersion: configVersion,
+            },
+            facultyEvaluation: {
+              status: "pending",
+              finalMarks: null,
+              comment: null,
+              reviewedAt: null,
+              reviewedBy: null,
+            },
           });
         }
       }
+
 
       // --- STAGE 5 (100%): EVALUATION_COMPLETED & MERGING ---
       await updateProgress("VALIDATING_RESULT", 95, "Merging results and recalculating summary...");
@@ -550,9 +601,9 @@ Return your assessment strictly in the following JSON structure:
         const newResult = newQuestionResults[0];
         const prevResult = previousQuestionsMap.get(newResult.questionId.toString());
 
-        if (newResult.errorMessage && prevResult && !prevResult.errorMessage) {
+        if (newResult.errorMessage && newResult.status !== "failed" && prevResult && !prevResult.errorMessage) {
           logger.info(
-            `Single question re-evaluation failed. Preserving previous valid evaluation for Q${questionNumber}.`
+            `Single question re-evaluation failed with exception. Preserving previous valid evaluation for Q${questionNumber}.`
           );
           finalQuestionsList = Array.from(previousQuestionsMap.values());
         } else {
@@ -673,6 +724,43 @@ Return your assessment strictly in the following JSON structure:
         percentage: percent,
       };
 
+      // Sync individual question evaluation data onto answerSheet arrays
+      for (const fq of finalQuestionsList) {
+        // Sync answerSheet.answers array
+        if (Array.isArray(answerSheet.answers)) {
+          const ansItem = answerSheet.answers.find(
+            (a) =>
+              (a.questionId && a.questionId.toString() === fq.questionId.toString()) ||
+              (a.questionNumber && a.questionNumber === fq.questionNumber)
+          );
+          if (ansItem) {
+            ansItem.aiAwardedMarks = fq.aiMarks;
+            ansItem.finalAwardedMarks = fq.finalAwardedMarks;
+            ansItem.evaluationConfigVersion = fq.evaluationConfigVersion;
+            ansItem.aiEvaluation = fq.aiEvaluation;
+            if (fq.wasOverridden) {
+              ansItem.wasOverridden = true;
+            }
+          }
+        }
+
+        // Sync answerSheet.digital_answers array
+        if (Array.isArray(answerSheet.digital_answers)) {
+          const daItem = answerSheet.digital_answers.find(
+            (da) =>
+              (da.question_id && da.question_id.toString() === fq.questionId.toString()) ||
+              (da.question_number && String(da.question_number) === String(fq.questionNumber))
+          );
+          if (daItem) {
+            daItem.evaluation = {
+              status: fq.status || fq.evaluationStatus || "completed",
+              aiEvaluation: fq.aiEvaluation,
+              facultyEvaluation: fq.facultyEvaluation || { status: "pending", finalMarks: null },
+            };
+          }
+        }
+      }
+
       if (finalStatus === "READY_FOR_FACULTY_REVIEW") {
         answerSheet.submissionStatus = "Faculty Review";
         answerSheet.reviewStatus = "READY_FOR_FACULTY_REVIEW";
@@ -682,6 +770,7 @@ Return your assessment strictly in the following JSON structure:
           finalStatus === "EVALUATION_FAILED" ? "All questions failed evaluation." : null;
       }
       await answerSheet.save();
+
 
       logger.info(
         `AI Evaluation Pipeline complete: status = ${finalStatus}, percentage = ${percent}%, failed = ${finalFailedCount}`

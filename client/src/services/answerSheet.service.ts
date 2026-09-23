@@ -81,19 +81,13 @@ const normalizeSheetData = (sheet: any) => {
         strokes
       };
     });
-
-    // Check if at least one item has text or strokes
-    const hasContent = digital_answers.some((a: any) => a.text.length > 0 || (a.strokes && a.strokes.length > 0));
-    if (!hasContent) {
-      digital_answers = null;
-    }
   } else {
     digital_answers = null;
   }
 
   // 2. If digital_answers is empty/null but sheet.answers exists and is non-empty, convert sheet.answers
   if (!digital_answers && Array.isArray(sheet.answers) && sheet.answers.length > 0) {
-    const convertedAnswers = sheet.answers.map((ans: any, idx: number) => {
+    digital_answers = sheet.answers.map((ans: any, idx: number) => {
       let strokes: any[] = [];
       if (ans.handwrittenData) {
         try {
@@ -123,11 +117,6 @@ const normalizeSheetData = (sheet: any) => {
         confidence: ans.confidence !== undefined ? ans.confidence : 1.0
       };
     });
-
-    const hasContent = convertedAnswers.some((a: any) => a.text.length > 0 || (a.strokes && a.strokes.length > 0));
-    if (hasContent) {
-      digital_answers = convertedAnswers;
-    }
   }
 
   // 3. Fallback: If digital_answers is still empty, build from sheet.extractedText or sheet.extracted_text
@@ -583,7 +572,122 @@ export const answerSheetService = {
     }
     
     throw new Error(`Unable to load scanned page ${pageNumber} for sheet ${id}.`);
-  }
+  },
+
+  reviewAnswer: async (answerId: string, reviewData: { action: 'approve' | 'modify' | 're_evaluate'; finalMarks?: number; comment?: string; questionId?: string }) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.patch(`/v1/evaluation/${answerId}/review`, reviewData, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  getEvaluationSummary: async (answerSheetId: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.get(`/v1/evaluation/answersheet/${answerSheetId}/summary`, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  finalizeAnswerSheet: async (answerSheetId: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.post(`/v1/evaluation/answersheet/${answerSheetId}/finalize`, {}, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  getReviewDashboardData: async (examId: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.get(`/v1/evaluations/exam/${examId}/review-dashboard`, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  getEvaluationDetail: async (evaluationId: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.get(`/v1/evaluations/${evaluationId}/detail`, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  updateReviewStatus: async (evaluationId: string, reviewStatus: string, comment?: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.patch(`/v1/evaluations/${evaluationId}/review-status`, { reviewStatus, comment }, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  acceptAiMarks: async (evaluationOrSheetId: string, questionIdOrNumber: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.post(`/v1/evaluations/${evaluationOrSheetId}/questions/${questionIdOrNumber}/accept-ai`, {}, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  overrideQuestionMarks: async (
+    evaluationOrSheetId: string,
+    questionIdOrNumber: string,
+    payload: { facultyMarks: number; overrideReason: string; comment?: string }
+  ) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.patch(`/v1/evaluations/${evaluationOrSheetId}/questions/${questionIdOrNumber}/review`, payload, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  finalizeSingleQuestion: async (evaluationOrSheetId: string, questionIdOrNumber: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.post(`/v1/evaluations/${evaluationOrSheetId}/questions/${questionIdOrNumber}/finalize`, {}, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
+
+  finalizeStudentEvaluation: async (evaluationOrSheetId: string) => {
+    const headers = getAuthHeaders();
+    const token = localStorage.getItem('gradeai_token');
+    return apiClient.post(`/v1/evaluations/${evaluationOrSheetId}/finalize-student`, {}, {
+      headers: {
+        ...headers,
+        'Authorization': token ? `Bearer ${token}` : '',
+      }
+    });
+  },
 };
+
 
 export default answerSheetService;

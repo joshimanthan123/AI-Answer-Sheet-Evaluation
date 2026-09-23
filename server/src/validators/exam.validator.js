@@ -106,6 +106,41 @@ export const examValidator = [
 
   body("questions.*.rubric").optional().trim(),
 
+  body("questions.*.rubricItems")
+    .optional()
+    .isArray()
+    .withMessage("rubricItems must be an array"),
+
+  body("questions.*.rubricItems.*.criterion")
+    .if((value, { req, path }) => value !== undefined)
+    .trim()
+    .notEmpty()
+    .withMessage("Rubric criterion name is required"),
+
+  body("questions.*.rubricItems.*.maxMarks")
+    .if((value, { req, path }) => value !== undefined)
+    .isFloat({ min: 0 })
+    .withMessage("Rubric item maxMarks must be a non-negative number"),
+
+  body("questions")
+    .optional()
+    .custom((questions) => {
+      if (!Array.isArray(questions)) return true;
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (Array.isArray(q.rubricItems) && q.rubricItems.length > 0) {
+          const qMax = q.maximumMarks !== undefined ? q.maximumMarks : q.maxMarks;
+          const rubricTotal = q.rubricItems.reduce((sum, item) => sum + (Number(item.maxMarks) || 0), 0);
+          if (qMax !== undefined && rubricTotal !== Number(qMax)) {
+            throw new Error(
+              `Question ${q.questionNumber || i + 1}: Total rubric marks (${rubricTotal}) must equal question max marks (${qMax})`
+            );
+          }
+        }
+      }
+      return true;
+    }),
+
   body("questions.*.bloomsLevel")
     .optional()
     .isIn(["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"])

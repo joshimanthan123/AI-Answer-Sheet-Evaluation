@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { examService, Exam, Question } from '../../services/exam.service';
+import { examService, Exam, Question, RubricItem } from '../../services/exam.service';
 import { useNotifications } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
@@ -14,21 +14,29 @@ export const AnswerKey: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number>(0);
 
-  // Active question local editing states
+  // Active question state
+  const [questionText, setQuestionText] = useState('');
+  const [maximumMarks, setMaximumMarks] = useState<number>(5);
+  const [questionType, setQuestionType] = useState<string>('descriptive');
   const [modelAnswer, setModelAnswer] = useState('');
+  const [version, setVersion] = useState<number>(1);
+  
+  // Evaluation Rubric criteria list
+  const [rubricItems, setRubricItems] = useState<RubricItem[]>([]);
+  const [editingRubricIdx, setEditingRubricIdx] = useState<number | null>(null);
+  
+  // New / editing criterion temporary inputs
+  const [newCritName, setNewCritName] = useState('');
+  const [newCritDesc, setNewCritDesc] = useState('');
+  const [newCritMarks, setNewCritMarks] = useState<number>(1);
+
+  // Validation error banner message
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Secondary legacy fields
   const [expectedLen, setExpectedLen] = useState<'short' | 'medium' | 'long'>('medium');
   const [keywords, setKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
-  
-  const [conceptualUnderstanding, setConceptualUnderstanding] = useState(0);
-  const [keywordAccuracy, setKeywordAccuracy] = useState(0);
-  const [completeness, setCompleteness] = useState(0);
-  const [correctness, setCorrectness] = useState(0);
-
-  const [partialRules, setPartialRules] = useState<Array<{ _id?: string; criterion: string; description?: string; marks: number }>>([]);
-  const [newRuleCrit, setNewRuleCrit] = useState('');
-  const [newRuleDesc, setNewRuleDesc] = useState('');
-  const [newRuleMarks, setNewRuleMarks] = useState(0);
 
   const fetchExam = async () => {
     if (!id) return;
@@ -52,10 +60,33 @@ export const AnswerKey: React.FC = () => {
   }, [id]);
 
   const loadQuestionState = (q: Question) => {
-    setModelAnswer(q.modelAnswer || '');
-    setExpectedLen(q.expectedAnswerLength || 'medium');
+    setQuestionText(q.questionText || '');
+    setMaximumMarks(q.maximumMarks || 5);
+    setQuestionType(q.questionType || 'descriptive');
     
-    // Parse keywords (handle array or comma-separated string)
+    const evalConfig = q.evaluationConfig;
+    setModelAnswer(evalConfig?.modelAnswer || q.modelAnswer || '');
+    setVersion(evalConfig?.version || 1);
+
+    if (evalConfig?.rubric && evalConfig.rubric.length > 0) {
+      setRubricItems(evalConfig.rubric.map(r => ({
+        _id: r._id,
+        criterion: r.criterion,
+        description: r.description || '',
+        maxMarks: Number(r.maxMarks) || 0
+      })));
+    } else if (Array.isArray((q as any).rubricItems) && (q as any).rubricItems.length > 0) {
+      setRubricItems((q as any).rubricItems.map((r: any) => ({
+        _id: r._id,
+        criterion: r.criterion,
+        description: r.description || '',
+        maxMarks: Number(r.maxMarks) || 0
+      })));
+    } else {
+      setRubricItems([]);
+    }
+
+    setExpectedLen(q.expectedAnswerLength || 'medium');
     if (Array.isArray(q.keywords)) {
       setKeywords(q.keywords);
     } else if (typeof q.keywords === 'string') {
@@ -64,17 +95,11 @@ export const AnswerKey: React.FC = () => {
       setKeywords([]);
     }
 
-    setConceptualUnderstanding(q.evaluationCriteria?.conceptualUnderstanding || 0);
-    setKeywordAccuracy(q.evaluationCriteria?.keywordAccuracy || 0);
-    setCompleteness(q.evaluationCriteria?.completeness || 0);
-    setCorrectness(q.evaluationCriteria?.correctness || 0);
-
-    setPartialRules(q.partialMarkingRules || []);
-    // Reset temp inputs
-    setNewKeyword('');
-    setNewRuleCrit('');
-    setNewRuleDesc('');
-    setNewRuleMarks(0);
+    setEditingRubricIdx(null);
+    setNewCritName('');
+    setNewCritDesc('');
+    setNewCritMarks(1);
+    setValidationError(null);
   };
 
   const selectQuestion = (idx: number) => {
@@ -83,6 +108,84 @@ export const AnswerKey: React.FC = () => {
     loadQuestionState(exam.questions[idx]);
   };
 
+  // Rubric Total calculation
+  const getRubricTotal = () => {
+    return rubricItems.reduce((sum, item) => sum + (Number(item.maxMarks) || 0), 0);
+  };
+
+  const rubricTotal = getRubricTotal();
+  const rubricTotalFormatted = Number(rubricTotal.toFixed(2));
+  const maxMarksFormatted = Number(Number(maximumMarks).toFixed(2));
+
+  // Add or Update Criterion in local state
+  const handleSaveCriterion = () => {
+    const crit = newCritName.trim();
+    const desc = newCritDesc.trim();
+    const marks = Number(newCritMarks);
+
+    if (!crit) {
+      setValidationError('Rubric criterion name is required.');
+      return;
+    }
+    if (!desc) {
+      setValidationError('Rubric criterion description is required.');
+      return;
+    }
+    if (isNaN(marks) || marks <= 0) {
+      setValidationError('Rubric criterion marks must be greater than 0.');
+      return;
+    }
+
+    setValidationError(null);
+
+    if (editingRubricIdx !== null) {
+      // Edit existing criterion
+      const updated = [...rubricItems];
+      updated[editingRubricIdx] = {
+        ...updated[editingRubricIdx],
+        criterion: crit,
+        description: desc,
+        maxMarks: marks,
+      };
+      setRubricItems(updated);
+      setEditingRubricIdx(null);
+    } else {
+      // Add new criterion
+      setRubricItems([...rubricItems, { criterion: crit, description: desc, maxMarks: marks }]);
+    }
+
+    // Reset inputs
+    setNewCritName('');
+    setNewCritDesc('');
+    setNewCritMarks(1);
+  };
+
+  const handleEditCriterion = (idx: number) => {
+    const item = rubricItems[idx];
+    setEditingRubricIdx(idx);
+    setNewCritName(item.criterion);
+    setNewCritDesc(item.description);
+    setNewCritMarks(item.maxMarks);
+  };
+
+  const handleDeleteCriterion = (idx: number) => {
+    setRubricItems(rubricItems.filter((_, i) => i !== idx));
+    if (editingRubricIdx === idx) {
+      setEditingRubricIdx(null);
+      setNewCritName('');
+      setNewCritDesc('');
+      setNewCritMarks(1);
+    }
+  };
+
+  const handleCancelCriterionEdit = () => {
+    setEditingRubricIdx(null);
+    setNewCritName('');
+    setNewCritDesc('');
+    setNewCritMarks(1);
+  };
+
+  // Keyword helpers
   const handleAddKeyword = () => {
     const kw = newKeyword.trim();
     if (!kw) return;
@@ -98,102 +201,119 @@ export const AnswerKey: React.FC = () => {
     setKeywords(keywords.filter(k => k !== kwToRemove));
   };
 
-  const handleAddRule = () => {
-    const crit = newRuleCrit.trim();
-    if (!crit) {
-      addToast('Rule criterion is required.', 'warning');
-      return;
-    }
-    if (newRuleMarks <= 0) {
-      addToast('Rule marks must be a positive number.', 'warning');
-      return;
-    }
-    setPartialRules([...partialRules, { criterion: crit, description: newRuleDesc.trim(), marks: Number(newRuleMarks) }]);
-    setNewRuleCrit('');
-    setNewRuleDesc('');
-    setNewRuleMarks(0);
-  };
-
-  const handleRemoveRule = (ruleIdx: number) => {
-    setPartialRules(partialRules.filter((_, i) => i !== ruleIdx));
-  };
-
-  // Check sum of current question edit
-  const getCriteriaSum = () => {
-    return conceptualUnderstanding + keywordAccuracy + completeness + correctness;
-  };
-
-  const getPartialRulesSum = () => {
-    return partialRules.reduce((sum, r) => sum + r.marks, 0);
-  };
-
-  // Helper check per question
-  const isQuestionComplete = (q: Question) => {
-    if (!q.modelAnswer || q.modelAnswer.trim().length === 0) return false;
-    // Must have matching criteria totals
-    const sumCrit = q.evaluationCriteria
-      ? (q.evaluationCriteria.conceptualUnderstanding || 0) +
-        (q.evaluationCriteria.keywordAccuracy || 0) +
-        (q.evaluationCriteria.completeness || 0) +
-        (q.evaluationCriteria.correctness || 0)
-      : 0;
-    const sumRules = (q.partialMarkingRules || []).reduce((sum, r) => sum + r.marks, 0);
-    
-    if (sumCrit > q.maximumMarks) return false;
-    if (sumRules > q.maximumMarks) return false;
-    
-    return true;
+  // Validate question completion
+  const isQuestionConfigValid = (q: Question) => {
+    const cfg = q.evaluationConfig;
+    if (!q.modelAnswer && !cfg?.modelAnswer) return false;
+    const rItems = cfg?.rubric || (q as any).rubricItems || [];
+    if (!rItems || rItems.length === 0) return false;
+    const sum = rItems.reduce((acc: number, item: any) => acc + (Number(item.maxMarks) || 0), 0);
+    return Math.abs(sum - q.maximumMarks) < 0.001;
   };
 
   const getCompletedCount = () => {
     if (!exam || !exam.questions) return 0;
-    return exam.questions.filter(isQuestionComplete).length;
+    return exam.questions.filter(isQuestionConfigValid).length;
   };
 
-  const handleSaveActiveQuestion = async () => {
+  // Save full evaluation configuration
+  const handleSaveEvaluationConfig = async () => {
     if (!exam || !exam.questions || exam.questions.length === 0 || !id) return;
     const activeQ = exam.questions[activeIdx];
+    const qId = activeQ._id || activeQ.id || '';
 
-    const sumCrit = getCriteriaSum();
-    const sumRules = getPartialRulesSum();
-
-    if (sumCrit > activeQ.maximumMarks) {
-      addToast(`Evaluation criteria sum (${sumCrit}) cannot exceed question max marks (${activeQ.maximumMarks}).`, 'error');
+    // Validate rules:
+    if (!questionText.trim()) {
+      setValidationError('Question text is required.');
+      addToast('Question text is required.', 'error');
       return;
     }
-    if (sumRules > activeQ.maximumMarks) {
-      addToast(`Partial marking rules sum (${sumRules}) cannot exceed question max marks (${activeQ.maximumMarks}).`, 'error');
+    if (isNaN(maximumMarks) || maximumMarks <= 0) {
+      setValidationError('Maximum marks must be greater than 0.');
+      addToast('Maximum marks must be greater than 0.', 'error');
       return;
     }
+    if (!modelAnswer.trim()) {
+      setValidationError('Model answer is required when evaluation configuration is enabled.');
+      addToast('Model answer is required.', 'error');
+      return;
+    }
+    if (rubricItems.length === 0) {
+      setValidationError('At least one rubric criterion is required.');
+      addToast('At least one rubric criterion is required.', 'error');
+      return;
+    }
+
+    for (let i = 0; i < rubricItems.length; i++) {
+      const item = rubricItems[i];
+      if (!item.criterion.trim()) {
+        setValidationError(`Criterion #${i + 1} name is required.`);
+        addToast(`Criterion #${i + 1} name is required.`, 'error');
+        return;
+      }
+      if (!item.description.trim()) {
+        setValidationError(`Criterion #${i + 1} (${item.criterion}) description is required.`);
+        addToast(`Criterion #${i + 1} description is required.`, 'error');
+        return;
+      }
+      if (item.maxMarks <= 0) {
+        setValidationError(`Criterion #${i + 1} (${item.criterion}) marks must be greater than 0.`);
+        addToast(`Criterion #${i + 1} marks must be > 0.`, 'error');
+        return;
+      }
+    }
+
+    if (rubricTotalFormatted !== maxMarksFormatted) {
+      const msg = `Rubric total (${rubricTotalFormatted}) must equal maximum marks (${maxMarksFormatted}).`;
+      setValidationError(msg);
+      addToast(msg, 'error');
+      return;
+    }
+
+    setValidationError(null);
 
     try {
       setSaving(true);
-      const data = {
-        modelAnswer,
-        expectedAnswerLength: expectedLen,
+      const payload = {
+        questionText: questionText.trim(),
+        maximumMarks: Number(maximumMarks),
+        questionType,
+        modelAnswer: modelAnswer.trim(),
+        rubric: rubricItems.map(r => ({
+          criterion: r.criterion.trim(),
+          description: r.description.trim(),
+          maxMarks: Number(r.maxMarks)
+        })),
         keywords,
-        evaluationCriteria: {
-          conceptualUnderstanding,
-          keywordAccuracy,
-          completeness,
-          correctness
-        },
-        partialMarkingRules: partialRules
+        expectedAnswerLength: expectedLen
       };
 
-      const updatedExam = await examService.updateQuestionAnswerKey(id, activeQ._id || activeQ.id || '', data);
+      const result = await examService.saveEvaluationConfig(id, qId, payload);
       
+      const newVersionNum = result.evaluationConfig?.version || result.version || (version + 1);
+      setVersion(newVersionNum);
+
       // Update local state copy
       const nextQuestions = [...(exam.questions || [])];
       nextQuestions[activeIdx] = {
         ...nextQuestions[activeIdx],
-        ...data,
+        questionText: payload.questionText,
+        maximumMarks: payload.maximumMarks,
+        questionType: payload.questionType,
+        modelAnswer: payload.modelAnswer,
+        keywords: payload.keywords,
+        evaluationConfig: result.evaluationConfig || {
+          version: newVersionNum,
+          modelAnswer: payload.modelAnswer,
+          rubric: payload.rubric
+        }
       };
-      setExam({ ...updatedExam, questions: nextQuestions });
-      addToast('Question Answer Key details saved successfully.', 'success');
+      setExam({ ...exam, questions: nextQuestions });
+      addToast(`Evaluation configuration saved successfully! (Version ${newVersionNum})`, 'success');
     } catch (err: any) {
       console.error(err);
-      const errMsg = err.response?.data?.message || 'Failed to save question answer key.';
+      const errMsg = err.response?.data?.message || 'Failed to save evaluation configuration.';
+      setValidationError(errMsg);
       addToast(errMsg, 'error');
     } finally {
       setSaving(false);
@@ -211,11 +331,6 @@ export const AnswerKey: React.FC = () => {
       console.error(err);
       const errMsg = err.response?.data?.message || 'Failed to lock answer key.';
       addToast(errMsg, 'error');
-      
-      // If incomplete questions are returned, alert details
-      if (err.response?.data?.errors) {
-        console.log('Validation deficiencies:', err.response.data.errors);
-      }
     } finally {
       setSaving(false);
     }
@@ -262,13 +377,16 @@ export const AnswerKey: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-outline-variant/20 pb-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-2xl font-black text-on-surface font-display">Manage Answer Key</h2>
+            <h2 className="text-2xl font-black text-on-surface font-display">Faculty Model Answer & Rubric Management</h2>
             <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border ${
               isLocked 
                 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
                 : 'bg-amber-100 text-amber-700 border-amber-200'
             }`}>
-              {isLocked ? '🔒 Locked' : '✏️ Draft'}
+              {isLocked ? '🔒 Locked' : '✏️ Draft Config'}
+            </span>
+            <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-primary/10 text-primary border border-primary/20">
+              Config v{version}
             </span>
           </div>
           <p className="text-xs text-outline mt-1.5 font-semibold">
@@ -289,19 +407,19 @@ export const AnswerKey: React.FC = () => {
             <button
               onClick={handleUnlock}
               disabled={saving}
-              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow"
+              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow cursor-pointer"
             >
               <span className="material-symbols-outlined text-xs">lock_open</span>
-              Unlock Answer Key
+              Unlock Config
             </button>
           ) : (
             <button
               onClick={handleFinalize}
               disabled={saving || totalQuestions === 0}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow cursor-pointer"
             >
               <span className="material-symbols-outlined text-xs">verified</span>
-              Finalize & Lock Answer Key
+              Finalize & Lock Config
             </button>
           )}
         </div>
@@ -311,7 +429,7 @@ export const AnswerKey: React.FC = () => {
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 items-center text-emerald-800 text-xs font-medium">
           <span className="material-symbols-outlined text-lg text-emerald-700">lock</span>
           <div>
-            This answer key is locked/finalized. Question criteria properties are ready for AI evaluation and cannot be altered unless unlocked.
+            This evaluation configuration is locked. Model answers and rubrics are saved and ready for the Phase 3C AI Evaluation Engine. Unlock to edit.
           </div>
         </div>
       )}
@@ -319,29 +437,30 @@ export const AnswerKey: React.FC = () => {
       {totalQuestions === 0 ? (
         <div className="glass-card p-12 text-center border border-outline-variant/20 bg-white">
           <span className="material-symbols-outlined text-outline text-4xl block mb-2">quiz</span>
-          <h3 className="font-bold text-sm text-on-surface">No Questions Connected</h3>
-          <p className="text-xs text-outline mt-1">Please add questions to this exam before configuring key rules.</p>
+          <h3 className="font-bold text-sm text-on-surface">No Questions Found</h3>
+          <p className="text-xs text-outline mt-1">Please add questions to this exam before configuring model answers and rubrics.</p>
           <Link 
             to={`/faculty/exams/${exam.id}/edit`}
             className="mt-4 inline-block text-xs font-bold text-primary bg-primary/10 px-4 py-2 rounded-xl"
           >
-            Go to Exam Layout Editor
+            Go to Exam Question Editor
           </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 font-sans">
-          {/* Questions Navigation Left side (3 cols) */}
+          {/* Question List Sidebar (3 cols) */}
           <div className="md:col-span-3 space-y-4">
-            <h3 className="text-xs font-black text-outline uppercase tracking-wider">Question Registry</h3>
+            <h3 className="text-xs font-black text-outline uppercase tracking-wider">Question List</h3>
             <div className="flex flex-col gap-2">
               {exam.questions.map((q, idx) => {
-                const complete = isQuestionComplete(q);
+                const complete = isQuestionConfigValid(q);
                 const active = activeIdx === idx;
+                const qVer = q.evaluationConfig?.version || 1;
                 return (
                   <button
                     key={q.id || idx}
                     onClick={() => selectQuestion(idx)}
-                    className={`p-3 rounded-xl border text-left text-xs font-semibold flex items-center justify-between transition ${
+                    className={`p-3 rounded-xl border text-left text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
                       active 
                         ? 'bg-primary/10 border-primary text-primary shadow-sm' 
                         : 'bg-white hover:bg-outline-variant/5 border-outline-variant/20 text-on-surface'
@@ -353,7 +472,7 @@ export const AnswerKey: React.FC = () => {
                       }`}>
                         {idx + 1}
                       </span>
-                      <span>Question Q{q.questionNumber}</span>
+                      <span>Q{q.questionNumber} (v{qVer})</span>
                     </span>
                     <span>
                       {complete ? (
@@ -367,11 +486,11 @@ export const AnswerKey: React.FC = () => {
               })}
             </div>
 
-            {/* Overall progress indicator widget */}
+            {/* Overall Rubric Config Progress */}
             <div className="glass-card p-4 rounded-2xl border border-outline-variant/20 bg-white text-xs space-y-2">
-              <span className="text-[10px] text-outline uppercase font-black block">Answer Key Progress</span>
+              <span className="text-[10px] text-outline uppercase font-black block">Configuration Progress</span>
               <div className="flex justify-between font-bold text-on-surface text-[11px] mt-1">
-                <span>{completedQuestions} / {totalQuestions} Completed</span>
+                <span>{completedQuestions} / {totalQuestions} Configured</span>
                 <span>{Math.round(progressPercent)}%</span>
               </div>
               <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -383,260 +502,220 @@ export const AnswerKey: React.FC = () => {
             </div>
           </div>
 
-          {/* Active Question Editor Right side (9 cols) */}
+          {/* Question Evaluation Config Editor (9 cols) */}
           <div className="md:col-span-9 space-y-6">
             <div className="glass-card p-6 rounded-2xl border border-outline-variant/20 bg-white space-y-6">
               
-              {/* Question Specs Banner */}
-              <div className="flex justify-between items-start gap-4 pb-4 border-b border-outline-variant/10">
-                <div className="space-y-1">
-                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold uppercase rounded">
-                    Q{activeQ?.questionNumber} • {activeQ?.questionType}
-                  </span>
-                  <p className="font-bold text-sm text-on-surface leading-relaxed pt-1.5">{activeQ?.questionText}</p>
+              {/* Question Banner & Config Fields */}
+              <div className="space-y-4 pb-4 border-b border-outline-variant/10">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-black uppercase rounded-lg">
+                      Question Q{activeQ?.questionNumber}
+                    </span>
+                    <span className="px-2.5 py-1 bg-surface-container-high text-outline text-xs font-bold uppercase rounded-lg border border-outline-variant/10">
+                      Version {version}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] text-outline font-black block uppercase">Max Marks</span>
-                  <span className="text-lg font-black text-on-surface">{activeQ?.maximumMarks} Points</span>
+
+                {/* View Question Text & Editable fields */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-black text-outline uppercase tracking-wider block mb-1">Question Text</label>
+                    <input
+                      type="text"
+                      value={questionText}
+                      onChange={(e) => setQuestionText(e.target.value)}
+                      disabled={isLocked || saving}
+                      className="w-full text-xs font-semibold p-3 border border-outline-variant/30 rounded-xl outline-none focus:border-primary transition disabled:bg-slate-50"
+                      placeholder="Enter question prompt..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-black text-outline uppercase tracking-wider block mb-1">Question Type</label>
+                      <select
+                        value={questionType}
+                        onChange={(e) => setQuestionType(e.target.value)}
+                        disabled={isLocked || saving}
+                        className="w-full text-xs font-bold p-2.5 border border-outline-variant/30 rounded-xl outline-none focus:border-primary transition bg-white disabled:bg-slate-50"
+                      >
+                        <option value="descriptive">Descriptive</option>
+                        <option value="numerical">Numerical</option>
+                        <option value="programming">Programming</option>
+                        <option value="mcq">MCQ</option>
+                        <option value="diagram">Diagram</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-black text-outline uppercase tracking-wider block mb-1">Maximum Marks</label>
+                      <input
+                        type="number"
+                        min={0.5}
+                        step={0.5}
+                        value={maximumMarks}
+                        onChange={(e) => setMaximumMarks(Number(e.target.value) || 0)}
+                        disabled={isLocked || saving}
+                        className="w-full text-xs font-bold p-2.5 border border-outline-variant/30 rounded-xl outline-none focus:border-primary transition bg-white disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Model Answer Input */}
+              {/* Model Answer Input (Large Text Area) */}
               <div className="space-y-2">
-                <label className="text-xs font-black text-outline uppercase tracking-wider block">Model Answer Reference</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-black text-outline uppercase tracking-wider block">
+                    Model Answer <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-outline italic">Required for AI evaluation engine</span>
+                </div>
                 <textarea
                   value={modelAnswer}
                   onChange={(e) => setModelAnswer(e.target.value)}
                   disabled={isLocked || saving}
-                  rows={4}
-                  className="w-full text-xs p-3.5 border border-outline-variant/30 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition disabled:bg-slate-50 disabled:text-outline resize-y"
-                  placeholder="Provide semantic textbook model text representing a full marks answer..."
+                  rows={5}
+                  className="w-full text-xs p-3.5 border border-outline-variant/30 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition disabled:bg-slate-50 disabled:text-outline resize-y font-mono leading-relaxed"
+                  placeholder="Provide reference textbook model answer for full marks evaluation..."
                 ></textarea>
               </div>
 
-              {/* Expected Length & Keywords */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {/* Expected Length */}
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-outline uppercase tracking-wider block">Expected Answer Length</label>
-                  <div className="flex gap-2">
-                    {(['short', 'medium', 'long'] as const).map((len) => (
-                      <button
-                        key={len}
-                        type="button"
-                        disabled={isLocked || saving}
-                        onClick={() => setExpectedLen(len)}
-                        className={`flex-1 py-2 text-xs font-bold rounded-xl border text-center transition capitalize ${
-                          expectedLen === len
-                            ? 'bg-primary text-white border-primary'
-                            : 'bg-white hover:bg-slate-50 border-outline-variant/30 text-on-surface'
-                        }`}
-                      >
-                        {len}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Keywords Tag Manager */}
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-outline uppercase tracking-wider block">NLP Keywords</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newKeyword}
-                      onChange={(e) => setNewKeyword(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddKeyword())}
-                      disabled={isLocked || saving}
-                      placeholder="Add keyword tag..."
-                      className="flex-grow text-xs px-3 border border-outline-variant/30 rounded-xl outline-none focus:border-primary transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddKeyword}
-                      disabled={isLocked || saving}
-                      className="px-4 py-2 bg-secondary text-white font-bold text-xs rounded-xl"
-                    >
-                      Add
-                    </button>
-                  </div>
+              {/* Evaluation Rubric Criteria Manager */}
+              <div className="space-y-4 pt-2">
+                <div className="flex justify-between items-center border-b border-outline-variant/10 pb-2">
+                  <label className="text-xs font-black text-outline uppercase tracking-wider">Evaluation Rubric</label>
                   
-                  {keywords.length === 0 ? (
-                    <p className="text-[10px] text-outline italic">No keyword tags configured for semantic matcher yet.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5 pt-1.5">
-                      {keywords.map((kw, i) => (
-                        <span 
-                          key={i} 
-                          className="px-2.5 py-1 bg-outline-variant/10 text-on-surface rounded-lg text-[10px] font-bold flex items-center gap-1 border border-outline-variant/10"
-                        >
-                          {kw}
-                          {!isLocked && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveKeyword(kw)}
-                              className="material-symbols-outlined text-[10px] hover:text-red-500 cursor-pointer"
-                            >
-                              close
-                            </button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Evaluation Criteria Weights */}
-              <div className="space-y-4 pt-2">
-                <div className="flex justify-between items-center border-b border-outline-variant/10 pb-2">
-                  <label className="text-xs font-black text-outline uppercase tracking-wider">Evaluation Criteria Mark Allocation</label>
-                  <div className="flex items-center gap-1 text-[11px] font-black uppercase">
-                    <span>Weights Total:</span>
-                    <span className={getCriteriaSum() === activeQ?.maximumMarks ? 'text-emerald-600 font-black' : 'text-amber-600 font-black'}>
-                      {getCriteriaSum()} / {activeQ?.maximumMarks || 0} Points
-                      {getCriteriaSum() === activeQ?.maximumMarks && ' ✓'}
+                  {/* Automatically Calculated Rubric Total */}
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase">
+                    <span>Rubric Total:</span>
+                    <span className={`px-2.5 py-1 rounded-lg border text-xs font-black ${
+                      rubricTotalFormatted === maxMarksFormatted 
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                    }`}>
+                      {rubricTotalFormatted} / {maxMarksFormatted} Marks
+                      {rubricTotalFormatted === maxMarksFormatted && ' ✓'}
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="space-y-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
-                    <span className="text-[10px] text-outline font-black block">Conceptual Understanding</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={activeQ?.maximumMarks || 100}
-                      disabled={isLocked || saving}
-                      value={conceptualUnderstanding}
-                      onChange={(e) => setConceptualUnderstanding(Number(e.target.value) || 0)}
-                      className="w-full text-xs font-bold text-center p-2 rounded-lg border outline-none bg-white focus:ring-1 focus:ring-primary/20"
-                    />
+                {/* Validation Error Message Banner */}
+                {validationError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    <span>{validationError}</span>
                   </div>
-                  <div className="space-y-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
-                    <span className="text-[10px] text-outline font-black block">Keyword Accuracy</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={activeQ?.maximumMarks || 100}
-                      disabled={isLocked || saving}
-                      value={keywordAccuracy}
-                      onChange={(e) => setKeywordAccuracy(Number(e.target.value) || 0)}
-                      className="w-full text-xs font-bold text-center p-2 rounded-lg border outline-none bg-white focus:ring-1 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div className="space-y-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
-                    <span className="text-[10px] text-outline font-black block">Completeness weight</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={activeQ?.maximumMarks || 100}
-                      disabled={isLocked || saving}
-                      value={completeness}
-                      onChange={(e) => setCompleteness(Number(e.target.value) || 0)}
-                      className="w-full text-xs font-bold text-center p-2 rounded-lg border outline-none bg-white focus:ring-1 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div className="space-y-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
-                    <span className="text-[10px] text-outline font-black block">Correctness weight</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={activeQ?.maximumMarks || 100}
-                      disabled={isLocked || saving}
-                      value={correctness}
-                      onChange={(e) => setCorrectness(Number(e.target.value) || 0)}
-                      className="w-full text-xs font-bold text-center p-2 rounded-lg border outline-none bg-white focus:ring-1 focus:ring-primary/20"
-                    />
-                  </div>
-                </div>
-              </div>
+                )}
 
-              {/* Partial Marking Rules */}
-              <div className="space-y-4 pt-2">
-                <div className="flex justify-between items-center border-b border-outline-variant/10 pb-2">
-                  <label className="text-xs font-black text-outline uppercase tracking-wider">Partial Marking Rubric Rules</label>
-                  <div className="flex items-center gap-1 text-[11px] font-black uppercase text-outline">
-                    <span>Rules Aggregate:</span>
-                    <span className={getPartialRulesSum() === activeQ?.maximumMarks ? 'text-emerald-600 font-black' : 'text-outline font-black'}>
-                      {getPartialRulesSum()} / {activeQ?.maximumMarks || 0} Marks
-                    </span>
-                  </div>
-                </div>
-
+                {/* Add / Edit Rubric Criterion Form */}
                 {!isLocked && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-outline-variant/10">
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-outline block uppercase font-bold">Rule Criterion</span>
-                      <input
-                        type="text"
-                        placeholder="e.g. Definition stated"
-                        value={newRuleCrit}
-                        onChange={(e) => setNewRuleCrit(e.target.value)}
-                        className="w-full text-xs p-2 border rounded-lg bg-white outline-none focus:border-primary transition"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-outline block uppercase font-bold">Rule Description</span>
-                      <input
-                        type="text"
-                        placeholder="e.g. Gives partial definition details"
-                        value={newRuleDesc}
-                        onChange={(e) => setNewRuleDesc(e.target.value)}
-                        className="w-full text-xs p-2 border rounded-lg bg-white outline-none focus:border-primary transition"
-                      />
-                    </div>
-                    <div className="space-y-1 flex gap-2 items-end">
-                      <div className="flex-grow">
-                        <span className="text-[9px] text-outline block uppercase font-bold">Allocated Marks</span>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-outline-variant/15 space-y-3">
+                    <span className="text-[10px] font-black text-outline uppercase tracking-wider block">
+                      {editingRubricIdx !== null ? `Edit Rubric Criterion #${editingRubricIdx + 1}` : '+ Add Rubric Criterion'}
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                      <div className="sm:col-span-4">
+                        <label className="text-[9px] text-outline block uppercase font-bold mb-1">Criterion Name <span className="text-red-500">*</span></label>
                         <input
-                          type="number"
-                          min={0.5}
-                          step={0.5}
-                          value={newRuleMarks === 0 ? '' : newRuleMarks}
-                          onChange={(e) => setNewRuleMarks(Number(e.target.value) || 0)}
+                          type="text"
+                          placeholder="e.g. Scalability"
+                          value={newCritName}
+                          onChange={(e) => setNewCritName(e.target.value)}
                           className="w-full text-xs p-2 border rounded-lg bg-white outline-none focus:border-primary transition"
                         />
                       </div>
+
+                      <div className="sm:col-span-5">
+                        <label className="text-[9px] text-outline block uppercase font-bold mb-1">Description <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Explains horizontal scaling principles"
+                          value={newCritDesc}
+                          onChange={(e) => setNewCritDesc(e.target.value)}
+                          className="w-full text-xs p-2 border rounded-lg bg-white outline-none focus:border-primary transition"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="text-[9px] text-outline block uppercase font-bold mb-1">Marks <span className="text-red-500">*</span></label>
+                        <input
+                          type="number"
+                          min={0.1}
+                          step={0.1}
+                          value={newCritMarks}
+                          onChange={(e) => setNewCritMarks(Number(e.target.value) || 0)}
+                          className="w-full text-xs p-2 border rounded-lg bg-white outline-none focus:border-primary transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      {editingRubricIdx !== null && (
+                        <button
+                          type="button"
+                          onClick={handleCancelCriterionEdit}
+                          className="px-3 py-1.5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={handleAddRule}
-                        className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg h-9 hover:bg-primary-dark transition cursor-pointer"
+                        onClick={handleSaveCriterion}
+                        className="px-4 py-1.5 bg-secondary text-white text-xs font-bold rounded-lg hover:bg-secondary-dark transition flex items-center gap-1 cursor-pointer"
                       >
-                        Add Rule
+                        <span className="material-symbols-outlined text-xs">add</span>
+                        {editingRubricIdx !== null ? 'Update Criterion' : 'Add Criterion'}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {partialRules.length === 0 ? (
-                  <p className="text-[10px] text-outline italic text-center py-2 bg-slate-50/50 rounded-xl border border-dashed border-outline-variant/20">No partial rubrics defined. Future AI evaluations will rely solely on semantic criteria weights.</p>
+                {/* Rubric Criteria Table */}
+                {rubricItems.length === 0 ? (
+                  <div className="text-[11px] text-outline italic text-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-outline-variant/20">
+                    No rubric criteria added yet. Add criteria above to build evaluation rubric (Rubric total must equal {maxMarksFormatted} marks).
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-outline-variant/15">
+                  <div className="overflow-x-auto rounded-xl border border-outline-variant/15 shadow-sm">
                     <table className="min-w-full text-left text-xs bg-white">
-                      <thead className="bg-slate-50 text-[10px] text-outline uppercase font-black font-mono">
+                      <thead className="bg-slate-50 text-[10px] text-outline uppercase font-black">
                         <tr>
-                          <th className="px-4 py-3">Criterion Name</th>
+                          <th className="px-4 py-3">Criterion</th>
                           <th className="px-4 py-3">Description</th>
                           <th className="px-4 py-3 text-center">Marks</th>
-                          {!isLocked && <th className="px-4 py-3 w-[80px]"></th>}
+                          {!isLocked && <th className="px-4 py-3 text-right">Actions</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-                        {partialRules.map((rule, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-semibold">{rule.criterion}</td>
-                            <td className="px-4 py-3 text-on-surface-variant leading-relaxed">{rule.description || '-'}</td>
-                            <td className="px-4 py-3 text-center font-bold text-primary">{rule.marks}</td>
+                        {rubricItems.map((item, i) => (
+                          <tr key={i} className={`hover:bg-slate-50 ${editingRubricIdx === i ? 'bg-primary/5 font-bold' : ''}`}>
+                            <td className="px-4 py-3 font-bold text-on-surface">{item.criterion}</td>
+                            <td className="px-4 py-3 text-on-surface-variant leading-relaxed">{item.description}</td>
+                            <td className="px-4 py-3 text-center font-black text-primary">{item.maxMarks}</td>
                             {!isLocked && (
                               <td className="px-4 py-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveRule(i)}
-                                  className="text-red-500 hover:text-red-700 font-bold ml-auto text-xs cursor-pointer block"
-                                >
-                                  Remove
-                                </button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditCriterion(i)}
+                                    className="text-primary hover:text-primary-dark font-bold text-xs cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCriterion(i)}
+                                    className="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                             )}
                           </tr>
@@ -647,17 +726,58 @@ export const AnswerKey: React.FC = () => {
                 )}
               </div>
 
-              {/* Action buttons footer for question editor */}
-              {!isLocked && (
-                <div className="flex justify-end pt-4 border-t border-outline-variant/10">
+              {/* Keywords Tag Manager (Optional Auxiliary NLP Context) */}
+              <div className="space-y-2 pt-2 border-t border-outline-variant/10">
+                <label className="text-xs font-black text-outline uppercase tracking-wider block">Keywords (Optional NLP Context)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newKeyword}
+                    onChange={(e) => setNewKeyword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddKeyword())}
+                    disabled={isLocked || saving}
+                    placeholder="Add keyword tag..."
+                    className="flex-grow text-xs px-3 py-2 border border-outline-variant/30 rounded-xl outline-none focus:border-primary transition"
+                  />
                   <button
                     type="button"
-                    onClick={handleSaveActiveQuestion}
-                    disabled={saving}
-                    className="px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-xl transition flex items-center gap-1 hover:shadow active:scale-95 disabled:opacity-50 cursor-pointer"
+                    onClick={handleAddKeyword}
+                    disabled={isLocked || saving}
+                    className="px-4 py-2 bg-slate-100 text-on-surface font-bold text-xs rounded-xl hover:bg-slate-200 transition"
+                  >
+                    Add Tag
+                  </button>
+                </div>
+                {keywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {keywords.map((kw, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-slate-100 text-on-surface rounded-lg text-[10px] font-bold flex items-center gap-1">
+                        {kw}
+                        {!isLocked && (
+                          <button type="button" onClick={() => handleRemoveKeyword(kw)} className="hover:text-red-500 cursor-pointer">✕</button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Save Evaluation Configuration Action Button */}
+              {!isLocked && (
+                <div className="flex justify-between items-center pt-4 border-t border-outline-variant/10">
+                  <span className="text-[11px] text-outline font-semibold">
+                    {rubricTotalFormatted === maxMarksFormatted 
+                      ? '✓ Rubric configuration ready to save' 
+                      : '⚠️ Rubric total must equal maximum marks before saving'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveEvaluationConfig}
+                    disabled={saving || rubricTotalFormatted !== maxMarksFormatted}
+                    className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 hover:shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-xs">save</span>
-                    Save Question Draft
+                    Save Evaluation Configuration (v{version})
                   </button>
                 </div>
               )}

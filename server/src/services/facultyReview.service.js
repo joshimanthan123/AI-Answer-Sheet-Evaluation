@@ -687,6 +687,359 @@ export const finalizeReview = async (answerSheetId, userId) => {
   return { answerSheet: ansSheet, evaluation };
 };
 
+export const PREDEFINED_OVERRIDE_REASONS = [
+  "AI underestimated answer",
+  "AI overestimated answer",
+  "OCR error",
+  "Valid alternative answer",
+  "Partial concept accepted",
+  "Reference answer mismatch",
+  "Correct concept with different wording",
+  "Student answer deserves additional marks",
+  "Student answer deserves fewer marks",
+  "Other"
+];
+
+/**
+ * Resolves Evaluation and AnswerSheet by either evaluationId or answerSheetId.
+ */
+export const resolveEvaluationAndSheet = async (id) => {
+  let evaluation = await Evaluation.findOne({ _id: id, isDeleted: false }).populate({
+    path: "answerSheet",
+    populate: "exam student subject",
+  });
+  let ansSheet;
+  if (evaluation) {
+    ansSheet = evaluation.answerSheet;
+  } else {
+    ansSheet = await AnswerSheet.findOne({ _id: id, isDeleted: false }).populate("exam student subject");
+    if (!ansSheet) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation or Answer sheet not found.");
+    }
+    evaluation = await Evaluation.findOne({ answerSheet: ansSheet._id, isDeleted: false });
+  }
+  return { evaluation, ansSheet };
+};
+
+/**
+ * Finds target question subdocument inside Evaluation by questionId or questionNumber.
+ */
+
+const findQuestionInEvaluation = (evaluation, questionIdOrNum) => {
+  if (!evaluation || !evaluation.questions) return null;
+  const targetStr = String(questionIdOrNum).trim();
+  const numericQNum = parseInt(targetStr.replace(/[^\d]/g, ""));
+
+  return evaluation.questions.find((q) => {
+    if (q._id && q._id.toString() === targetStr) return true;
+    if (q.questionId && q.questionId.toString() === targetStr) return true;
+    if (q.questionNumber !== undefined && q.questionNumber !== null) {
+      if (String(q.questionNumber).trim() === targetStr) return true;
+      if (!isNaN(numericQNum) && parseInt(String(q.questionNumber).replace(/[^\d]/g, "")) === numericQNum) return true;
+      if (`Q${q.questionNumber}`.toUpperCase() === targetStr.toUpperCase()) return true;
+    }
+    return false;
+  });
+};
+
+/**
+ * Accepts AI marks for a specific question. Preserves original AI evaluation intact.
+ */
+export const acceptAiQuestion = async (id, questionIdOrNum, userId) => {
+  const { evaluation, ansSheet } = await resolveEvaluationAndSheet(id);
+  if (!evaluation || !ansSheet) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation details not found.");
+  }
+
+  await validateAccess(ansSheet, userId);
+
+  if (ansSheet.reviewStatus === "FINALIZED" || evaluation.evaluationStatus === "finalized") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Evaluation review is finalized and locked.");
+  }
+
+  const qEval = findQuestionInEvaluation(evaluation, questionIdOrNum);
+  if (!qEval) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, `Question ${questionIdOrNum} not found in evaluation.`);
+  }
+
+  if (qEval.reviewStatus === "finalized") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Question ${qEval.questionNumber} is finalized and locked.`);
+  }
+
+  const aiMarks = qEval.aiEvaluation?.marksAwarded ?? qEval.aiMarks ?? 0;
+  
+  // Set faculty values = AI values (Accept AI)
+  qEval.facultyAwardedMarks = aiMarks;
+  qEval.facultyMarks = aiMarks;
+  qEval.finalAwardedMarks = aiMarks;
+  qEval.wasOverridden = false;
+  qEval.overrideReason = "";
+  qEval.facultyComment = qEval.facultyComment || "Accepted AI evaluation";
+  qEval.reviewType = "accepted";
+  qEval.reviewStatus = "reviewed";
+
+  qEval.facultyEvaluation = {
+    status: "accepted",
+    reviewType: "accepted",
+    finalMarks: aiMarks,
+    overrideReason: "",
+    comment: qEval.facultyComment,
+    reviewedAt: new Date(),
+    reviewedBy: userId,
+  };
+
+  evaluation.auditHistory.push({
+    action: "AI_ACCEPTED",
+    questionNumber: `Q${qEval.questionNumber}`,
+    previousValue: { marks: qEval.aiMarks },
+    newValue: { marks: aiMarks, reviewType: "accepted" },
+    comment: "Faculty accepted AI evaluation marks.",
+    changedBy: userId,
+  });
+
+  // Recalculate evaluation totals
+  const summary = evaluationValidator.calculateEvaluationSummary(evaluation.questions);
+  evaluation.obtainedMarks = summary.totalAwardedMarks;
+  evaluation.totalMarks = summary.totalMaximumMarks;
+  evaluation.percentage = summary.percentage;
+  evaluation.grade = gradingService.calculateGrade(summary.percentage);
+
+  await evaluation.save();
+
+  ansSheet.reviewStatus = "FACULTY_REVIEW_IN_PROGRESS";
+  ansSheet.evaluationSummary = summary;
+  await ansSheet.save();
+
+  return { evaluation, ansSheet, question: qEval };
+};
+
+/**
+ * Overrides AI marks for a specific question with reason, comment, and range validation.
+ */
+export const overrideQuestion = async (id, questionIdOrNum, facultyMarks, overrideReason, comment, userId) => {
+  const { evaluation, ansSheet } = await resolveEvaluationAndSheet(id);
+  if (!evaluation || !ansSheet) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation details not found.");
+  }
+
+  await validateAccess(ansSheet, userId);
+
+  if (ansSheet.reviewStatus === "FINALIZED" || evaluation.evaluationStatus === "finalized") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Evaluation review is finalized and locked.");
+  }
+
+  const qEval = findQuestionInEvaluation(evaluation, questionIdOrNum);
+  if (!qEval) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, `Question ${questionIdOrNum} not found in evaluation.`);
+  }
+
+  if (qEval.reviewStatus === "finalized") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Question ${qEval.questionNumber} is finalized and locked.`);
+  }
+
+  const maxMarks = qEval.maxMarks || qEval.aiEvaluation?.maxMarks || 10;
+  
+  // Marks validation
+  if (facultyMarks === null || facultyMarks === undefined || isNaN(facultyMarks)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Please provide valid numeric faculty marks.");
+  }
+
+  if (facultyMarks < 0 || facultyMarks > maxMarks) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Faculty marks must be between 0 and ${maxMarks}.`);
+  }
+
+  // Override reason validation
+  if (!overrideReason || typeof overrideReason !== "string" || !overrideReason.trim()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Valid override reason must be provided.");
+  }
+
+  const trimmedReason = overrideReason.trim();
+  if (!PREDEFINED_OVERRIDE_REASONS.includes(trimmedReason)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Selected override reason is invalid.");
+  }
+
+  if (trimmedReason === "Other" && (!comment || typeof comment !== "string" || !comment.trim())) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Faculty comment is required when reason is 'Other'.");
+  }
+
+  const finalComment = comment ? comment.trim() : trimmedReason;
+  const aiMarks = qEval.aiEvaluation?.marksAwarded ?? qEval.aiMarks ?? 0;
+  const difference = facultyMarks - aiMarks;
+
+  const previousMarks = qEval.facultyAwardedMarks !== undefined ? qEval.facultyAwardedMarks : aiMarks;
+
+  qEval.facultyAwardedMarks = facultyMarks;
+  qEval.facultyMarks = facultyMarks;
+  qEval.finalAwardedMarks = facultyMarks;
+  qEval.wasOverridden = true;
+  qEval.overrideReason = trimmedReason;
+  qEval.facultyComment = finalComment;
+  qEval.reviewType = "overridden";
+  qEval.reviewStatus = "reviewed";
+
+  qEval.facultyEvaluation = {
+    status: "modified",
+    reviewType: "overridden",
+    finalMarks: facultyMarks,
+    overrideReason: trimmedReason,
+    comment: finalComment,
+    reviewedAt: new Date(),
+    reviewedBy: userId,
+  };
+
+  evaluation.auditHistory.push({
+    action: "MARK_OVERRIDDEN",
+    questionNumber: `Q${qEval.questionNumber}`,
+    previousValue: { marks: previousMarks },
+    newValue: { marks: facultyMarks, difference, overrideReason: trimmedReason, comment: finalComment },
+    comment: `Faculty overridden Q${qEval.questionNumber}: ${trimmedReason}`,
+    changedBy: userId,
+  });
+
+  // Recalculate totals
+  const summary = evaluationValidator.calculateEvaluationSummary(evaluation.questions);
+  evaluation.obtainedMarks = summary.totalAwardedMarks;
+  evaluation.totalMarks = summary.totalMaximumMarks;
+  evaluation.percentage = summary.percentage;
+  evaluation.grade = gradingService.calculateGrade(summary.percentage);
+
+  await evaluation.save();
+
+  ansSheet.reviewStatus = "FACULTY_REVIEW_IN_PROGRESS";
+  ansSheet.evaluationSummary = summary;
+  await ansSheet.save();
+
+  return { evaluation, ansSheet, question: qEval, difference };
+};
+
+/**
+ * Finalizes a single question in an evaluation. Locks question from further editing.
+ */
+export const finalizeSingleQuestion = async (id, questionIdOrNum, userId) => {
+  const { evaluation, ansSheet } = await resolveEvaluationAndSheet(id);
+  if (!evaluation || !ansSheet) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation details not found.");
+  }
+
+  await validateAccess(ansSheet, userId);
+
+  const qEval = findQuestionInEvaluation(evaluation, questionIdOrNum);
+  if (!qEval) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, `Question ${questionIdOrNum} not found in evaluation.`);
+  }
+
+  if (qEval.reviewStatus === "pending") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Question ${qEval.questionNumber} must be reviewed (accepted or overridden) before finalization.`);
+  }
+
+  qEval.reviewStatus = "finalized";
+  if (qEval.facultyEvaluation) {
+    qEval.facultyEvaluation.status = "finalized";
+    qEval.facultyEvaluation.finalizedAt = new Date();
+    qEval.facultyEvaluation.finalizedBy = userId;
+  }
+
+  evaluation.auditHistory.push({
+    action: "QUESTION_FINALIZED",
+    questionNumber: `Q${qEval.questionNumber}`,
+    newValue: { status: "finalized", finalMarks: qEval.finalAwardedMarks ?? qEval.facultyAwardedMarks },
+    comment: `Question Q${qEval.questionNumber} locked and finalized by faculty.`,
+    changedBy: userId,
+  });
+
+  await evaluation.save();
+  return { evaluation, ansSheet, question: qEval };
+};
+
+/**
+ * Finalizes entire student evaluation after all questions have been reviewed/finalized.
+ */
+export const finalizeStudentEvaluation = async (id, userId) => {
+  const { evaluation, ansSheet } = await resolveEvaluationAndSheet(id);
+  if (!evaluation || !ansSheet) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation details not found.");
+  }
+
+  await validateAccess(ansSheet, userId);
+
+  if (ansSheet.reviewStatus === "FINALIZED" || evaluation.evaluationStatus === "finalized") {
+    throw new ApiError(STATUS_CODES.CONFLICT, "Student evaluation has already been finalized.");
+  }
+
+  // Ensure all questions are reviewed or finalized
+  const pendingQuestions = evaluation.questions.filter((q) => q.reviewStatus === "pending" && q.facultyEvaluation?.status === "pending");
+  if (pendingQuestions.length > 0) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      `Cannot finalize student evaluation. ${pendingQuestions.length} question(s) are still pending review.`
+    );
+  }
+
+  // Calculate totals: AI Total vs Faculty Final Total vs Total Difference
+  let totalAiMarks = 0;
+  let totalFacultyFinalMarks = 0;
+
+  evaluation.questions.forEach((q) => {
+    const aiM = q.aiEvaluation?.marksAwarded ?? q.aiMarks ?? 0;
+    const facM = q.facultyAwardedMarks ?? q.facultyMarks ?? q.facultyEvaluation?.finalMarks ?? aiM;
+    totalAiMarks += aiM;
+    totalFacultyFinalMarks += facM;
+    q.reviewStatus = "finalized";
+    if (q.facultyEvaluation) {
+      q.facultyEvaluation.status = "finalized";
+      q.facultyEvaluation.finalizedAt = new Date();
+      q.facultyEvaluation.finalizedBy = userId;
+    }
+  });
+
+  const totalDifference = totalFacultyFinalMarks - totalAiMarks;
+  const summary = evaluationValidator.calculateEvaluationSummary(evaluation.questions);
+
+  ansSheet.reviewStatus = "FINALIZED";
+  ansSheet.finalizedAt = new Date();
+  ansSheet.finalizedBy = userId;
+  ansSheet.submissionStatus = "Completed";
+  ansSheet.evaluationSummary = summary;
+  
+  ansSheet.resultPublication = {
+    status: "READY_FOR_RESULT_PUBLICATION",
+    publishedAt: null,
+    publishedBy: null,
+    unpublishedAt: null,
+    unpublishedBy: null,
+    publicationComment: null,
+  };
+  await ansSheet.save();
+
+  evaluation.evaluationStatus = "finalized";
+  evaluation.finalizedAt = new Date();
+  evaluation.finalizedBy = userId;
+  evaluation.obtainedMarks = summary.totalAwardedMarks;
+  evaluation.totalMarks = summary.totalMaximumMarks;
+  evaluation.percentage = summary.percentage;
+  evaluation.grade = gradingService.calculateGrade(summary.percentage);
+
+  evaluation.auditHistory.push({
+    action: "EVALUATION_FINALIZED",
+    comment: `Student evaluation finalized. Total AI Marks: ${totalAiMarks}, Final Faculty Marks: ${totalFacultyFinalMarks}, Difference: ${totalDifference >= 0 ? "+" : ""}${totalDifference}`,
+    changedBy: userId,
+  });
+
+  await evaluation.save();
+
+  return {
+    evaluation,
+    ansSheet,
+    summary: {
+      totalAiMarks,
+      totalFacultyFinalMarks,
+      totalDifference,
+      percentage: summary.percentage,
+      grade: evaluation.grade,
+    },
+  };
+};
+
 export default {
   validateAccess,
   getReviewQueue,
@@ -698,4 +1051,11 @@ export default {
   requestRevision,
   approveReview,
   finalizeReview,
+  acceptAiQuestion,
+  overrideQuestion,
+  finalizeSingleQuestion,
+  finalizeStudentEvaluation,
+  PREDEFINED_OVERRIDE_REASONS,
+  resolveEvaluationAndSheet,
 };
+

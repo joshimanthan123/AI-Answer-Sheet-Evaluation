@@ -23,10 +23,30 @@ const verifyExamOwnership = async (examId, userId, userRole) => {
 };
 
 /**
+ * Helper to resolve passing marks rule for an exam.
+ * Returns { hasPassingRule: boolean, passingMarks: number | null }
+ */
+const resolvePassingRule = (exam) => {
+  if (exam.passingMarks !== undefined && exam.passingMarks !== null && !isNaN(exam.passingMarks)) {
+    return { hasPassingRule: true, passingMarks: Number(exam.passingMarks) };
+  }
+  if (
+    exam.passingPercentage !== undefined &&
+    exam.passingPercentage !== null &&
+    !isNaN(exam.passingPercentage)
+  ) {
+    const marks = Math.round((Number(exam.totalMarks) * Number(exam.passingPercentage)) / 100);
+    return { hasPassingRule: true, passingMarks: marks };
+  }
+  return { hasPassingRule: false, passingMarks: null };
+};
+
+/**
  * Returns paginated results list for an exam.
  */
 export const getResultsForExam = async (examId, query = {}, userId, userRole) => {
-  await verifyExamOwnership(examId, userId, userRole);
+  const exam = await verifyExamOwnership(examId, userId, userRole);
+  const { hasPassingRule, passingMarks } = resolvePassingRule(exam);
 
   const {
     page = 1,
@@ -64,12 +84,18 @@ export const getResultsForExam = async (examId, query = {}, userId, userRole) =>
   if (status) {
     if (status === "finalized") {
       evalQuery.evaluationStatus = "finalized";
-    } else if (status === "pending_finalization") {
-      evalQuery.evaluationStatus = { $in: ["completed", "reviewed"] };
+    } else if (status === "pending_finalization" || status === "pending") {
+      evalQuery.evaluationStatus = { $ne: "finalized" };
     } else if (status === "processing") {
       evalQuery.evaluationStatus = { $in: ["pending", "queued", "processing"] };
     } else if (status === "failed") {
       evalQuery.evaluationStatus = "failed";
+    } else if (status === "pass" && hasPassingRule) {
+      evalQuery.evaluationStatus = "finalized";
+      evalQuery.obtainedMarks = { $gte: passingMarks };
+    } else if (status === "fail" && hasPassingRule) {
+      evalQuery.evaluationStatus = "finalized";
+      evalQuery.obtainedMarks = { $lt: passingMarks };
     }
   }
 
@@ -105,6 +131,37 @@ export const getResultsForExam = async (examId, query = {}, userId, userRole) =>
   const results = evals.map((e) => {
     const sheet = e.answerSheet;
     const student = sheet?.student;
+
+    // Sum AI total marks for comparison
+    const aiTotalMarks = e.questions.reduce(
+      (sum, q) => sum + (q.aiAwardedMarks !== undefined ? q.aiAwardedMarks : (q.aiMarks || 0)),
+      0
+    );
+
+    // Sum Final Faculty Marks (from Phase 4B)
+    const finalTotalMarks =
+      e.evaluationStatus === "finalized"
+        ? e.obtainedMarks
+        : e.questions.reduce(
+            (sum, q) =>
+              sum +
+              (q.finalAwardedMarks !== undefined && q.finalAwardedMarks !== null
+                ? q.finalAwardedMarks
+                : q.aiAwardedMarks || 0),
+            0
+          );
+
+    const isFinalized = e.evaluationStatus === "finalized";
+
+    let resultStatus = "Not Configured";
+    if (isFinalized) {
+      if (hasPassingRule) {
+        resultStatus = finalTotalMarks >= passingMarks ? "PASS" : "FAIL";
+      }
+    } else {
+      resultStatus = "Pending";
+    }
+
     return {
       evaluationId: e._id,
       answerSheetId: sheet?._id,
@@ -112,16 +169,24 @@ export const getResultsForExam = async (examId, query = {}, userId, userRole) =>
         sheet?.studentIdentifier || student?.rollNo || student?.name || "Unknown Candidate",
       studentName: student?.name || "Unknown Candidate",
       filename: sheet?.uploadedFileName || "Scan",
-      obtainedMarks: e.obtainedMarks,
+      aiTotalMarks,
+      obtainedMarks: finalTotalMarks,
+      finalTotalMarks,
       totalMarks: e.totalMarks,
       percentage: e.percentage,
       status: e.evaluationStatus,
+      isFinalized,
+      resultStatus,
+      hasPassingRule,
+      passingMarks,
       finalizedAt: e.updatedAt,
     };
   });
 
   return {
     results,
+    hasPassingRule,
+    passingMarks,
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -132,10 +197,11 @@ export const getResultsForExam = async (examId, query = {}, userId, userRole) =>
 };
 
 /**
- * Returns overall exam statistics and question-wise aggregates.
+ * Returns overall exam statistics, AI vs Faculty metrics, and question-wise aggregates.
  */
 export const getExamAnalytics = async (examId, userId, userRole) => {
   const exam = await verifyExamOwnership(examId, userId, userRole);
+  const { hasPassingRule, passingMarks } = resolvePassingRule(exam);
 
   const sheets = await AnswerSheet.find({ exam: examId, isDeleted: { $ne: true } });
   const sheetIds = sheets.map((s) => s._id);
@@ -150,12 +216,16 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
   const finalizedCount = finalized.length;
 
   const pendingReview = allEvals.filter((e) =>
-    ["completed", "reviewed"].includes(e.evaluationStatus)
+    ["completed", "reviewed", "EVALUATION_COMPLETED", "READY_FOR_FACULTY_REVIEW"].includes(
+      e.evaluationStatus
+    )
   ).length;
   const processing = allEvals.filter((e) =>
-    ["pending", "queued", "processing"].includes(e.evaluationStatus)
+    ["pending", "queued", "processing", "HWR_PROCESSING", "LLM_PROCESSING", "GRADING"].includes(
+      e.evaluationStatus
+    )
   ).length;
-  const failed = allEvals.filter((e) => e.evaluationStatus === "failed").length;
+  const failed = allEvals.filter((e) => e.evaluationStatus === "failed" || e.evaluationStatus === "EVALUATION_FAILED").length;
 
   let averageMarks = 0;
   let averagePercentage = 0;
@@ -164,7 +234,14 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
   let passCount = 0;
   let failCount = 0;
 
-  const passingMarks = exam.passingMarks || Math.round(exam.totalMarks * 0.4);
+  // AI vs Faculty metrics
+  let totalAIMarksSum = 0;
+  let totalFinalMarksSum = 0;
+  let totalQuestionsEvaluated = 0;
+  let aiAcceptedCount = 0;
+  let aiOverriddenCount = 0;
+  let marksIncreasedCount = 0;
+  let marksDecreasedCount = 0;
 
   const distribution = {
     "0-20%": 0,
@@ -190,10 +267,12 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
       if (marks > highestScore) highestScore = marks;
       if (marks < lowestScore) lowestScore = marks;
 
-      if (marks >= passingMarks) {
-        passCount++;
-      } else {
-        failCount++;
+      if (hasPassingRule && passingMarks !== null) {
+        if (marks >= passingMarks) {
+          passCount++;
+        } else {
+          failCount++;
+        }
       }
 
       if (percent <= 20) distribution["0-20%"]++;
@@ -201,6 +280,27 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
       else if (percent <= 60) distribution["41-60%"]++;
       else if (percent <= 80) distribution["61-80%"]++;
       else distribution["81-100%"]++;
+
+      // Per-question AI vs Faculty metrics accumulation
+      (e.questions || []).forEach((q) => {
+        totalQuestionsEvaluated++;
+        const aiScore = q.aiAwardedMarks !== undefined ? q.aiAwardedMarks : (q.aiMarks || 0);
+        const finalScore =
+          q.finalAwardedMarks !== undefined && q.finalAwardedMarks !== null
+            ? q.finalAwardedMarks
+            : aiScore;
+
+        totalAIMarksSum += aiScore;
+        totalFinalMarksSum += finalScore;
+
+        if (q.wasOverridden || q.reviewType === "overridden") {
+          aiOverriddenCount++;
+          if (finalScore > aiScore) marksIncreasedCount++;
+          else if (finalScore < aiScore) marksDecreasedCount++;
+        } else {
+          aiAcceptedCount++;
+        }
+      });
     });
 
     averageMarks = parseFloat((sumMarks / finalizedCount).toFixed(2));
@@ -209,8 +309,14 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
     if (highestScore === -Infinity) highestScore = 0;
   }
 
+  const averageAIMarks = finalizedCount > 0 ? parseFloat((totalAIMarksSum / finalizedCount).toFixed(2)) : 0;
+  const averageFinalMarks = averageMarks;
+  const averageDifference = parseFloat((averageFinalMarks - averageAIMarks).toFixed(2));
+
   const passPercentage =
-    finalizedCount > 0 ? parseFloat(((passCount / finalizedCount) * 100).toFixed(2)) : 0;
+    hasPassingRule && finalizedCount > 0
+      ? parseFloat(((passCount / finalizedCount) * 100).toFixed(2))
+      : 0;
 
   // Question-wise aggregates
   const questionAnalytics = [];
@@ -218,36 +324,50 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
 
   questionsList.forEach((q) => {
     const qid = q._id.toString();
-    const scores = [];
+    const finalScores = [];
+    const aiScores = [];
+    let qOverridden = 0;
 
     finalized.forEach((e) => {
       const eq = e.questions.find((eqLine) => eqLine.questionId.toString() === qid);
       if (eq) {
-        const scoreVal =
+        const aiScoreVal = eq.aiAwardedMarks !== undefined ? eq.aiAwardedMarks : (eq.aiMarks || 0);
+        const finalScoreVal =
           eq.finalAwardedMarks !== undefined && eq.finalAwardedMarks !== null
             ? eq.finalAwardedMarks
-            : eq.aiAwardedMarks;
-        scores.push(scoreVal);
+            : aiScoreVal;
+
+        aiScores.push(aiScoreVal);
+        finalScores.push(finalScoreVal);
+
+        if (eq.wasOverridden || eq.reviewType === "overridden") {
+          qOverridden++;
+        }
       }
     });
 
     const maxMarks = q.maximumMarks || 0;
     let averageMarks = 0;
+    let aiAverageMarks = 0;
     let averagePercentage = 0;
     let highestMarks = 0;
     let lowestMarks = 0;
     let zeroCount = 0;
     let fullMarksCount = 0;
 
-    if (scores.length > 0) {
-      const totalScore = scores.reduce((s, val) => s + val, 0);
-      averageMarks = parseFloat((totalScore / scores.length).toFixed(2));
+    if (finalScores.length > 0) {
+      const totalScore = finalScores.reduce((s, val) => s + val, 0);
+      const totalAiScore = aiScores.reduce((s, val) => s + val, 0);
+
+      averageMarks = parseFloat((totalScore / finalScores.length).toFixed(2));
+      aiAverageMarks = parseFloat((totalAiScore / aiScores.length).toFixed(2));
+
       averagePercentage =
         maxMarks > 0 ? parseFloat(((averageMarks / maxMarks) * 100).toFixed(2)) : 0;
-      highestMarks = Math.max(...scores);
-      lowestMarks = Math.min(...scores);
-      zeroCount = scores.filter((s) => s === 0).length;
-      fullMarksCount = scores.filter((s) => s === maxMarks).length;
+      highestMarks = Math.max(...finalScores);
+      lowestMarks = Math.min(...finalScores);
+      zeroCount = finalScores.filter((s) => s === 0).length;
+      fullMarksCount = finalScores.filter((s) => s === maxMarks).length;
     }
 
     let performanceDifficulty = "moderate";
@@ -260,13 +380,16 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
     questionAnalytics.push({
       questionId: qid,
       questionNumber: q.questionNumber,
+      questionText: q.questionText || "",
       maxMarks,
       averageMarks,
+      aiAverageMarks,
       averagePercentage,
       highestMarks,
       lowestMarks,
       zeroCount,
       fullMarksCount,
+      overriddenCount: qOverridden,
       performanceDifficulty,
     });
   });
@@ -278,7 +401,7 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
     )[0];
     if (hardest && hardest.averagePercentage < 50) {
       insights.push(
-        `Question ${hardest.questionNumber} had the lowest performance average of ${hardest.averagePercentage}%.`
+        `Question Q${hardest.questionNumber} had the lowest performance average of ${hardest.averagePercentage}%.`
       );
     }
 
@@ -287,20 +410,28 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
     )[0];
     if (easiest && easiest.averagePercentage > 75) {
       insights.push(
-        `Question ${easiest.questionNumber} was answered correctly by most candidates with an average score of ${easiest.averagePercentage}%.`
+        `Question Q${easiest.questionNumber} was answered correctly by most candidates with an average score of ${easiest.averagePercentage}%.`
       );
     }
 
     insights.push(
-      `The average exam grade performance across candidates was ${averagePercentage}%.`
+      `The average finalized exam performance across candidates was ${averagePercentage}%.`
     );
+
+    if (aiOverriddenCount > 0) {
+      insights.push(
+        `Faculty modified ${aiOverriddenCount} question evaluations (${marksIncreasedCount} increased, ${marksDecreasedCount} decreased).`
+      );
+    } else {
+      insights.push(`Faculty accepted all AI evaluations without modification.`);
+    }
 
     const highScorers = finalized.filter((e) => e.percentage >= 80).length;
     if (highScorers > 0) {
-      insights.push(`${highScorers} candidate(s) achieved excellent marks above 80%.`);
+      insights.push(`${highScorers} candidate(s) achieved top performance marks above 80%.`);
     }
   } else {
-    insights.push("No finalized analytics profiles compiled yet.");
+    insights.push("No finalized evaluation records compiled yet for this exam.");
   }
 
   return {
@@ -317,7 +448,23 @@ export const getExamAnalytics = async (examId, userId, userRole) => {
     passCount,
     failCount,
     passPercentage,
+    hasPassingRule,
+    passingMarks,
     distribution,
+    aiFacultyComparison: {
+      averageAIMarks,
+      averageFinalMarks,
+      averageDifference,
+      aiAcceptedCount,
+      aiOverriddenCount,
+    },
+    facultyOverrideSummary: {
+      totalQuestions: totalQuestionsEvaluated,
+      aiAccepted: aiAcceptedCount,
+      aiOverridden: aiOverriddenCount,
+      marksIncreased: marksIncreasedCount,
+      marksDecreased: marksDecreasedCount,
+    },
     questionAnalytics,
     insights,
   };
@@ -350,6 +497,79 @@ export const getIndividualResult = async (evaluationId, userId, userRole) => {
     throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You do not own this exam.");
   }
 
+  // Student authorization check: student can only view their own result, and only if published
+  if (userRole === ROLES.STUDENT) {
+    if (!sheet.student || sheet.student._id.toString() !== userId.toString()) {
+      throw new ApiError(
+        STATUS_CODES.FORBIDDEN,
+        "Access denied. You can only view your own evaluation results."
+      );
+    }
+    const publicationStatus = sheet?.resultPublication?.status || "NOT_READY";
+    if (publicationStatus !== "RESULT_PUBLISHED") {
+      throw new ApiError(
+        STATUS_CODES.FORBIDDEN,
+        "Results for this evaluation have not been published by the faculty yet."
+      );
+    }
+  }
+
+  const { hasPassingRule, passingMarks } = resolvePassingRule(exam);
+  const isFinalized = e.evaluationStatus === "finalized";
+
+  // Compute question-wise breakdown and totals
+  let aiTotalMarks = 0;
+  let finalTotalMarks = 0;
+  let pendingQuestionsCount = 0;
+
+  const questions = e.questions.map((q) => {
+    const eq = exam.questions?.find((examQ) => examQ._id.toString() === q.questionId.toString());
+    const aiScore = q.aiAwardedMarks !== undefined ? q.aiAwardedMarks : (q.aiMarks || 0);
+    const finalScore =
+      q.finalAwardedMarks !== undefined && q.finalAwardedMarks !== null
+        ? q.finalAwardedMarks
+        : aiScore;
+
+    aiTotalMarks += aiScore;
+    finalTotalMarks += finalScore;
+
+    if (q.reviewStatus !== "finalized" && q.facultyEvaluation?.status !== "finalized") {
+      pendingQuestionsCount++;
+    }
+
+    return {
+      questionId: q.questionId,
+      questionNumber: eq?.questionNumber || q.questionNumber || 1,
+      questionText: eq?.questionText || "",
+      maxMarks: eq?.maximumMarks || q.maximumMarks || 0,
+      recognizedText: q.recognizedText,
+      studentAnswer: q.studentAnswer,
+      modelAnswer: eq?.modelAnswer || q.modelAnswer || "",
+      aiAwardedMarks: aiScore,
+      finalAwardedMarks: finalScore,
+      differenceMarks: parseFloat((finalScore - aiScore).toFixed(2)),
+      wasOverridden: Boolean(q.wasOverridden || q.reviewType === "overridden"),
+      overrideReason: q.overrideReason || q.facultyEvaluation?.overrideReason || "",
+      facultyComment: q.facultyComment || q.facultyEvaluation?.comment || "",
+      feedback: q.feedback,
+      matchedKeywords: q.matchedKeywords || [],
+      missingKeywords: q.missingKeywords || [],
+      criteriaScores: q.criteriaScores || [],
+    };
+  });
+
+  const totalMaxMarks = e.totalMarks;
+  const percentage = totalMaxMarks > 0 ? parseFloat(((finalTotalMarks / totalMaxMarks) * 100).toFixed(2)) : 0;
+
+  let resultStatus = "Not Configured";
+  if (isFinalized) {
+    if (hasPassingRule && passingMarks !== null) {
+      resultStatus = finalTotalMarks >= passingMarks ? "PASS" : "FAIL";
+    }
+  } else {
+    resultStatus = "Pending";
+  }
+
   return {
     evaluationId: e._id,
     answerSheetId: sheet?._id,
@@ -365,49 +585,34 @@ export const getIndividualResult = async (evaluationId, userId, userRole) => {
     examCode: exam.examCode,
     subjectName: sheet?.subject?.name,
     subjectCode: sheet?.subject?.code,
-    obtainedMarks: e.obtainedMarks,
-    totalMarks: e.totalMarks,
-    percentage: e.percentage,
+    obtainedMarks: isFinalized ? e.obtainedMarks : finalTotalMarks,
+    aiTotalMarks: parseFloat(aiTotalMarks.toFixed(2)),
+    finalTotalMarks: isFinalized ? e.obtainedMarks : finalTotalMarks,
+    differenceMarks: parseFloat(((isFinalized ? e.obtainedMarks : finalTotalMarks) - aiTotalMarks).toFixed(2)),
+    totalMarks: totalMaxMarks,
+    percentage,
     grade: e.grade,
     status: e.evaluationStatus,
+    isFinalized,
+    pendingQuestionsCount,
+    resultStatus,
+    hasPassingRule,
+    passingMarks,
     publicationStatus: sheet?.resultPublication?.status || "NOT_READY",
     finalizedAt: e.updatedAt,
     strengths: e.strengths,
     weaknesses: e.weaknesses,
     suggestions: e.suggestions,
-    questions: e.questions.map((q) => {
-      // Find matching exam question max marks
-      const eq = exam.questions?.find((examQ) => examQ._id.toString() === q.questionId.toString());
-      return {
-        questionId: q.questionId,
-        questionNumber: eq?.questionNumber || 1,
-        questionText: eq?.questionText || "",
-        maxMarks: eq?.maximumMarks || 0,
-        recognizedText: q.recognizedText,
-        studentAnswer: q.studentAnswer,
-        modelAnswer: eq?.modelAnswer || q.modelAnswer || "",
-        aiAwardedMarks: q.aiAwardedMarks,
-        finalAwardedMarks:
-          q.finalAwardedMarks !== undefined && q.finalAwardedMarks !== null
-            ? q.finalAwardedMarks
-            : q.aiAwardedMarks,
-        wasOverridden: q.wasOverridden,
-        overrideReason: q.overrideReason,
-        facultyComment: q.facultyComment,
-        feedback: q.feedback,
-        matchedKeywords: q.matchedKeywords || [],
-        missingKeywords: q.missingKeywords || [],
-        criteriaScores: q.criteriaScores || [],
-      };
-    }),
+    questions,
   };
 };
 
 /**
- * Returns CSV string representing results list.
+ * Returns CSV string representing results list with per-question dynamic columns.
  */
 export const exportExamResultsCSV = async (examId, userId, userRole) => {
-  await verifyExamOwnership(examId, userId, userRole);
+  const exam = await verifyExamOwnership(examId, userId, userRole);
+  const { hasPassingRule, passingMarks } = resolvePassingRule(exam);
 
   const sheets = await AnswerSheet.find({ exam: examId, isDeleted: { $ne: true } }).populate(
     "student",
@@ -417,16 +622,37 @@ export const exportExamResultsCSV = async (examId, userId, userRole) => {
   const sheetIds = sheets.map((s) => s._id);
   const evals = await Evaluation.find({
     answerSheet: { $in: sheetIds },
-    evaluationStatus: "finalized",
     isDeleted: { $ne: true },
   }).populate({
     path: "answerSheet",
     populate: { path: "student", select: "name email rollNo" },
   });
 
-  let fileRows = [
-    "Student Identifier,Candidate Name,Filename,Total Marks,Maximum Marks,Percentage,Evaluation Status,Finalized Date",
+  const sortedExamQuestions = [...(exam.questions || [])].sort(
+    (a, b) => a.questionNumber - b.questionNumber
+  );
+
+  // Dynamic headers: Enrollment Number, Student Name, Exam, Q1 AI, Q1 Final, Q2 AI, Q2 Final, ..., AI Total, Final Total, Max Marks, Percentage, Status, Review Status
+  const qHeaders = sortedExamQuestions.flatMap((q) => [
+    `Q${q.questionNumber} AI`,
+    `Q${q.questionNumber} Final`,
+  ]);
+
+  const headers = [
+    "Enrollment Number",
+    "Candidate Name",
+    "Exam Title",
+    ...qHeaders,
+    "AI Total Marks",
+    "Final Total Marks",
+    "Maximum Marks",
+    "Percentage",
+    "Result Status",
+    "Review Status",
+    "Finalized Date",
   ];
+
+  const fileRows = [headers.join(",")];
 
   evals.forEach((e) => {
     const s = e.answerSheet;
@@ -434,17 +660,55 @@ export const exportExamResultsCSV = async (examId, userId, userRole) => {
     const identifier =
       s?.studentIdentifier || student?.rollNo || student?.name || "Unknown Candidate";
     const name = student?.name || "Unknown Candidate";
-    const filename = s?.uploadedFileName || "Scan";
     const dateStr = new Date(e.updatedAt).toISOString().split("T")[0];
 
-    // Escape commas
+    const isFinalized = e.evaluationStatus === "finalized";
+    const finalMarksTotal = isFinalized ? e.obtainedMarks : e.obtainedMarks || 0;
+
+    let resultStatus = "Not Configured";
+    if (isFinalized) {
+      if (hasPassingRule && passingMarks !== null) {
+        resultStatus = finalMarksTotal >= passingMarks ? "PASS" : "FAIL";
+      }
+    } else {
+      resultStatus = "Pending";
+    }
+
+    let aiTotal = 0;
+    const qCols = sortedExamQuestions.flatMap((q) => {
+      const qid = q._id.toString();
+      const eq = (e.questions || []).find((eqLine) => eqLine.questionId.toString() === qid);
+      if (eq) {
+        const aiScore = eq.aiAwardedMarks !== undefined ? eq.aiAwardedMarks : (eq.aiMarks || 0);
+        const finalScore =
+          eq.finalAwardedMarks !== undefined && eq.finalAwardedMarks !== null
+            ? eq.finalAwardedMarks
+            : aiScore;
+        aiTotal += aiScore;
+        return [aiScore, finalScore];
+      }
+      return ["-", "-"];
+    });
+
     const escId = "\"" + identifier.replace(/"/g, "\"\"") + "\"";
     const escName = "\"" + name.replace(/"/g, "\"\"") + "\"";
-    const escFile = "\"" + filename.replace(/"/g, "\"\"") + "\"";
+    const escExam = "\"" + exam.title.replace(/"/g, "\"\"") + "\"";
 
-    fileRows.push(
-      `${escId},${escName},${escFile},${e.obtainedMarks},${e.totalMarks},${e.percentage}%,${e.evaluationStatus},${dateStr}`
-    );
+    const row = [
+      escId,
+      escName,
+      escExam,
+      ...qCols,
+      aiTotal,
+      finalMarksTotal,
+      e.totalMarks,
+      `${e.percentage}%`,
+      resultStatus,
+      e.evaluationStatus,
+      dateStr,
+    ];
+
+    fileRows.push(row.join(","));
   });
 
   return fileRows.join("\n");
@@ -455,15 +719,26 @@ export const exportExamResultsCSV = async (examId, userId, userRole) => {
  */
 export const generateExamSummaryHTML = (exam, analytics, results) => {
   const dateStr = new Date().toLocaleDateString();
+  const { hasPassingRule, passingMarks } = resolvePassingRule(exam);
+
   const rows = results
     .map(
       (r) => `
     <tr>
       <td style="padding:8px; border-bottom:1px solid #ddd;">${r.studentIdentifier}</td>
       <td style="padding:8px; border-bottom:1px solid #ddd;">${r.studentName}</td>
-      <td style="padding:8px; border-bottom:1px solid #ddd;">${r.filename}</td>
-      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${r.obtainedMarks} / ${r.totalMarks}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${r.aiTotalMarks}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold;">${r.obtainedMarks} / ${r.totalMarks}</td>
       <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${r.percentage}%</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">
+        <span style="font-weight:bold; padding:2px 6px; border-radius:4px; font-size:10px; ${
+          r.resultStatus === "PASS"
+            ? "background:#d1fae5; color:#065f46;"
+            : r.resultStatus === "FAIL"
+            ? "background:#fee2e2; color:#991b1b;"
+            : "background:#f3f4f6; color:#4b5563;"
+        }">${r.resultStatus}</span>
+      </td>
       <td style="padding:8px; border-bottom:1px solid #ddd;">${r.status}</td>
     </tr>
   `
@@ -476,9 +751,9 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
     <tr>
       <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">Q${q.questionNumber}</td>
       <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${q.maxMarks}</td>
-      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${q.averageMarks} (${q.averagePercentage}%)</td>
-      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${q.highestMarks}</td>
-      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${q.lowestMarks}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">${q.aiAverageMarks || 0}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold;">${q.averageMarks} (${q.averagePercentage}%)</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">${q.overriddenCount || 0}</td>
       <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">${q.performanceDifficulty.toUpperCase()}</td>
     </tr>
   `
@@ -493,7 +768,7 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
         body { font-family: sans-serif; color: #333; line-height: 1.4; padding: 20px; }
         h1, h2 { color: #1e3a8a; }
         .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
-        .card { background: #f3f4f6; padding: 12px; rounded: 8px; border-radius: 8px; text-align: center; }
+        .card { background: #f3f4f6; padding: 12px; border-radius: 8px; text-align: center; }
         .card-val { font-size: 18px; font-weight: bold; color: #111827; }
         .card-lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; margin-top:4px;}
         table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px; }
@@ -503,7 +778,7 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
     <body onload="window.print()">
       <div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 20px;">
         <h1 style="margin:0; font-size:24px;">AI-Based Automated Answer Sheet Evaluation</h1>
-        <h2 style="margin:5px 0 0 0; font-size:16px; font-weight:normal; color:#555;">Class-Level Exam Summary Report</h2>
+        <h2 style="margin:5px 0 0 0; font-size:16px; font-weight:normal; color:#555;">Class-Level Academic Result & Evaluation Summary</h2>
       </div>
 
       <div style="display:flex; justify-content:space-between; margin-bottom: 20px; font-size:12px;">
@@ -514,6 +789,7 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
         </div>
         <div style="text-align:right;">
           <strong>Date Generated:</strong> ${dateStr}<br/>
+          <strong>Passing Rule:</strong> ${hasPassingRule ? `Configured (${passingMarks} Marks)` : "Not Configured"}<br/>
           <strong>Finalized Stats Reference:</strong> ${analytics.finalizedResults} scripts
         </div>
       </div>
@@ -522,11 +798,11 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
       <div class="grid">
         <div class="card">
           <div class="card-val">${analytics.totalAnswerSheets}</div>
-          <div class="card-lbl">Total Scans</div>
+          <div class="card-lbl">Total Answer Sheets</div>
         </div>
         <div class="card">
           <div class="card-val">${analytics.finalizedResults}</div>
-          <div class="card-lbl">Finalized</div>
+          <div class="card-lbl">Finalized Results</div>
         </div>
         <div class="card">
           <div class="card-val">${analytics.averagePercentage}%</div>
@@ -538,16 +814,36 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
         </div>
       </div>
 
+      <h2>AI vs Faculty Audit Summary</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="card-val">${analytics.aiFacultyComparison?.averageAIMarks || 0}</div>
+          <div class="card-lbl">Avg AI Marks</div>
+        </div>
+        <div class="card">
+          <div class="card-val">${analytics.aiFacultyComparison?.averageFinalMarks || 0}</div>
+          <div class="card-lbl">Avg Final Marks</div>
+        </div>
+        <div class="card">
+          <div class="card-val">${analytics.facultyOverrideSummary?.aiAccepted || 0}</div>
+          <div class="card-lbl">AI Accepted</div>
+        </div>
+        <div class="card">
+          <div class="card-val">${analytics.facultyOverrideSummary?.aiOverridden || 0}</div>
+          <div class="card-lbl">Faculty Overridden</div>
+        </div>
+      </div>
+
       <h2>Question Performance Analysis</h2>
       <table>
         <thead>
           <tr>
             <th style="text-align:center;">Question</th>
             <th style="text-align:right;">Max Marks</th>
-            <th style="text-align:right;">Average score</th>
-            <th style="text-align:right;">Highest Marks</th>
-            <th style="text-align:right;">Lowest Marks</th>
-            <th style="text-align:center;">Performance Difficulty</th>
+            <th style="text-align:right;">Avg AI Marks</th>
+            <th style="text-align:right;">Avg Final Marks</th>
+            <th style="text-align:center;">Overridden Count</th>
+            <th style="text-align:center;">Difficulty</th>
           </tr>
         </thead>
         <tbody>
@@ -555,15 +851,16 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
         </tbody>
       </table>
 
-      <h2>Student Results Summary</h2>
+      <h2>Student Academic Results</h2>
       <table>
         <thead>
           <tr>
-            <th>Student Identifier</th>
+            <th>Enrollment Number</th>
             <th>Candidate Name</th>
-            <th>Filename</th>
-            <th style="text-align:right;">Marks Obtained</th>
+            <th style="text-align:right;">AI Marks</th>
+            <th style="text-align:right;">Faculty Final Marks</th>
             <th style="text-align:right;">Percentage</th>
+            <th style="text-align:center;">Result Status</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -585,21 +882,21 @@ export const generateIndividualReportHTML = (result) => {
   const qRows = result.questions
     .map((q) => {
       const isOverride = q.wasOverridden
-        ? "<span style=\"color:#d97706; font-size:10px; font-weight:bold; margin-left:8px;\">[FACULTY OVERRIDDEN]</span>"
+        ? `<span style="color:#d97706; font-size:10px; font-weight:bold; margin-left:8px;">[FACULTY OVERRIDDEN: ${q.differenceMarks > 0 ? "+" : ""}${q.differenceMarks}]</span>`
         : "";
 
       return `
       <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size:12px; background:#fff;">
         <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid #eee; padding-bottom:6px; margin-bottom:6px; background:#f9fafb; padding:4px 8px; margin:-12px -12px 10px -12px; border-radius: 8px 8px 0 0;">
-          <span>Question ${q.questionNumber} ${isOverride}</span>
-          <span>Marks Obtained: ${q.finalAwardedMarks} / ${q.maxMarks}</span>
+          <span>Question Q${q.questionNumber} ${isOverride}</span>
+          <span>Final Marks: ${q.finalAwardedMarks} / ${q.maxMarks} (AI: ${q.aiAwardedMarks})</span>
         </div>
         <div style="margin-bottom:8px;"><strong>Question Text:</strong> ${q.questionText}</div>
         <div style="margin-bottom:8px; background:#f0f9ff; padding:8px; border-radius:6px; font-family:monospace; white-space:pre-wrap;"><strong>Student Transcription:</strong> ${q.studentAnswer || q.recognizedText || "[No Written Answer Extracted]"}</div>
         <div style="margin-bottom:8px;"><strong>AI Semantic Rubric Feedback:</strong> ${q.feedback || "None"}</div>
         ${q.matchedKeywords.length ? `<div style="margin-bottom:4px; font-size:11px;">🌱 <strong>Matched Keywords:</strong> ${q.matchedKeywords.join(", ")}</div>` : ""}
         ${q.missingKeywords.length ? `<div style="margin-bottom:4px; font-size:11px; color:#b91c1c;">⚠️ <strong>Missing Key Concepts:</strong> ${q.missingKeywords.join(", ")}</div>` : ""}
-        ${q.facultyComment ? `<div style="margin-top:8px; padding:6px; border-left:3px solid #d97706; background:#fffbeb; font-size:11.5px;">✍️ <strong>Faculty Override Justification:</strong> "${q.facultyComment}"</div>` : ""}
+        ${q.wasOverridden && (q.facultyComment || q.overrideReason) ? `<div style="margin-top:8px; padding:6px; border-left:3px solid #d97706; background:#fffbeb; font-size:11.5px;">✍️ <strong>Faculty Override Justification:</strong> "${q.facultyComment || q.overrideReason}"</div>` : ""}
       </div>
     `;
     })
@@ -608,7 +905,7 @@ export const generateIndividualReportHTML = (result) => {
   return `
     <html>
     <head>
-      <title>Individual Evaluation Report - ${result.studentIdentifier}</title>
+      <title>Official Academic Result - ${result.studentIdentifier}</title>
       <style>
         body { font-family: sans-serif; color: #333; line-height: 1.4; padding: 20px; background:#f9fafb; }
         h1, h2 { color: #1e3a8a; }
@@ -616,42 +913,39 @@ export const generateIndividualReportHTML = (result) => {
     </head>
     <body onload="window.print()">
       <div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 25px; background:white; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <h1 style="margin:0; font-size:22px;">AI-Based Automated Answer Sheet Evaluation</h1>
-        <h2 style="margin:5px 0 0 0; font-size:15px; font-weight:normal; color:#555;">Candidate Individual Performance Report</h2>
+        <h1 style="margin:0; font-size:22px;">AI-Based Automated Answer Sheet Evaluation System</h1>
+        <h2 style="margin:5px 0 0 0; font-size:15px; font-weight:normal; color:#555;">Official Student Examination Result</h2>
       </div>
 
       <div style="display:flex; justify-content:space-between; margin-bottom: 25px; font-size:12px; background:white; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
         <div>
-          <strong>Student Identifier:</strong> ${result.studentIdentifier}<br/>
-          <strong>Candidate Name:</strong> ${result.studentName}<br/>
-          <strong>Scan Filename:</strong> ${result.filename}
+          <strong>Enrollment / Student ID:</strong> ${result.studentIdentifier}<br/>
+          <strong>Student Name:</strong> ${result.studentName || "N/A"}<br/>
+          <strong>Result Status:</strong> <span style="font-weight:bold; color:${result.resultStatus === "PASS" ? "#059669" : result.resultStatus === "FAIL" ? "#dc2626" : "#4b5563"}">${result.resultStatus}</span>
         </div>
         <div style="text-align:right;">
-          <strong>Exam:</strong> ${result.examTitle} (${result.examCode})<br/>
-          <strong>Subject:</strong> ${result.subjectCode} - ${result.subjectName}<br/>
+          <strong>Exam Title:</strong> ${result.examTitle} (${result.examCode || "N/A"})<br/>
+          <strong>Subject:</strong> ${result.subjectCode || ""} ${result.subjectName || ""}<br/>
           <strong>Finalized Date:</strong> ${dateStr}
         </div>
       </div>
 
       <div style="background:#1e3a8a; color:white; padding:15px; border-radius:8px; text-align:center; font-size:20px; font-weight:bold; margin-bottom:25px;">
-        FINAL GRADE PERFORMANCE: ${result.obtainedMarks} / ${result.totalMarks} (${result.percentage}%) • GRADE ${result.grade || "F"}
+        FACULTY FINAL SCORE: ${result.obtainedMarks} / ${result.totalMarks} (${result.percentage}%) • ${result.resultStatus}
       </div>
 
-      <h2>Evaluation Strengths & Weaknesses</h2>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:25px; font-size:12px;">
-        <div style="background:#ecfdf5; border-left:4px solid #10b981; padding:12px; border-radius:6px;">
-          <strong style="color:#065f46; display:block; margin-bottom:6px;">Conceptual Strengths</strong>
-          ${result.strengths || "None noted during AI rubrics checks."}
-        </div>
-        <div style="background:#fef2f2; border-left:4px solid #ef4444; padding:12px; border-radius:6px;">
-          <strong style="color:#991b1b; display:block; margin-bottom:6px;">Key Improvements Required</strong>
-          ${result.weaknesses || "Critical issues were not detected."}
-        </div>
-      </div>
-
-      <h2>Question-wise Assessment Details</h2>
+      <h2>Question-wise Final Marks Breakdown</h2>
       ${qRows}
     </body>
     </html>
   `;
+};
+
+export default {
+  getResultsForExam,
+  getExamAnalytics,
+  getIndividualResult,
+  exportExamResultsCSV,
+  generateExamSummaryHTML,
+  generateIndividualReportHTML,
 };

@@ -90,6 +90,30 @@ export const unlockAnswerKey = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Answer key unlocked successfully", result);
 });
 
+export const getEvaluationConfig = asyncHandler(async (req, res) => {
+  const examId = req.params.examId || req.params.id;
+  const { questionId } = req.params;
+  const result = await examService.getEvaluationConfig(
+    examId,
+    questionId,
+    req.user._id,
+    req.user.role
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation configuration retrieved successfully", result);
+});
+
+export const saveEvaluationConfig = asyncHandler(async (req, res) => {
+  const examId = req.params.examId || req.params.id;
+  const { questionId } = req.params;
+  const result = await examService.saveEvaluationConfig(
+    examId,
+    questionId,
+    req.body,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation configuration saved successfully", result);
+});
+
 export default {
   createExam,
   getExamById,
@@ -104,4 +128,6 @@ export default {
   updateQuestionAnswerKey,
   finalizeAnswerKey,
   unlockAnswerKey,
+  getEvaluationConfig,
+  saveEvaluationConfig,
 };

@@ -260,6 +260,35 @@ export const finalizeEvaluation = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Evaluation finalized successfully", result);
 });
 
+export const getReviewDashboard = asyncHandler(async (req, res) => {
+  const result = await evaluationService.getReviewDashboardData(
+    req.params.examId,
+    req.user._id,
+    req.query
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation review dashboard data retrieved successfully", result);
+});
+
+export const getEvaluationDetail = asyncHandler(async (req, res) => {
+  const result = await evaluationService.getEvaluationDetail(
+    req.params.id,
+    req.user._id,
+    req.user.role
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation detail retrieved successfully", result);
+});
+
+export const updateReviewStatus = asyncHandler(async (req, res) => {
+  const { reviewStatus, comment } = req.body;
+  const result = await evaluationService.updateEvaluationReviewStatus(
+    req.params.id,
+    reviewStatus,
+    comment,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Review status updated successfully", result);
+});
+
 export default {
   createEvaluation,
   getEvaluationById,
@@ -275,4 +304,8 @@ export default {
   reEvaluateQuestion,
   reviewQuestion,
   finalizeEvaluation,
+  getReviewDashboard,
+  getEvaluationDetail,
+  updateReviewStatus,
 };
+
