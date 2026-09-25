@@ -9,6 +9,7 @@ import evaluationValidator from "../utils/evaluationValidator.js";
 import gradingService from "./ai/grading.service.js";
 import evaluationPipelineService from "./ai/evaluationPipeline.service.js";
 import logger from "../utils/logger.js";
+import { recordOverrideFeedback } from "./feedback.service.js";
 
 /**
  * Validates whether the faculty member owns the exam associated with the answer sheet.
@@ -192,8 +193,94 @@ export const getReviewDetails = async (answerSheetId, userId) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation details not found for this answer sheet.");
   }
 
+  const sheetObj = ansSheet.toObject ? ansSheet.toObject() : { ...ansSheet };
+
+  // Ensure digital_answers exists and is populated for AnswerSheetViewer frontend UI
+  if (!sheetObj.digital_answers || sheetObj.digital_answers.length === 0) {
+    const examQuestions = sheetObj.exam?.questions || [];
+    if (sheetObj.answers && sheetObj.answers.length > 0) {
+      sheetObj.digital_answers = sheetObj.answers.map((ans, idx) => {
+        const matchedQ = examQuestions.find(q => q._id && ans.questionId && q._id.toString() === ans.questionId.toString());
+        const qNum = ans.question_number || (matchedQ ? matchedQ.questionNumber : idx + 1);
+        const qText = ans.question_text || (matchedQ ? matchedQ.questionText : "");
+        const maxMarks = ans.max_marks || (matchedQ ? (matchedQ.maximumMarks || matchedQ.marks || 10) : 10);
+        let strokes = ans.strokes || [];
+        if ((!strokes || strokes.length === 0) && ans.handwrittenData) {
+          try {
+            const parsed = typeof ans.handwrittenData === "string" ? JSON.parse(ans.handwrittenData) : ans.handwrittenData;
+            if (parsed && Array.isArray(parsed.strokes)) strokes = parsed.strokes;
+          } catch (e) {}
+        }
+        let textVal = (ans.recognizedText || ans.text || ans.answer_text || "").trim();
+        if (textVal.startsWith("Transcribed canvas response") || textVal.startsWith("Digitized canvas answer")) {
+          textVal = "";
+        }
+        return {
+          question_number: String(qNum),
+          question_id: ans.questionId,
+          question_text: qText,
+          max_marks: maxMarks,
+          text: textVal,
+          answer_text: textVal,
+          recognizedText: textVal,
+          handwrittenData: ans.handwrittenData || "",
+          strokes,
+          page_number: ans.page_number || ans.pageNumber || 1,
+          confidence: ans.confidence !== undefined ? ans.confidence : 1.0,
+        };
+      });
+    } else if (sheetObj.extractedText && sheetObj.extractedText.trim().length > 0) {
+      const parts = sheetObj.extractedText.split(/\n\n+/).filter((p) => p.trim().length > 0);
+      sheetObj.digital_answers = parts.map((part, idx) => {
+        const match = part.match(/^Q(\d+):\s*(.*)/s);
+        return {
+          question_number: match ? match[1] : String(idx + 1),
+          text: match ? match[2].trim() : part.trim(),
+          answer_text: match ? match[2].trim() : part.trim(),
+          confidence: 0.95,
+        };
+      });
+    }
+  }
+
+  // Merge evaluation metrics onto digital_answers if available
+  if (sheetObj.digital_answers && evaluation && evaluation.questions) {
+    sheetObj.digital_answers = sheetObj.digital_answers.map(da => {
+      const matchedEvalQ = evaluation.questions.find(eq => 
+        (eq.questionId && da.question_id && eq.questionId.toString() === da.question_id.toString()) ||
+        (eq.questionNumber && String(eq.questionNumber) === String(da.question_number))
+      );
+      if (matchedEvalQ) {
+        return {
+          ...da,
+          text: da.text || matchedEvalQ.recognizedText || matchedEvalQ.studentAnswer || "",
+          answer_text: da.answer_text || matchedEvalQ.recognizedText || matchedEvalQ.studentAnswer || "",
+          recognizedText: da.recognizedText || matchedEvalQ.recognizedText || matchedEvalQ.studentAnswer || "",
+          evaluation: {
+            status: matchedEvalQ.status || matchedEvalQ.evaluationStatus || "completed",
+            aiEvaluation: matchedEvalQ.aiEvaluation || {
+              marksAwarded: matchedEvalQ.aiMarks ?? matchedEvalQ.aiAwardedMarks ?? 0,
+              maxMarks: matchedEvalQ.maximumMarks || da.max_marks || 10,
+              feedback: matchedEvalQ.feedback || "",
+              confidence: matchedEvalQ.confidence ?? 1.0,
+              criteria: matchedEvalQ.criteria || matchedEvalQ.criteriaScores || [],
+              matchedConcepts: matchedEvalQ.matchedConcepts || matchedEvalQ.matchedKeywords || [],
+              missingConcepts: matchedEvalQ.missingConcepts || matchedEvalQ.missingKeywords || [],
+            },
+            facultyEvaluation: matchedEvalQ.facultyEvaluation || {
+              status: matchedEvalQ.wasOverridden ? "overridden" : "pending",
+              finalMarks: matchedEvalQ.facultyAwardedMarks ?? matchedEvalQ.finalAwardedMarks ?? null,
+              comment: matchedEvalQ.facultyComment || matchedEvalQ.overrideReason || null,
+            }
+          }
+        };
+      }
+      return da;
+    });
+  }
+
   return {
-    answerSheet: ansSheet,
+    answerSheet: sheetObj,
     evaluation,
   };
 };
@@ -788,6 +875,10 @@ export const acceptAiQuestion = async (id, questionIdOrNum, userId) => {
     reviewedBy: userId,
   };
 
+  if (!evaluation.auditHistory) {
+    evaluation.auditHistory = [];
+  }
+
   evaluation.auditHistory.push({
     action: "AI_ACCEPTED",
     questionNumber: `Q${qEval.questionNumber}`,
@@ -905,6 +996,26 @@ export const overrideQuestion = async (id, questionIdOrNum, facultyMarks, overri
 
   await evaluation.save();
 
+  // Record structured feedback for Phase 5B learning
+  try {
+    await recordOverrideFeedback({
+      evaluationId: evaluation._id,
+      answerSheetId: ansSheet._id,
+      examId: ansSheet.exam?._id || ansSheet.exam,
+      questionId: qEval.questionId,
+      questionNumber: qEval.questionNumber,
+      studentId: ansSheet.student?._id || ansSheet.student,
+      aiMarks,
+      finalMarks: facultyMarks,
+      reason: trimmedReason,
+      comment: finalComment,
+      aiConfidence: qEval.aiEvaluation?.confidence ?? qEval.confidence ?? 0,
+      userId,
+    });
+  } catch (fbErr) {
+    logger.error(`Failed to record structured feedback: ${fbErr.message}`);
+  }
+
   ansSheet.reviewStatus = "FACULTY_REVIEW_IN_PROGRESS";
   ansSheet.evaluationSummary = summary;
   await ansSheet.save();
@@ -1018,6 +1129,10 @@ export const finalizeStudentEvaluation = async (id, userId) => {
   evaluation.totalMarks = summary.totalMaximumMarks;
   evaluation.percentage = summary.percentage;
   evaluation.grade = gradingService.calculateGrade(summary.percentage);
+
+  if (!evaluation.auditHistory) {
+    evaluation.auditHistory = [];
+  }
 
   evaluation.auditHistory.push({
     action: "EVALUATION_FINALIZED",

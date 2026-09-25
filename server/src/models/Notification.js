@@ -28,6 +28,10 @@ const notificationSchema = new mongoose.Schema(
           "AI Evaluation Completed",
           "Faculty Review Pending",
           "Results Published",
+          "RESULT_PUBLISHED",
+          "EVALUATION_FINALIZED",
+          "EVALUATION_UPDATED",
+          "REPORT_GENERATED",
           "System Notification",
           "Exam Published",
           "General Announcement",
@@ -37,10 +41,20 @@ const notificationSchema = new mongoose.Schema(
       default: "System Notification",
       index: true,
     },
+    relatedEntityType: {
+      type: String,
+      trim: true,
+    },
+    relatedEntityId: {
+      type: mongoose.Schema.Types.ObjectId,
+    },
     read: {
       type: Boolean,
       default: false,
       index: true,
+    },
+    readAt: {
+      type: Date,
     },
     isDeleted: {
       type: Boolean,

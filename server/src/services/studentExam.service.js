@@ -564,7 +564,7 @@ export const startStudentExam = async (studentId, examId) => {
 
 // Autosave answers to the database
 export const autosaveStudentExamAnswer = async (studentId, examId, payload) => {
-  const { questionId, handwrittenData } = payload;
+  const { questionId, handwrittenData, recognizedText } = payload;
   if (!questionId) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "questionId is required");
   }
@@ -622,12 +622,16 @@ export const autosaveStudentExamAnswer = async (studentId, examId, payload) => {
   if (existingAnswerIndex !== -1) {
     // If it exists, update the specific fields
     submission.answers[existingAnswerIndex].handwrittenData = typeof handwrittenData === "string" ? handwrittenData : JSON.stringify(handwrittenData);
+    if (recognizedText) {
+      submission.answers[existingAnswerIndex].recognizedText = recognizedText;
+    }
     submission.answers[existingAnswerIndex].submissionTime = new Date();
   } else {
     // If it does not exist, push a new item to the array
     submission.answers.push({
       questionId: new mongoose.Types.ObjectId(questionId),
       handwrittenData: typeof handwrittenData === "string" ? handwrittenData : JSON.stringify(handwrittenData),
+      recognizedText: recognizedText || "",
       submissionTime: new Date(),
     });
   }

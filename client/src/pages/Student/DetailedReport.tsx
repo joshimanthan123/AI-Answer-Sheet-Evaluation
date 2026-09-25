@@ -84,7 +84,16 @@ export const StudentDetailedReport: React.FC = () => {
           >
             <span className="material-symbols-outlined text-sm">splitscreen</span> View Digital Paper
           </button>
-          <button className="px-4 py-2 bg-white dark:bg-surface-container border border-outline-variant hover:bg-surface-container-high text-primary hover:text-primary-container rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all active:scale-95">
+          <button 
+            onClick={() => {
+              if (id) {
+                const token = localStorage.getItem('token');
+                const baseUrl = window.location.origin.includes('localhost') ? 'http://127.0.0.1:5000/api' : '/api';
+                window.open(`${baseUrl}/evaluations/${id}/report?token=${token || ''}`, '_blank');
+              }
+            }}
+            className="px-4 py-2 bg-white dark:bg-surface-container border border-outline-variant hover:bg-surface-container-high text-primary hover:text-primary-container rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+          >
             <span className="material-symbols-outlined text-sm">download</span> Download PDF
           </button>
         </div>

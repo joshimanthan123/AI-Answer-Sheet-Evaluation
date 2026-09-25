@@ -14,9 +14,13 @@ export const AdminLayout: React.FC = () => {
 
   const menuItems = [
     { name: 'Dashboard', path: '/admin', icon: 'donut_large' },
+    { name: 'Analytics', path: '/admin/analytics', icon: 'monitoring' },
+    { name: 'Advanced Analytics', path: '/admin/advanced-analytics', icon: 'insights' },
+    { name: 'System Intelligence', path: '/admin/system-intelligence', icon: 'monitor_heart' },
     { name: 'User Management', path: '/admin/users', icon: 'manage_accounts' },
     { name: 'Registries', path: '/admin/registries', icon: 'dns' },
     { name: 'AI Models Config', path: '/admin/ai-config', icon: 'settings_suggest' },
+    { name: 'AI Improvement', path: '/admin/ai-improvement', icon: 'auto_fix_high' },
     { name: 'Security Logs', path: '/admin/logs', icon: 'security' },
     { name: 'Settings', path: '/admin/settings', icon: 'settings' }
   ];

@@ -60,6 +60,22 @@ export const deleteNotification = asyncHandler(async (req, res) => {
   return sendSuccess(res, STATUS_CODES.OK, "Notification deleted successfully", result);
 });
 
+export const getUnreadCount = asyncHandler(async (req, res) => {
+  const result = await notificationService.getUnreadCount(req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Unread notifications count retrieved successfully", result);
+});
+
+export const markAsRead = asyncHandler(async (req, res) => {
+  const notification = await notificationService.getNotificationById(req.params.id);
+  
+  if (req.user.role !== "admin" && notification.user._id.toString() !== req.user._id.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You can only update your own notifications.");
+  }
+
+  const result = await notificationService.markAsRead(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Notification marked as read", result);
+});
+
 export const markAllAsRead = asyncHandler(async (req, res) => {
   const result = await notificationService.markAllAsRead(req.user._id, req.user._id);
   return sendSuccess(res, STATUS_CODES.OK, "All notifications marked as read", result);
@@ -69,6 +85,8 @@ export default {
   createNotification,
   getNotificationById,
   getAllNotifications,
+  getUnreadCount,
+  markAsRead,
   updateNotification,
   deleteNotification,
   markAllAsRead,

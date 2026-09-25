@@ -97,10 +97,33 @@ export const deleteNotification = async (id, userId) => {
   return notification;
 };
 
+export const getUnreadCount = async (userId) => {
+  const count = await Notification.countDocuments({
+    user: userId,
+    read: false,
+    isDeleted: false,
+  });
+  return { unreadCount: count };
+};
+
+export const markAsRead = async (id, userId) => {
+  const notification = await Notification.findOne({ _id: id, isDeleted: false });
+  if (!notification) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Notification not found");
+  }
+
+  notification.read = true;
+  notification.readAt = new Date();
+  notification.updatedBy = userId;
+
+  await notification.save();
+  return notification;
+};
+
 export const markAllAsRead = async (user, userId) => {
   await Notification.updateMany(
     { user, read: false, isDeleted: false },
-    { $set: { read: true, updatedBy: userId } }
+    { $set: { read: true, readAt: new Date(), updatedBy: userId } }
   );
   return { success: true };
 };
@@ -109,6 +132,8 @@ export default {
   createNotification,
   getNotificationById,
   getAllNotifications,
+  getUnreadCount,
+  markAsRead,
   updateNotification,
   deleteNotification,
   markAllAsRead,

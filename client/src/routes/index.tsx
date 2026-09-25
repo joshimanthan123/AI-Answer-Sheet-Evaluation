@@ -52,6 +52,9 @@ import FacultyHistoricalReferences from '../pages/Faculty/HistoricalReferencesPa
 import ResultsDashboard from '../pages/Faculty/ResultsDashboard';
 import IndividualResult from '../pages/Faculty/IndividualResult';
 import AIEvaluationReviewDashboard from '../pages/Faculty/AIEvaluationReviewDashboard';
+import AnalyticsDashboard from '../pages/Faculty/AnalyticsDashboard';
+import AdvancedAnalyticsDashboard from '../pages/Faculty/AdvancedAnalyticsDashboard';
+import AIImprovementDashboard from '../pages/Faculty/AIImprovementDashboard';
 
 // Admin Pages
 
@@ -61,6 +64,7 @@ import AdminRegistries from '../pages/Admin/Registries';
 import AdminAIConfig from '../pages/Admin/AIConfig';
 import AdminLogs from '../pages/Admin/Logs';
 import AdminSettings from '../pages/Admin/Settings';
+import SystemIntelligence from '../pages/Admin/SystemIntelligence';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -122,6 +126,10 @@ export const AppRoutes: React.FC = () => {
           <Route path="pending/:id" element={<FacultyManualEvaluation />} />
           <Route path="students" element={<FacultyStudents />} />
           <Route path="reports" element={<FacultyReports />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
+          <Route path="advanced-analytics" element={<AdvancedAnalyticsDashboard />} />
+          <Route path="ai-improvement" element={<AIImprovementDashboard />} />
+          <Route path="feedback" element={<AIImprovementDashboard />} />
           <Route path="settings" element={<FacultySettings />} />
           <Route path="subjects" element={<FacultySubjects />} />
         </Route>
@@ -134,6 +142,11 @@ export const AppRoutes: React.FC = () => {
           <Route path="users" element={<AdminUsers />} />
           <Route path="registries" element={<AdminRegistries />} />
           <Route path="ai-config" element={<AdminAIConfig />} />
+          <Route path="ai-improvement" element={<AIImprovementDashboard />} />
+          <Route path="feedback" element={<AIImprovementDashboard />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
+          <Route path="advanced-analytics" element={<AdvancedAnalyticsDashboard />} />
+          <Route path="system-intelligence" element={<SystemIntelligence />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>

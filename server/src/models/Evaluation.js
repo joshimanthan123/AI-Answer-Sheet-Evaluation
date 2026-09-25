@@ -87,6 +87,14 @@ const questionEvaluationSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  matchedConcepts: {
+    type: [String],
+    default: [],
+  },
+  missingConcepts: {
+    type: [String],
+    default: [],
+  },
   criteriaScores: [
     {
       criterion: { type: String, trim: true },
@@ -253,7 +261,9 @@ const evaluationSchema = new mongoose.Schema(
           "LLM_PROCESSING",
           "GRADING",
           "AI_COMPLETED",
+          "AI_EVALUATED",
           "FACULTY_REVIEW",
+          "FINALIZED",
           "PUBLISHED",
           "FAILED",
           // Lowercase lifecycle status mappings
@@ -331,6 +341,10 @@ const evaluationSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    facultyRemarks: {
+      type: String,
+      trim: true,
+    },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -341,10 +355,20 @@ const evaluationSchema = new mongoose.Schema(
     reviewedAt: {
       type: Date,
     },
+    evaluatedAt: {
+      type: Date,
+    },
     finalizedAt: {
       type: Date,
     },
     finalizedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    publishedAt: {
+      type: Date,
+    },
+    publishedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },

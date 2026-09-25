@@ -62,8 +62,22 @@ router
   .post(authorize(ROLES.FACULTY, ROLES.ADMIN), facultyController.finalizeStudentEvaluation);
 
 router
+  .route("/exam/:examId")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.getEvaluationsByExam);
+
+router
+  .route("/student/:studentId")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN, ROLES.STUDENT), evaluationController.getEvaluationsByStudent);
+
+router
   .route("/:id/finalize")
-  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), facultyController.finalizeStudentEvaluation);
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.finalizeEvaluation)
+  .put(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.finalizeEvaluation);
+
+router
+  .route("/:id/publish")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.publishEvaluation)
+  .put(authorize(ROLES.FACULTY, ROLES.ADMIN), evaluationController.publishEvaluation);
 
 router
   .route("/answersheet/:answerSheetId/summary")
@@ -93,7 +107,7 @@ router
 
 router
   .route("/:id/report")
-  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), resultsController.downloadIndividualResultReport);
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN, ROLES.STUDENT), resultsController.downloadIndividualResultReport);
 
 export default router;
 

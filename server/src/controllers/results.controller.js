@@ -113,8 +113,8 @@ export const downloadIndividualResultReport = asyncHandler(async (req, res) => {
 
   const resultDetail = await resultsService.getIndividualResult(evaluationId, userId, role);
 
-  // Requirement: Only finalized results can generate report
-  if (resultDetail.status !== "finalized") {
+  // Requirement: Only finalized or published results can generate report
+  if (!["FINALIZED", "finalized", "PUBLISHED", "published"].includes(resultDetail.status)) {
     throw new ApiError(
       STATUS_CODES.CONFLICT,
       "Operation failed because the candidate evaluation is not finalized."

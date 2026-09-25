@@ -3,6 +3,7 @@ import AnswerSheet from "../models/AnswerSheet.js";
 import Evaluation from "../models/Evaluation.js";
 import Exam from "../models/Exam.js";
 import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 import ApiError from "../utils/ApiError.js";
 import { STATUS_CODES } from "../constants/statusCodes.js";
 import { validateAccess } from "./facultyReview.service.js";
@@ -238,6 +239,26 @@ export const publishResult = async (answerSheetId, facultyId, comment = "") => {
     changedBy: facultyId,
   });
   await evaluation.save();
+
+  // Automatically create a notification for the student
+  if (ansSheet.student) {
+    try {
+      const examDoc = await Exam.findById(ansSheet.exam);
+      const examTitle = examDoc?.title || "Exam";
+      await Notification.create({
+        user: ansSheet.student,
+        title: "Result Published",
+        message: `Your result for "${examTitle}" has been published.`,
+        type: "Results Published",
+        relatedEntityType: "Evaluation",
+        relatedEntityId: evaluation._id,
+        createdBy: facultyId,
+        updatedBy: facultyId,
+      });
+    } catch (notifErr) {
+      logger.error(`Failed to create notification on result publication: ${notifErr.message}`);
+    }
+  }
 
   logger.info(`Faculty ${facultyId} published results for AnswerSheet ${answerSheetId}`);
 

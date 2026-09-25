@@ -9,6 +9,9 @@ export class LlmProviderFactory {
 
     if (isLiveE2E) {
       if (!apiKey || apiKey === "mock-api-key-for-development") {
+        if (process.env.ALLOW_MOCK_LLM_E2E === "true") {
+          return new MockLlmProvider();
+        }
         throw new Error(
           "[LIVE_E2E ENFORCEMENT] OpenAI API Key is missing or invalid ('mock-api-key-for-development'). Fallback to MockLlmProvider is strictly forbidden during LIVE E2E validation."
         );

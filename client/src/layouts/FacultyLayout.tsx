@@ -35,14 +35,17 @@ export const FacultyLayout: React.FC = () => {
         { name: 'AI Evaluation Review', path: '/faculty/evaluations', icon: 'fact_check' },
         { name: 'Evaluation Queue', path: '/faculty/evaluation-queue', icon: 'playlist_play' },
         { name: 'Review Evaluations', path: '/faculty/review-evaluations', icon: 'rate_review' },
-        { name: 'Historical References', path: '/faculty/historical-references', icon: 'bookmarks' }
+        { name: 'Historical References', path: '/faculty/historical-references', icon: 'bookmarks' },
+        { name: 'AI Improvement', path: '/faculty/ai-improvement', icon: 'auto_fix_high' }
       ]
     },
 
     {
       category: 'RESULTS & REPORTS',
       items: [
-        { name: 'Analytics & Reports', path: '/faculty/reports', icon: 'analytics' }
+        { name: 'Analytics', path: '/faculty/analytics', icon: 'monitoring' },
+        { name: 'Advanced Analytics', path: '/faculty/advanced-analytics', icon: 'insights' },
+        { name: 'Academic Reports', path: '/faculty/reports', icon: 'analytics' }
       ]
     },
     {

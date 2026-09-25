@@ -1,7 +1,5 @@
 import express from "express";
 import feedbackController from "../controllers/feedback.controller.js";
-import { feedbackValidator } from "../validators/feedback.validator.js";
-import validate from "../middleware/validation.middleware.js";
 import authMiddleware from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/role.middleware.js";
 import { ROLES } from "../constants/roles.js";
@@ -12,23 +10,22 @@ router.use(authMiddleware);
 
 router
   .route("/")
-  .post(
-    authorize(ROLES.STUDENT, ROLES.ADMIN),
-    feedbackValidator,
-    validate,
-    feedbackController.createFeedback
-  )
-  .get(feedbackController.getAllFeedback);
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), feedbackController.getAllFeedback);
 
 router
-  .route("/:id")
-  .get(feedbackController.getFeedbackById)
-  .put(
-    authorize(ROLES.STUDENT, ROLES.ADMIN),
-    feedbackValidator,
-    validate,
-    feedbackController.updateFeedback
-  )
-  .delete(authorize(ROLES.ADMIN), feedbackController.deleteFeedback);
+  .route("/override")
+  .post(authorize(ROLES.FACULTY, ROLES.ADMIN), feedbackController.submitOverrideFeedback);
+
+router
+  .route("/export/csv")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), feedbackController.exportFeedbackCSV);
+
+router
+  .route("/export/excel")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), feedbackController.exportFeedbackExcel);
+
+router
+  .route("/export/pdf")
+  .get(authorize(ROLES.FACULTY, ROLES.ADMIN), feedbackController.exportFeedbackPDF);
 
 export default router;

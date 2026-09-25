@@ -1,5 +1,9 @@
 import evaluationService from "../services/evaluation.service.js";
 import evaluationPipelineService from "../services/ai/evaluationPipeline.service.js";
+import * as resultsService from "../services/results.service.js";
+import * as studentResultService from "../services/studentResult.service.js";
+import * as resultPublicationService from "../services/resultPublication.service.js";
+import facultyReviewService from "../services/facultyReview.service.js";
 import { sendSuccess } from "../helpers/response.js";
 import { STATUS_CODES } from "../constants/statusCodes.js";
 import asyncHandler from "../utils/asyncHandler.js";
@@ -256,8 +260,53 @@ export const reviewQuestion = asyncHandler(async (req, res) => {
 });
 
 export const finalizeEvaluation = asyncHandler(async (req, res) => {
-  const result = await evaluationService.finalizeEvaluation(req.params.id, req.user._id);
-  return sendSuccess(res, STATUS_CODES.OK, "Evaluation finalized successfully", result);
+  const targetId = req.params.id;
+  const result = await facultyReviewService.finalizeStudentEvaluation(targetId, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Student evaluation finalized and sealed successfully", result);
+});
+
+export const getEvaluationsByExam = asyncHandler(async (req, res) => {
+  const data = await resultsService.getResultsForExam(
+    req.params.examId,
+    req.query,
+    req.user._id,
+    req.user.role
+  );
+  return sendSuccess(
+    res,
+    STATUS_CODES.OK,
+    "Exam evaluations retrieved successfully",
+    data.results,
+    data.pagination
+  );
+});
+
+export const getEvaluationsByStudent = asyncHandler(async (req, res) => {
+  const studentId = req.params.studentId;
+  if (req.user.role === "student" && req.user._id.toString() !== studentId.toString()) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Access denied. You can only view your own evaluations.");
+  }
+  const result = await studentResultService.getStudentResults(studentId, req.query);
+  return sendSuccess(res, STATUS_CODES.OK, "Student evaluations retrieved successfully", result.data, {
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  });
+});
+
+export const publishEvaluation = asyncHandler(async (req, res) => {
+  const targetId = req.params.id;
+  const { comment } = req.body || {};
+
+  let answerSheetId = targetId;
+  const ev = await Evaluation.findById(targetId);
+  if (ev) {
+    answerSheetId = ev.answerSheet.toString();
+  }
+
+  const result = await resultPublicationService.publishResult(answerSheetId, req.user._id, comment);
+  return sendSuccess(res, STATUS_CODES.OK, "Result published successfully", result.data);
 });
 
 export const getReviewDashboard = asyncHandler(async (req, res) => {
@@ -304,6 +353,9 @@ export default {
   reEvaluateQuestion,
   reviewQuestion,
   finalizeEvaluation,
+  getEvaluationsByExam,
+  getEvaluationsByStudent,
+  publishEvaluation,
   getReviewDashboard,
   getEvaluationDetail,
   updateReviewStatus,

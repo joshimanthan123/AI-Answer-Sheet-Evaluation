@@ -26,6 +26,9 @@ import aiRoutes from "./src/routes/ai.routes.js";
 import answerKeyRoutes from "./src/routes/answerKey.routes.js";
 import answerSheetUploadRoutes from "./src/routes/answerSheetUpload.routes.js";
 import historicalEvaluationRoutes from "./src/routes/historicalEvaluation.routes.js";
+import analyticsRoutes from "./src/routes/analytics.routes.js";
+import improvementRoutes from "./src/routes/improvement.routes.js";
+import advancedAnalyticsRoutes from "./src/routes/advancedAnalytics.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/config/swagger.js";
 
@@ -224,6 +227,9 @@ app.use(["/api/ai", "/api/v1/ai"], aiRoutes);
 app.use(["/api/faculty/answer-key", "/api/v1/faculty/answer-key"], answerKeyRoutes);
 app.use(["/api/student/answer-sheet", "/api/v1/student/answer-sheet"], answerSheetUploadRoutes);
 app.use(["/api/historical-evaluations", "/api/v1/historical-evaluations"], historicalEvaluationRoutes);
+app.use(["/api/analytics", "/api/v1/analytics"], analyticsRoutes);
+app.use(["/api/improvements", "/api/v1/improvements"], improvementRoutes);
+app.use(["/api/advanced-analytics", "/api/v1/advanced-analytics"], advancedAnalyticsRoutes);
 
 // Swagger Documentation Endpoints
 app.get(["/api-docs.json", "/api/v1/api-docs.json"], (req, res) => {

@@ -515,7 +515,7 @@ export const getIndividualResult = async (evaluationId, userId, userRole) => {
   }
 
   const { hasPassingRule, passingMarks } = resolvePassingRule(exam);
-  const isFinalized = e.evaluationStatus === "finalized";
+  const isFinalized = ["FINALIZED", "finalized", "PUBLISHED", "published"].includes(e.evaluationStatus);
 
   // Compute question-wise breakdown and totals
   let aiTotalMarks = 0;
@@ -877,65 +877,113 @@ export const generateExamSummaryHTML = (exam, analytics, results) => {
  * Returns HTML representation of individual report.
  */
 export const generateIndividualReportHTML = (result) => {
-  const dateStr = new Date(result.finalizedAt || Date.now()).toLocaleDateString();
+  const evalDateStr = result.evaluatedAt ? new Date(result.evaluatedAt).toLocaleDateString() : "N/A";
+  const finalDateStr = result.finalizedAt ? new Date(result.finalizedAt).toLocaleDateString() : new Date().toLocaleDateString();
+  const pubDateStr = result.publishedAt ? new Date(result.publishedAt).toLocaleDateString() : (result.publicationStatus === "RESULT_PUBLISHED" ? new Date().toLocaleDateString() : "Not Published");
 
-  const qRows = result.questions
+  const qTableRows = result.questions
     .map((q) => {
       const isOverride = q.wasOverridden
-        ? `<span style="color:#d97706; font-size:10px; font-weight:bold; margin-left:8px;">[FACULTY OVERRIDDEN: ${q.differenceMarks > 0 ? "+" : ""}${q.differenceMarks}]</span>`
+        ? `<span style="color:#d97706; font-size:10px; font-weight:bold; margin-left:6px;">[FACULTY OVERRIDDEN: ${q.differenceMarks > 0 ? "+" : ""}${q.differenceMarks}]</span>`
         : "";
 
       return `
-      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size:12px; background:#fff;">
-        <div style="display:flex; justify-content:space-between; font-weight:bold; border-bottom:1px solid #eee; padding-bottom:6px; margin-bottom:6px; background:#f9fafb; padding:4px 8px; margin:-12px -12px 10px -12px; border-radius: 8px 8px 0 0;">
-          <span>Question Q${q.questionNumber} ${isOverride}</span>
-          <span>Final Marks: ${q.finalAwardedMarks} / ${q.maxMarks} (AI: ${q.aiAwardedMarks})</span>
-        </div>
-        <div style="margin-bottom:8px;"><strong>Question Text:</strong> ${q.questionText}</div>
-        <div style="margin-bottom:8px; background:#f0f9ff; padding:8px; border-radius:6px; font-family:monospace; white-space:pre-wrap;"><strong>Student Transcription:</strong> ${q.studentAnswer || q.recognizedText || "[No Written Answer Extracted]"}</div>
-        <div style="margin-bottom:8px;"><strong>AI Semantic Rubric Feedback:</strong> ${q.feedback || "None"}</div>
-        ${q.matchedKeywords.length ? `<div style="margin-bottom:4px; font-size:11px;">🌱 <strong>Matched Keywords:</strong> ${q.matchedKeywords.join(", ")}</div>` : ""}
-        ${q.missingKeywords.length ? `<div style="margin-bottom:4px; font-size:11px; color:#b91c1c;">⚠️ <strong>Missing Key Concepts:</strong> ${q.missingKeywords.join(", ")}</div>` : ""}
-        ${q.wasOverridden && (q.facultyComment || q.overrideReason) ? `<div style="margin-top:8px; padding:6px; border-left:3px solid #d97706; background:#fffbeb; font-size:11.5px;">✍️ <strong>Faculty Override Justification:</strong> "${q.facultyComment || q.overrideReason}"</div>` : ""}
-      </div>
+      <tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding:10px; text-align:center; font-weight:bold;">Q${q.questionNumber} ${isOverride}</td>
+        <td style="padding:10px; text-align:right; font-weight:bold; color:#4b5563;">${q.aiAwardedMarks}</td>
+        <td style="padding:10px; text-align:right; font-weight:bold; color:#1e3a8a;">${q.finalAwardedMarks}</td>
+        <td style="padding:10px; text-align:right; font-weight:bold;">${q.maxMarks}</td>
+        <td style="padding:10px; font-size:11px;">
+          <div><strong>Student Transcription:</strong> <span style="font-family:monospace; color:#374151;">${q.studentAnswer || q.recognizedText || "[No Text Extracted]"}</span></div>
+          <div style="margin-top:4px;"><strong>AI Feedback:</strong> ${q.feedback || "None"}</div>
+          ${q.matchedKeywords.length ? `<div style="margin-top:3px; color:#065f46;">🌱 <strong>Matched Concepts:</strong> ${q.matchedKeywords.join(", ")}</div>` : ""}
+          ${q.missingKeywords.length ? `<div style="margin-top:3px; color:#991b1b;">⚠️ <strong>Missing Concepts:</strong> ${q.missingKeywords.join(", ")}</div>` : ""}
+          ${q.wasOverridden && (q.facultyComment || q.overrideReason) ? `<div style="margin-top:4px; padding:4px 6px; background:#fffbeb; border-left:3px solid #d97706;">✍️ <strong>Faculty Remarks:</strong> "${q.facultyComment || q.overrideReason}"</div>` : ""}
+        </td>
+      </tr>
     `;
     })
     .join("");
 
   return `
+    <!DOCTYPE html>
     <html>
     <head>
-      <title>Official Academic Result - ${result.studentIdentifier}</title>
+      <title>CHARUSAT - Evaluation Report (${result.studentIdentifier})</title>
       <style>
-        body { font-family: sans-serif; color: #333; line-height: 1.4; padding: 20px; background:#f9fafb; }
-        h1, h2 { color: #1e3a8a; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1f2937; line-height: 1.5; padding: 25px; background:#ffffff; }
+        .header { border-bottom: 3px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; }
+        .institution-title { font-size: 26px; font-weight: 900; color: #1e3a8a; letter-spacing: 0.5px; }
+        .sub-title { font-size: 14px; font-weight: 600; color: #4b5563; text-transform: uppercase; }
+        .section-title { font-size: 14px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+        .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 12px; }
+        .score-banner { background: #1e3a8a; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; margin-bottom: 20px; }
+        .score-val { font-size: 24px; font-weight: 900; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        th { background: #1e3a8a; color: white; padding: 8px; text-align: left; }
+        @media print {
+          body { padding: 0; background: white; }
+          .no-print { display: none; }
+        }
       </style>
     </head>
     <body onload="window.print()">
-      <div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 25px; background:white; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <h1 style="margin:0; font-size:22px;">AI-Based Automated Answer Sheet Evaluation System</h1>
-        <h2 style="margin:5px 0 0 0; font-size:15px; font-weight:normal; color:#555;">Official Student Examination Result</h2>
-      </div>
-
-      <div style="display:flex; justify-content:space-between; margin-bottom: 25px; font-size:12px; background:white; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+      <div class="header">
         <div>
-          <strong>Enrollment / Student ID:</strong> ${result.studentIdentifier}<br/>
-          <strong>Student Name:</strong> ${result.studentName || "N/A"}<br/>
-          <strong>Result Status:</strong> <span style="font-weight:bold; color:${result.resultStatus === "PASS" ? "#059669" : result.resultStatus === "FAIL" ? "#dc2626" : "#4b5563"}">${result.resultStatus}</span>
+          <div class="institution-title">CHARUSAT</div>
+          <div class="sub-title">AI-Based Automated Answer Sheet Evaluation System</div>
         </div>
         <div style="text-align:right;">
-          <strong>Exam Title:</strong> ${result.examTitle} (${result.examCode || "N/A"})<br/>
-          <strong>Subject:</strong> ${result.subjectCode || ""} ${result.subjectName || ""}<br/>
-          <strong>Finalized Date:</strong> ${dateStr}
+          <span style="font-size:12px; font-weight:bold; background:#e0e7ff; color:#3730a3; padding:4px 10px; border-radius:12px;">EVALUATION REPORT</span>
         </div>
       </div>
 
-      <div style="background:#1e3a8a; color:white; padding:15px; border-radius:8px; text-align:center; font-size:20px; font-weight:bold; margin-bottom:25px;">
-        FACULTY FINAL SCORE: ${result.obtainedMarks} / ${result.totalMarks} (${result.percentage}%) • ${result.resultStatus}
+      <div class="grid-info">
+        <div>
+          <div style="font-size:14px; font-weight:bold; color:#111827; margin-bottom:6px;">Student Information</div>
+          <strong>Student / Roll No:</strong> ${result.studentIdentifier}<br/>
+          <strong>Student Name:</strong> ${result.studentName || "N/A"}<br/>
+          <strong>Evaluation Status:</strong> <span style="font-weight:bold; color:#1e3a8a;">${(result.status || "FINALIZED").toUpperCase()}</span><br/>
+          <strong>Publication Status:</strong> ${result.publicationStatus || "NOT_READY"}
+        </div>
+        <div>
+          <div style="font-size:14px; font-weight:bold; color:#111827; margin-bottom:6px;">Exam Information</div>
+          <strong>Exam Title:</strong> ${result.examTitle} (${result.examCode || "N/A"})<br/>
+          <strong>Subject:</strong> ${result.subjectCode || ""} ${result.subjectName || ""}<br/>
+          <strong>Evaluation Date:</strong> ${evalDateStr}<br/>
+          <strong>Finalization Date:</strong> ${finalDateStr}<br/>
+          <strong>Publication Date:</strong> ${pubDateStr}
+        </div>
       </div>
 
-      <h2>Question-wise Final Marks Breakdown</h2>
-      ${qRows}
+      <div class="score-banner">
+        <div style="font-size:12px; text-transform:uppercase; letter-spacing:1px; opacity:0.9;">Official Final Evaluation Marks</div>
+        <div class="score-val">${result.obtainedMarks} / ${result.totalMarks} Marks (${result.percentage}%)</div>
+        <div style="font-size:12px; margin-top:4px;">Result Status: <strong>${result.resultStatus || (result.percentage >= 40 ? "PASS" : "FAIL")}</strong></div>
+      </div>
+
+      <div class="section-title">Question-wise Evaluation & Audit Details</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:10%; text-align:center;">Question</th>
+            <th style="width:10%; text-align:right;">AI Marks</th>
+            <th style="width:12%; text-align:right;">Faculty Final Marks</th>
+            <th style="width:10%; text-align:right;">Max Marks</th>
+            <th style="width:58%;">Evaluation Feedback & Transcription</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${qTableRows}
+        </tbody>
+      </table>
+
+      ${result.facultyRemarks ? `
+        <div class="section-title">Overall Faculty Remarks</div>
+        <div style="background:#fffbeb; border:1px solid #fef3c7; border-left:4px solid #d97706; padding:12px; border-radius:6px; font-size:12px; font-style:italic;">
+          "${result.facultyRemarks}"
+        </div>
+      ` : ""}
     </body>
     </html>
   `;

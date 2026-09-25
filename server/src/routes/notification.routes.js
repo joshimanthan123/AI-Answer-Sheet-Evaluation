@@ -11,7 +11,11 @@ router
   .post(notificationController.createNotification)
   .get(notificationController.getAllNotifications);
 
+router.route("/unread-count").get(notificationController.getUnreadCount);
+
 router.route("/mark-all-read").patch(notificationController.markAllAsRead);
+
+router.route("/:id/read").patch(notificationController.markAsRead).put(notificationController.markAsRead);
 
 router
   .route("/:id")
