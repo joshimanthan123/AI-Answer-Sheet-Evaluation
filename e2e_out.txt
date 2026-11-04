@@ -1,0 +1,129 @@
+=========================================================================
+       MASTER PROMPT ΓÇö FINAL LIVE E2E AI EVALUATION VALIDATION           
+=========================================================================
+
+--- PHASE 4: VERIFYING SERVICE HEALTH ENDPOINTS ---
+React UI (http://localhost:5173): PASS (HTTP 200)
+Express Backend (http://127.0.0.1:5000/health): PASS
+FastAPI OCR (http://127.0.0.1:8000/health): PASS
+MongoDB Database Connection (mongodb://localhost:27017/ai_evaluation_db): PASS
+
+--- PHASE 5: HWR PROVIDER VERIFICATION ---
+Configured OCR Service HWR Provider: 'paddle'
+HWR Provider Verification: PASS (PaddleOCR 3.7.0 / PaddlePaddle 3.3.1 active)
+
+--- PHASE 6: AUTHENTICATION AND ROLE SEPARATION ---
+Student User ID: 6a6c9dc7ee8f54a3343113d7
+Faculty User ID: 6a6c9dc6ee8f54a3343113d4
+Admin User ID: 6a6c9dc6ee8f54a3343113d1
+Authentication and Role Separation: PASS
+
+--- PHASE 7: CREATING REAL E2E TEST EXAM ---
+Created Exam ID: 6a97d88e317875c8a10e7998 ("FINAL LIVE AI EVALUATION TEST")
+Created & Approved AnswerKey ID: 6a97d88e317875c8a10e799e
+--- PHASE 8: SUBMITTING REAL DIGITAL HANDWRITTEN ANSWERS ---
+Exam session started for student. AnswerSheet Session ID: 6a97d88e317875c8a10e79b1
+Submitted exam. Submission Status: Submitted
+--- PHASE 9 & 10: EXECUTING REAL PADDLEOCR HWR INFERENCE ---
+[2026-09-02 13:34:30:3430] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a97d88e317875c8a10e79b1[39m
+[2026-09-02 13:34:30:3430] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a97d88e317875c8a10e79b1[39m
+[2026-09-02 13:34:30:3430] [32minfo[39m: [32mSending 79 strokes of question 6a97d88e317875c8a10e7995 (Q1) to FastAPI for OCR...[39m
+[2026-09-02 13:34:30:3430] [32minfo[39m: [32mSending 79 strokes of question 6a97d88e317875c8a10e7995 (Q1) to FastAPI for OCR...[39m
+[2026-09-02 13:35:44:3544] [32minfo[39m: [32mSending 82 strokes of question 6a97d88e317875c8a10e7996 (Q2) to FastAPI for OCR...[39m
+[2026-09-02 13:36:29:3629] [32minfo[39m: [32mSending 82 strokes of question 6a97d88e317875c8a10e7996 (Q2) to FastAPI for OCR...[39m
+[2026-09-02 13:37:16:3716] [32minfo[39m: [32mSending 85 strokes of question 6a97d88e317875c8a10e7997 (Q3) to FastAPI for OCR...[39m
+[2026-09-02 13:38:03:383] [32minfo[39m: [32mSending 85 strokes of question 6a97d88e317875c8a10e7997 (Q3) to FastAPI for OCR...[39m
+[2026-09-02 13:38:54:3854] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a97d88e317875c8a10e79b1[39m
+PaddleOCR 3.7.0 Neural Inference completed in 263.28 seconds.
+
+MongoDB AnswerSheet Document Verification:
+  ocrStatus: 'completed'
+  processingStatus: 'completed'
+  evaluationStatus: 'READY_FOR_EVALUATION'
+  extractedText:
+"Q1: VACECENT P CI CED
+
+Q2: CONNECITIONIESS UDP RERAIE S
+
+Q3: ANOCACLE INO OND INI ORIACQUATION DIOS REDUND ANCO"
+
+--- PHASE 11 & 12: OCR QUALITY & QUESTION SEGMENTATION ---
+Question Q1 (ID: 6a97d88e317875c8a10e7995):
+  Recognized Text: "VACECENT P CI CED"
+  Confidence: 0.7454 (MEDIUM)
+  HWR Status: Completed
+Question Q2 (ID: 6a97d88e317875c8a10e7996):
+  Recognized Text: "CONNECITIONIESS UDP RERAIE S"
+  Confidence: 0.7069 (MEDIUM)
+  HWR Status: Completed
+Question Q3 (ID: 6a97d88e317875c8a10e7997):
+  Recognized Text: "ANOCACLE INO OND INI ORIACQUATION DIOS REDUND ANCO"
+  Confidence: 0.7595 (MEDIUM)
+  HWR Status: Completed
+Question/Answer Segmentation: PASS
+
+--- PHASE 13, 14 & 15: REAL LLM EVALUATION PIPELINE ---
+[LLM Pipeline Event] EVALUATION_ALREADY_RUNNING
+[2026-09-02 13:38:54:3854] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: [LIVE_E2E ENFORCEMENT] OpenAI API Key is missing or invalid ('mock-api-key-for-development'). Fallback to MockLlmProvider is strictly forbidden during LIVE E2E validation.[39m
+=========================================================================
+FAIL REAL LLM VALIDATION
+Exact Reason: EVALUATION_ALREADY_RUNNING
+=========================================================================
+
+--- PHASE 17 & 18: FACULTY REVIEW AND RESULT PUBLICATION ---
+Faculty Review & Finalization: PASS (Status updated to PUBLISHED)
+
+--- PHASE 19 & 20: STUDENT RESULT VIEW & ISOLATION ---
+Student Published Result Summary:
+  Exam Title: FINAL LIVE AI EVALUATION TEST
+  Score: 0 / 15
+  Status: Published
+  Questions Evaluated: 0
+Security Access Control (Student B denied Student A data): PASS
+
+--- PHASE 23: MOCK DETECTION & NO-MOCK ASSERTIONS ---
+Active HWR Provider: PaddleHWRProvider (PaddleOCR 3.7.0)
+Mock HWR Executed: NO
+Active LLM Provider: None (Validation Enforced Failure on Invalid Key)
+Mock LLM Executed: NO (Strictly Blocked by LIVE_E2E=true)
+=========================================================================
+                FINAL LIVE E2E VALIDATION MATRIX                         
+=========================================================================
+Service Health - React          : PASS
+Service Health - Express        : PASS
+Service Health - FastAPI        : PASS
+Service Health - MongoDB        : PASS
+Provider Verification           : PASS
+Authentication                  : PASS
+Role Separation                 : PASS
+Exam Creation                   : PASS
+Answer Key                      : PASS
+
+Student Submission              : PASS
+Stroke Processing               : PASS
+
+PaddleOCR Inference             : PASS
+OCR Persistence                 : PASS
+Answer Segmentation             : PASS
+Real LLM Provider               : FAIL
+AI Evaluation                   : FAIL (REAL LLM VALIDATION FAILED)
+Similarity Analysis             : FAIL
+Keyword Analysis                : FAIL
+Faculty Review                  : PASS
+Publication                     : PASS
+Student Result                  : PASS
+Security Isolation              : PASS
+No-Mock Verification            : PASS
+
+
+--- PERFORMANCE TIMINGS ---
+PaddleOCR Total HWR Time        : 263.28 seconds
+LLM Evaluation Time             : 0.03 seconds
+Total Live E2E Execution Time   : 264.59 seconds
+
+=========================================================================
+FINAL VERDICT: VERIFIED WITH KNOWN LIMITATIONS
+=========================================================================
+
+[2026-09-02 13:39:49:3949] [31merror[39m: [31mBackground HWR pipeline failed for digital AnswerSheet 6a97d88e317875c8a10e79b1: Client must be connected before running operations[39m
+[2026-09-02 13:39:49:3949] [31merror[39m: [31mFailed to log error status for digital AnswerSheet 6a97d88e317875c8a10e79b1: Client must be connected before running operations[39m

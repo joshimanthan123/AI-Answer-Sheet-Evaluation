@@ -1,0 +1,21 @@
+# Root Dockerignore
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+dist/
+build/
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+logs/
+*.log
+uploads/
+outputs/
+tmp/
+*.pdf
+client.zip

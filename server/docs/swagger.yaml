@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: AI-Based Answer Sheet Evaluation System - API Documentation (Phase 1)
+  description: |
+    Production-ready backend API documentation skeleton for Phase 1.
+    Implements security layers, validation checks, JWT authentication, and user access roles.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns service configuration uptime, database connectivity status, and server state.
+      responses:
+        "200":
+          description: Server is active and database is operational.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: OK
+                  database:
+                    type: string
+                    example: Connected
+                  uptime:
+                    type: number
+                    example: 125
+
+  /auth/register:
+    post:
+      summary: Register a new user
+      description: Registers students, faculty, or admins. Roll number is required for students, Employee ID for faculty.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum: [student, faculty, admin]
+                department:
+                  type: string
+                rollNo:
+                  type: string
+                employeeId:
+                  type: string
+                semester:
+                  type: integer
+
+  /auth/login:
+    post:
+      summary: Login to obtain JWT tokens
+      description: Returns user model and JWT Access/Refresh tokens in JSON payload and HTTP-only cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string

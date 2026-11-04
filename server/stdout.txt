@@ -1,0 +1,552 @@
+Logging in as Faculty...
+Login successful!
+Fetching Faculty review details for AnswerSheet: 6a81b9d108ae9aae3cbd7085...
+--- REVIEW DETAILS API RESPONSE ---
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Faculty review details retrieved successfully",
+  "data": {
+    "answerSheet": {
+      "evaluationSummary": {
+        "totalQuestions": 3,
+        "evaluatedQuestions": 3,
+        "failedQuestions": 0,
+        "totalMaximumMarks": 20,
+        "totalAwardedMarks": 15.1,
+        "percentage": 75.5
+      },
+      "resultPublication": {
+        "status": "NOT_READY",
+        "publishedAt": null,
+        "publishedBy": null,
+        "unpublishedAt": null,
+        "unpublishedBy": null,
+        "publicationComment": null
+      },
+      "_id": "6a81b9d108ae9aae3cbd7085",
+      "student": {
+        "_id": "6a81ada9bdfba19aaf491a00",
+        "name": "Student Test",
+        "email": "student@test.com",
+        "rollNo": "STU123",
+        "department": "6a81addac1d5ceaf1b26f80b",
+        "semester": 5
+      },
+      "subject": {
+        "_id": "6a81addbc1d5ceaf1b26f815",
+        "semester": 5,
+        "name": "Advanced Software Group Product",
+        "code": "ASGP"
+      },
+      "exam": {
+        "_id": "6a81b2dcbfc444dd42cb37a4",
+        "title": "E2E AI Evaluation Test",
+        "totalMarks": 20,
+        "duration": 180,
+        "questions": [
+          {
+            "evaluationCriteria": {
+              "conceptualUnderstanding": 0,
+              "keywordAccuracy": 0,
+              "completeness": 0,
+              "correctness": 0
+            },
+            "questionNumber": 1,
+            "questionText": "Explain the role of a CPU.",
+            "maximumMarks": 5,
+            "keywords": [
+              "CPU",
+              "processing",
+              "control unit",
+              "ALU",
+              "register"
+            ],
+            "modelAnswer": "The Central Processing Unit (CPU) is the primary component of a computer that acts as its brain. It performs basic arithmetic, logical, control and input/output operations.",
+            "rubric": "2 marks for definition, 3 marks for functions.",
+            "bloomsLevel": "Analyze",
+            "difficulty": "Medium",
+            "questionType": "Descriptive",
+            "expectedAnswerLength": "medium",
+            "_id": "6a81b2dcbfc444dd42cb37a5",
+            "partialMarkingRules": []
+          },
+          {
+            "evaluationCriteria": {
+              "conceptualUnderstanding": 0,
+              "keywordAccuracy": 0,
+              "completeness": 0,
+              "correctness": 0
+            },
+            "questionNumber": 2,
+            "questionText": "Explain the difference between RAM and ROM.",
+            "maximumMarks": 10,
+            "keywords": [
+              "volatile",
+              "non-volatile",
+              "read",
+              "write"
+            ],
+            "modelAnswer": "RAM (Random Access Memory) is volatile, read/write memory used for temporary storage of running programs. ROM (Read Only Memory) is non-volatile, read-only memory containing boot system instructions.",
+            "rubric": "5 marks for RAM characteristics, 5 marks for ROM characteristics.",
+            "bloomsLevel": "Understand",
+            "difficulty": "Medium",
+            "questionType": "Short Answer",
+            "expectedAnswerLength": "medium",
+            "_id": "6a81b2dcbfc444dd42cb37a6",
+            "partialMarkingRules": []
+          },
+          {
+            "evaluationCriteria": {
+              "conceptualUnderstanding": 0,
+              "keywordAccuracy": 0,
+              "completeness": 0,
+              "correctness": 0
+            },
+            "questionNumber": 3,
+            "questionText": "What is an operating system?",
+            "maximumMarks": 5,
+            "keywords": [
+              "operating system",
+              "resource management",
+              "interface"
+            ],
+            "modelAnswer": "An operating system (OS) is system software that manages computer hardware, software resources, and provides common services for computer programs.",
+            "rubric": "2 marks for definition, 3 marks for key functions.",
+            "bloomsLevel": "Understand",
+            "difficulty": "Easy",
+            "questionType": "Descriptive",
+            "expectedAnswerLength": "medium",
+            "_id": "6a81b2dcbfc444dd42cb37a7",
+            "partialMarkingRules": []
+          }
+        ]
+      },
+      "submissionStatus": "Faculty Review",
+      "deviceInfo": "",
+      "answers": [
+        {
+          "questionId": "6a81b2dcbfc444dd42cb37a5",
+          "handwrittenData": "{\"strokes\":[]}",
+          "recognizedText": "The CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.",
+          "hwrStatus": "Completed",
+          "submissionTime": "2026-08-17T06:51:42.403Z",
+          "confidenceLevel": "HIGH",
+          "confidence": 1,
+          "_id": "6a82af7e25f12ed1401716e4"
+        },
+        {
+          "questionId": "6a81b2dcbfc444dd42cb37a6",
+          "handwrittenData": "{\"strokes\":[]}",
+          "recognizedText": "RAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.",
+          "hwrStatus": "Completed",
+          "submissionTime": "2026-08-17T06:51:42.403Z",
+          "confidenceLevel": "HIGH",
+          "confidence": 1,
+          "_id": "6a82af7e25f12ed1401716e5"
+        },
+        {
+          "questionId": "6a81b2dcbfc444dd42cb37a7",
+          "handwrittenData": "{\"strokes\":[]}",
+          "recognizedText": "An operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.",
+          "hwrStatus": "Completed",
+          "submissionTime": "2026-08-17T06:51:42.403Z",
+          "confidenceLevel": "HIGH",
+          "confidence": 1,
+          "_id": "6a82af7e25f12ed1401716e6"
+        }
+      ],
+      "submissionType": "DIGITAL",
+      "attemptNo": 1,
+      "isFinalSubmission": true,
+      "totalQuestions": 0,
+      "processingStatus": "completed",
+      "ocrStatus": "completed",
+      "segmentationStatus": "completed",
+      "evaluationStatus": "READY_FOR_FACULTY_REVIEW",
+      "evaluationProgress": 100,
+      "evaluationCurrentStep": "Evaluation completed",
+      "evaluationError": null,
+      "evaluationAttempt": 1,
+      "reviewStatus": "NOT_READY",
+      "isDeleted": false,
+      "createdBy": "6a81ada9bdfba19aaf491a00",
+      "pages": [],
+      "createdAt": "2026-08-16T13:23:29.236Z",
+      "updatedAt": "2026-08-17T06:51:46.644Z",
+      "__v": 8,
+      "lastSavedAt": "2026-08-16T13:23:29.434Z",
+      "submittedAt": "2026-08-16T13:23:29.486Z",
+      "evaluationStartedAt": "2026-08-17T06:51:42.835Z",
+      "evaluationCompletedAt": "2026-08-17T06:51:46.640Z"
+    },
+    "evaluation": {
+      "aiMetadata": {
+        "tokenUsage": {
+          "promptTokens": 750,
+          "completionTokens": 240,
+          "totalTokens": 990
+        },
+        "durations": {
+          "hwrMs": 0,
+          "llmMs": 3628,
+          "totalMs": 3732
+        },
+        "promptText": "[Q: 1] [Attempt #1] \nYou are an expert academic evaluator. Analyze the student's answer and grade it out of 5 marks based on the model answer and rubric.\n\nQUESTION:\n\"Explain the role of a CPU.\"\n\nSTUDENT ANSWER CONTENT:\n<StudentAnswer>\nThe CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.\n</StudentAnswer>\n\nMODEL ANSWER:\n\"The Central Processing Unit (CPU) is the primary component of a computer that acts as its brain. It performs basic arithmetic, logical, control and input/output operations.\"\n\nExpected keywords/concepts to check: CPU, processing, control unit, ALU, register\n\nGRADING RUBRIC GUIDELINES:\n1. Criteria: \"definition\", Marks: 2\n2. Criteria: \"functions\", Marks: 3\n\nProvide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (5).\nReturn your assessment strictly in the following JSON structure:\n{\n  \"marks\": <float_value_awarded>,\n  \"similarity\": <float_value_from_0_to_1>,\n  \"strengths\": <string_summarizing_good_details>,\n  \"weaknesses\": <string_summarizing_missing_details>,\n  \"suggestions\": <string_improvement_tips_or_comments>,\n  \"justification\": <string_reasoning_for_awarded_marks>,\n  \"confidence\": <float_value_from_0_to_1>,\n  \"criteriaScores\": [\n    {\n      \"criterion\": \"<criterion_name_from_guidelines>\",\n      \"marksAwarded\": <float_marks_awarded>,\n      \"maxMarks\": <float_max_marks>\n    }\n  ],\n  \"matchedKeywords\": [\n    \"<matching_keyword_1>\",\n    \"<matching_keyword_2>\"\n  ],\n  \"missingKeywords\": [\n    \"<missing_keyword_1>\"\n  ]\n}\n\n\n[Q: 2] [Attempt #1] \nYou are an expert academic evaluator. Analyze the student's answer and grade it out of 10 marks based on the model answer and rubric.\n\nQUESTION:\n\"Explain the difference between RAM and ROM.\"\n\nSTUDENT ANSWER CONTENT:\n<StudentAnswer>\nRAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.\n</StudentAnswer>\n\nMODEL ANSWER:\n\"RAM (Random Access Memory) is volatile, read/write memory used for temporary storage of running programs. ROM (Read Only Memory) is non-volatile, read-only memory containing boot system instructions.\"\n\nExpected keywords/concepts to check: volatile, non-volatile, read, write\n\nGRADING RUBRIC GUIDELINES:\n1. Criteria: \"RAM characteristics\", Marks: 5\n2. Criteria: \"ROM characteristics\", Marks: 5\n\nProvide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (10).\nReturn your assessment strictly in the following JSON structure:\n{\n  \"marks\": <float_value_awarded>,\n  \"similarity\": <float_value_from_0_to_1>,\n  \"strengths\": <string_summarizing_good_details>,\n  \"weaknesses\": <string_summarizing_missing_details>,\n  \"suggestions\": <string_improvement_tips_or_comments>,\n  \"justification\": <string_reasoning_for_awarded_marks>,\n  \"confidence\": <float_value_from_0_to_1>,\n  \"criteriaScores\": [\n    {\n      \"criterion\": \"<criterion_name_from_guidelines>\",\n      \"marksAwarded\": <float_marks_awarded>,\n      \"maxMarks\": <float_max_marks>\n    }\n  ],\n  \"matchedKeywords\": [\n    \"<matching_keyword_1>\",\n    \"<matching_keyword_2>\"\n  ],\n  \"missingKeywords\": [\n    \"<missing_keyword_1>\"\n  ]\n}\n\n\n[Q: 3] [Attempt #1] \nYou are an expert academic evaluator. Analyze the student's answer and grade it out of 5 marks based on the model answer and rubric.\n\nQUESTION:\n\"What is an operating system?\"\n\nSTUDENT ANSWER CONTENT:\n<StudentAnswer>\nAn operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.\n</StudentAnswer>\n\nMODEL ANSWER:\n\"An operating system (OS) is system software that manages computer hardware, software resources, and provides common services for computer programs.\"\n\nExpected keywords/concepts to check: operating system, resource management, interface\n\nGRADING RUBRIC GUIDELINES:\n1. Criteria: \"definition\", Marks: 2\n2. Criteria: \"key functions\", Marks: 3\n\nProvide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (5).\nReturn your assessment strictly in the following JSON structure:\n{\n  \"marks\": <float_value_awarded>,\n  \"similarity\": <float_value_from_0_to_1>,\n  \"strengths\": <string_summarizing_good_details>,\n  \"weaknesses\": <string_summarizing_missing_details>,\n  \"suggestions\": <string_improvement_tips_or_comments>,\n  \"justification\": <string_reasoning_for_awarded_marks>,\n  \"confidence\": <float_value_from_0_to_1>,\n  \"criteriaScores\": [\n    {\n      \"criterion\": \"<criterion_name_from_guidelines>\",\n      \"marksAwarded\": <float_marks_awarded>,\n      \"maxMarks\": <float_max_marks>\n    }\n  ],\n  \"matchedKeywords\": [\n    \"<matching_keyword_1>\",\n    \"<matching_keyword_2>\"\n  ],\n  \"missingKeywords\": [\n    \"<missing_keyword_1>\"\n  ]\n}",
+        "modelUsed": "gpt-4o",
+        "promptVersion": "1.2",
+        "evaluatedAt": "2026-08-17T06:51:46.618Z"
+      },
+      "_id": "6a82af7e25f12ed14017170f",
+      "answerSheet": "6a81b9d108ae9aae3cbd7085",
+      "evaluationType": "AI",
+      "obtainedMarks": 15.1,
+      "totalMarks": 20,
+      "percentage": 75.5,
+      "evaluationStatus": "READY_FOR_FACULTY_REVIEW",
+      "isDeleted": false,
+      "createdBy": "6a81ada9bdfba19aaf491a00",
+      "updatedBy": "6a81ada9bdfba19aaf491a00",
+      "questions": [
+        {
+          "questionId": "6a81b2dcbfc444dd42cb37a5",
+          "recognizedText": "The CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.",
+          "modelAnswer": "The Central Processing Unit (CPU) is the primary component of a computer that acts as its brain. It performs basic arithmetic, logical, control and input/output operations.",
+          "similarityScore": 44,
+          "aiMarks": 3.8,
+          "maximumMarks": 5,
+          "feedback": "The student correctly identified the core components and explained the main mechanism fairly well. | A few secondary details and critical vocabulary terms were not included in the response. | Include more context about structural dynamics and reference key terms from the prompt rubric.",
+          "studentAnswer": "The CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.",
+          "aiAwardedMarks": 3.8,
+          "finalAwardedMarks": 3.8,
+          "wasOverridden": false,
+          "keywordScore": 1,
+          "semanticScore": 44,
+          "confidence": 0.88,
+          "matchedKeywords": [
+            "concept"
+          ],
+          "missingKeywords": [
+            "vocabulary",
+            "dynamics"
+          ],
+          "criteriaScores": [
+            {
+              "criterion": "Conceptual Understanding",
+              "marksAwarded": 2,
+              "maxMarks": 2.5,
+              "_id": "6a82af8225f12ed140171740"
+            },
+            {
+              "criterion": "Correctness",
+              "marksAwarded": 1.8,
+              "maxMarks": 2.5,
+              "_id": "6a82af8225f12ed140171741"
+            }
+          ],
+          "warnings": [],
+          "provider": "Mock",
+          "model": "gpt-4o",
+          "evaluationAttempt": 1,
+          "startedAt": "2026-08-17T06:51:42.935Z",
+          "completedAt": "2026-08-17T06:51:44.164Z",
+          "_id": "6a82af8225f12ed14017173f"
+        },
+        {
+          "questionId": "6a81b2dcbfc444dd42cb37a6",
+          "recognizedText": "RAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.",
+          "modelAnswer": "RAM (Random Access Memory) is volatile, read/write memory used for temporary storage of running programs. ROM (Read Only Memory) is non-volatile, read-only memory containing boot system instructions.",
+          "similarityScore": 33,
+          "aiMarks": 7.5,
+          "maximumMarks": 10,
+          "feedback": "The student correctly identified the core components and explained the main mechanism fairly well. | A few secondary details and critical vocabulary terms were not included in the response. | Include more context about structural dynamics and reference key terms from the prompt rubric.",
+          "studentAnswer": "RAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.",
+          "aiAwardedMarks": 7.5,
+          "finalAwardedMarks": 7.5,
+          "wasOverridden": false,
+          "keywordScore": 1,
+          "semanticScore": 33,
+          "confidence": 0.88,
+          "matchedKeywords": [
+            "concept"
+          ],
+          "missingKeywords": [
+            "vocabulary",
+            "dynamics"
+          ],
+          "criteriaScores": [
+            {
+              "criterion": "Conceptual Understanding",
+              "marksAwarded": 4,
+              "maxMarks": 5,
+              "_id": "6a82af8225f12ed140171743"
+            },
+            {
+              "criterion": "Correctness",
+              "marksAwarded": 3.5,
+              "maxMarks": 5,
+              "_id": "6a82af8225f12ed140171744"
+            }
+          ],
+          "warnings": [],
+          "provider": "Mock",
+          "model": "gpt-4o",
+          "evaluationAttempt": 1,
+          "startedAt": "2026-08-17T06:51:44.170Z",
+          "completedAt": "2026-08-17T06:51:45.388Z",
+          "_id": "6a82af8225f12ed140171742"
+        },
+        {
+          "questionId": "6a81b2dcbfc444dd42cb37a7",
+          "recognizedText": "An operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.",
+          "modelAnswer": "An operating system (OS) is system software that manages computer hardware, software resources, and provides common services for computer programs.",
+          "similarityScore": 58,
+          "aiMarks": 3.8,
+          "maximumMarks": 5,
+          "feedback": "The student correctly identified the core components and explained the main mechanism fairly well. | A few secondary details and critical vocabulary terms were not included in the response. | Include more context about structural dynamics and reference key terms from the prompt rubric.",
+          "studentAnswer": "An operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.",
+          "aiAwardedMarks": 3.8,
+          "finalAwardedMarks": 3.8,
+          "wasOverridden": false,
+          "keywordScore": 1,
+          "semanticScore": 58,
+          "confidence": 0.88,
+          "matchedKeywords": [
+            "concept"
+          ],
+          "missingKeywords": [
+            "vocabulary",
+            "dynamics"
+          ],
+          "criteriaScores": [
+            {
+              "criterion": "Conceptual Understanding",
+              "marksAwarded": 2,
+              "maxMarks": 2.5,
+              "_id": "6a82af8225f12ed140171746"
+            },
+            {
+              "criterion": "Correctness",
+              "marksAwarded": 1.8,
+              "maxMarks": 2.5,
+              "_id": "6a82af8225f12ed140171747"
+            }
+          ],
+          "warnings": [],
+          "provider": "Mock",
+          "model": "gpt-4o",
+          "evaluationAttempt": 1,
+          "startedAt": "2026-08-17T06:51:45.394Z",
+          "completedAt": "2026-08-17T06:51:46.605Z",
+          "_id": "6a82af8225f12ed140171745"
+        }
+      ],
+      "evaluationHistory": [
+        {
+          "attempt": 1,
+          "scope": "FULL_SHEET",
+          "questionNumber": null,
+          "provider": "Mock",
+          "model": "gpt-4o",
+          "startedAt": "2026-08-17T06:51:42.870Z",
+          "status": "READY_FOR_FACULTY_REVIEW",
+          "summary": "full_sheet evaluation (attempt #1) resolved with status: READY_FOR_FACULTY_REVIEW. percentage: 75.5%",
+          "error": null,
+          "_id": "6a82af7e25f12ed140171715",
+          "completedAt": "2026-08-17T06:51:46.633Z"
+        }
+      ],
+      "auditHistory": [],
+      "createdAt": "2026-08-17T06:51:42.862Z",
+      "updatedAt": "2026-08-17T06:51:46.635Z",
+      "__v": 2,
+      "grade": "B"
+    }
+  },
+  "meta": null
+}
+Connecting to database...
+--- MONGO EVALUATION DOCUMENT ---
+{
+  "_id": "6a82af7e25f12ed14017170f",
+  "answerSheet": "6a81b9d108ae9aae3cbd7085",
+  "evaluationType": "AI",
+  "obtainedMarks": 15.1,
+  "totalMarks": 20,
+  "percentage": 75.5,
+  "evaluationStatus": "READY_FOR_FACULTY_REVIEW",
+  "aiMetadata": {
+    "promptText": "[Q: 1] [Attempt #1] \nYou are an expert academic evaluator. Analyze the student's answer and grade it out of 5 marks based on the model answer and rubric.\n\nQUESTION:\n\"Explain the role of a CPU.\"\n\nSTUDENT ANSWER CONTENT:\n<StudentAnswer>\nThe CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.\n</StudentAnswer>\n\nMODEL ANSWER:\n\"The Central Processing Unit (CPU) is the primary component of a computer that acts as its brain. It performs basic arithmetic, logical, control and input/output operations.\"\n\nExpected keywords/concepts to check: CPU, processing, control unit, ALU, register\n\nGRADING RUBRIC GUIDELINES:\n1. Criteria: \"definition\", Marks: 2\n2. Criteria: \"functions\", Marks: 3\n\nProvide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (5).\nReturn your assessment strictly in the following JSON structure:\n{\n  \"marks\": <float_value_awarded>,\n  \"similarity\": <float_value_from_0_to_1>,\n  \"strengths\": <string_summarizing_good_details>,\n  \"weaknesses\": <string_summarizing_missing_details>,\n  \"suggestions\": <string_improvement_tips_or_comments>,\n  \"justification\": <string_reasoning_for_awarded_marks>,\n  \"confidence\": <float_value_from_0_to_1>,\n  \"criteriaScores\": [\n    {\n      \"criterion\": \"<criterion_name_from_guidelines>\",\n      \"marksAwarded\": <float_marks_awarded>,\n      \"maxMarks\": <float_max_marks>\n    }\n  ],\n  \"matchedKeywords\": [\n    \"<matching_keyword_1>\",\n    \"<matching_keyword_2>\"\n  ],\n  \"missingKeywords\": [\n    \"<missing_keyword_1>\"\n  ]\n}\n\n\n[Q: 2] [Attempt #1] \nYou are an expert academic evaluator. Analyze the student's answer and grade it out of 10 marks based on the model answer and rubric.\n\nQUESTION:\n\"Explain the difference between RAM and ROM.\"\n\nSTUDENT ANSWER CONTENT:\n<StudentAnswer>\nRAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.\n</StudentAnswer>\n\nMODEL ANSWER:\n\"RAM (Random Access Memory) is volatile, read/write memory used for temporary storage of running programs. ROM (Read Only Memory) is non-volatile, read-only memory containing boot system instructions.\"\n\nExpected keywords/concepts to check: volatile, non-volatile, read, write\n\nGRADING RUBRIC GUIDELINES:\n1. Criteria: \"RAM characteristics\", Marks: 5\n2. Criteria: \"ROM characteristics\", Marks: 5\n\nProvide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (10).\nReturn your assessment strictly in the following JSON structure:\n{\n  \"marks\": <float_value_awarded>,\n  \"similarity\": <float_value_from_0_to_1>,\n  \"strengths\": <string_summarizing_good_details>,\n  \"weaknesses\": <string_summarizing_missing_details>,\n  \"suggestions\": <string_improvement_tips_or_comments>,\n  \"justification\": <string_reasoning_for_awarded_marks>,\n  \"confidence\": <float_value_from_0_to_1>,\n  \"criteriaScores\": [\n    {\n      \"criterion\": \"<criterion_name_from_guidelines>\",\n      \"marksAwarded\": <float_marks_awarded>,\n      \"maxMarks\": <float_max_marks>\n    }\n  ],\n  \"matchedKeywords\": [\n    \"<matching_keyword_1>\",\n    \"<matching_keyword_2>\"\n  ],\n  \"missingKeywords\": [\n    \"<missing_keyword_1>\"\n  ]\n}\n\n\n[Q: 3] [Attempt #1] \nYou are an expert academic evaluator. Analyze the student's answer and grade it out of 5 marks based on the model answer and rubric.\n\nQUESTION:\n\"What is an operating system?\"\n\nSTUDENT ANSWER CONTENT:\n<StudentAnswer>\nAn operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.\n</StudentAnswer>\n\nMODEL ANSWER:\n\"An operating system (OS) is system software that manages computer hardware, software resources, and provides common services for computer programs.\"\n\nExpected keywords/concepts to check: operating system, resource management, interface\n\nGRADING RUBRIC GUIDELINES:\n1. Criteria: \"definition\", Marks: 2\n2. Criteria: \"key functions\", Marks: 3\n\nProvide an accurate evaluation. Award partial marks if student is partially correct. Do not go below 0 or exceed the maximum allowed marks (5).\nReturn your assessment strictly in the following JSON structure:\n{\n  \"marks\": <float_value_awarded>,\n  \"similarity\": <float_value_from_0_to_1>,\n  \"strengths\": <string_summarizing_good_details>,\n  \"weaknesses\": <string_summarizing_missing_details>,\n  \"suggestions\": <string_improvement_tips_or_comments>,\n  \"justification\": <string_reasoning_for_awarded_marks>,\n  \"confidence\": <float_value_from_0_to_1>,\n  \"criteriaScores\": [\n    {\n      \"criterion\": \"<criterion_name_from_guidelines>\",\n      \"marksAwarded\": <float_marks_awarded>,\n      \"maxMarks\": <float_max_marks>\n    }\n  ],\n  \"matchedKeywords\": [\n    \"<matching_keyword_1>\",\n    \"<matching_keyword_2>\"\n  ],\n  \"missingKeywords\": [\n    \"<missing_keyword_1>\"\n  ]\n}",
+    "modelUsed": "gpt-4o",
+    "promptVersion": "1.2",
+    "evaluatedAt": "2026-08-17T06:51:46.618Z",
+    "tokenUsage": {
+      "promptTokens": 750,
+      "completionTokens": 240,
+      "totalTokens": 990
+    },
+    "durations": {
+      "hwrMs": 0,
+      "llmMs": 3628,
+      "totalMs": 3732
+    }
+  },
+  "isDeleted": false,
+  "createdBy": "6a81ada9bdfba19aaf491a00",
+  "updatedBy": "6a81ada9bdfba19aaf491a00",
+  "questions": [
+    {
+      "questionId": "6a81b2dcbfc444dd42cb37a5",
+      "recognizedText": "The CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.",
+      "modelAnswer": "The Central Processing Unit (CPU) is the primary component of a computer that acts as its brain. It performs basic arithmetic, logical, control and input/output operations.",
+      "similarityScore": 44,
+      "aiMarks": 3.8,
+      "maximumMarks": 5,
+      "feedback": "The student correctly identified the core components and explained the main mechanism fairly well. | A few secondary details and critical vocabulary terms were not included in the response. | Include more context about structural dynamics and reference key terms from the prompt rubric.",
+      "studentAnswer": "The CPU (Central Processing Unit) acts as the brain of the computer. It performs processing of instructions, logic calculations using ALU, and manages register data.",
+      "aiAwardedMarks": 3.8,
+      "finalAwardedMarks": 3.8,
+      "wasOverridden": false,
+      "keywordScore": 1,
+      "semanticScore": 44,
+      "confidence": 0.88,
+      "matchedKeywords": [
+        "concept"
+      ],
+      "missingKeywords": [
+        "vocabulary",
+        "dynamics"
+      ],
+      "criteriaScores": [
+        {
+          "criterion": "Conceptual Understanding",
+          "marksAwarded": 2,
+          "maxMarks": 2.5,
+          "_id": "6a82af8225f12ed140171740"
+        },
+        {
+          "criterion": "Correctness",
+          "marksAwarded": 1.8,
+          "maxMarks": 2.5,
+          "_id": "6a82af8225f12ed140171741"
+        }
+      ],
+      "warnings": [],
+      "provider": "Mock",
+      "model": "gpt-4o",
+      "evaluationAttempt": 1,
+      "startedAt": "2026-08-17T06:51:42.935Z",
+      "completedAt": "2026-08-17T06:51:44.164Z",
+      "_id": "6a82af8225f12ed14017173f"
+    },
+    {
+      "questionId": "6a81b2dcbfc444dd42cb37a6",
+      "recognizedText": "RAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.",
+      "modelAnswer": "RAM (Random Access Memory) is volatile, read/write memory used for temporary storage of running programs. ROM (Read Only Memory) is non-volatile, read-only memory containing boot system instructions.",
+      "similarityScore": 33,
+      "aiMarks": 7.5,
+      "maximumMarks": 10,
+      "feedback": "The student correctly identified the core components and explained the main mechanism fairly well. | A few secondary details and critical vocabulary terms were not included in the response. | Include more context about structural dynamics and reference key terms from the prompt rubric.",
+      "studentAnswer": "RAM is volatile memory which means it is temporary and loses data when powered off. ROM stands for read only memory and is non-volatile, keeping data permanently.",
+      "aiAwardedMarks": 7.5,
+      "finalAwardedMarks": 7.5,
+      "wasOverridden": false,
+      "keywordScore": 1,
+      "semanticScore": 33,
+      "confidence": 0.88,
+      "matchedKeywords": [
+        "concept"
+      ],
+      "missingKeywords": [
+        "vocabulary",
+        "dynamics"
+      ],
+      "criteriaScores": [
+        {
+          "criterion": "Conceptual Understanding",
+          "marksAwarded": 4,
+          "maxMarks": 5,
+          "_id": "6a82af8225f12ed140171743"
+        },
+        {
+          "criterion": "Correctness",
+          "marksAwarded": 3.5,
+          "maxMarks": 5,
+          "_id": "6a82af8225f12ed140171744"
+        }
+      ],
+      "warnings": [],
+      "provider": "Mock",
+      "model": "gpt-4o",
+      "evaluationAttempt": 1,
+      "startedAt": "2026-08-17T06:51:44.170Z",
+      "completedAt": "2026-08-17T06:51:45.388Z",
+      "_id": "6a82af8225f12ed140171742"
+    },
+    {
+      "questionId": "6a81b2dcbfc444dd42cb37a7",
+      "recognizedText": "An operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.",
+      "modelAnswer": "An operating system (OS) is system software that manages computer hardware, software resources, and provides common services for computer programs.",
+      "similarityScore": 58,
+      "aiMarks": 3.8,
+      "maximumMarks": 5,
+      "feedback": "The student correctly identified the core components and explained the main mechanism fairly well. | A few secondary details and critical vocabulary terms were not included in the response. | Include more context about structural dynamics and reference key terms from the prompt rubric.",
+      "studentAnswer": "An operating system is system software that acts as an interface between user applications and hardware resources, managing running programs.",
+      "aiAwardedMarks": 3.8,
+      "finalAwardedMarks": 3.8,
+      "wasOverridden": false,
+      "keywordScore": 1,
+      "semanticScore": 58,
+      "confidence": 0.88,
+      "matchedKeywords": [
+        "concept"
+      ],
+      "missingKeywords": [
+        "vocabulary",
+        "dynamics"
+      ],
+      "criteriaScores": [
+        {
+          "criterion": "Conceptual Understanding",
+          "marksAwarded": 2,
+          "maxMarks": 2.5,
+          "_id": "6a82af8225f12ed140171746"
+        },
+        {
+          "criterion": "Correctness",
+          "marksAwarded": 1.8,
+          "maxMarks": 2.5,
+          "_id": "6a82af8225f12ed140171747"
+        }
+      ],
+      "warnings": [],
+      "provider": "Mock",
+      "model": "gpt-4o",
+      "evaluationAttempt": 1,
+      "startedAt": "2026-08-17T06:51:45.394Z",
+      "completedAt": "2026-08-17T06:51:46.605Z",
+      "_id": "6a82af8225f12ed140171745"
+    }
+  ],
+  "evaluationHistory": [
+    {
+      "attempt": 1,
+      "scope": "FULL_SHEET",
+      "questionNumber": null,
+      "provider": "Mock",
+      "model": "gpt-4o",
+      "startedAt": "2026-08-17T06:51:42.870Z",
+      "status": "READY_FOR_FACULTY_REVIEW",
+      "summary": "full_sheet evaluation (attempt #1) resolved with status: READY_FOR_FACULTY_REVIEW. percentage: 75.5%",
+      "error": null,
+      "_id": "6a82af7e25f12ed140171715",
+      "completedAt": "2026-08-17T06:51:46.633Z"
+    }
+  ],
+  "auditHistory": [],
+  "createdAt": "2026-08-17T06:51:42.862Z",
+  "updatedAt": "2026-08-17T06:51:46.635Z",
+  "__v": 2,
+  "grade": "B"
+}
+Done!

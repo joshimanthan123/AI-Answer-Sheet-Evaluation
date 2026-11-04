@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GradeAI Admin Dashboard</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed-dim": "#bec6e0",
+                      "primary-fixed": "#dbe1ff",
+                      "inverse-primary": "#b4c5ff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "background": "#f8f9ff",
+                      "tertiary-fixed": "#dae2fd",
+                      "surface-container": "#e5eeff",
+                      "on-secondary-fixed-variant": "#3323cc",
+                      "tertiary-container": "#656d84",
+                      "on-tertiary-fixed-variant": "#3f465c",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "on-tertiary-container": "#eef0ff",
+                      "on-primary-fixed": "#00174b",
+                      "on-error": "#ffffff",
+                      "on-secondary-fixed": "#0f0069",
+                      "secondary-container": "#645efb",
+                      "primary": "#004ac6",
+                      "on-error-container": "#93000a",
+                      "on-tertiary": "#ffffff",
+                      "error": "#ba1a1a",
+                      "on-secondary": "#ffffff",
+                      "outline": "#737686",
+                      "secondary-fixed": "#e2dfff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "surface-tint": "#0053db",
+                      "secondary": "#4b41e1",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-dim": "#cbdbf5",
+                      "on-background": "#0b1c30",
+                      "on-primary-container": "#eeefff",
+                      "inverse-surface": "#213145",
+                      "primary-container": "#2563eb",
+                      "surface-bright": "#f8f9ff",
+                      "on-secondary-container": "#fffbff",
+                      "surface": "#f8f9ff",
+                      "on-surface": "#0b1c30",
+                      "outline-variant": "#c3c6d7",
+                      "error-container": "#ffdad6",
+                      "surface-variant": "#d3e4fe",
+                      "surface-container-high": "#dce9ff",
+                      "surface-container-highest": "#d3e4fe",
+                      "on-surface-variant": "#434655",
+                      "secondary-fixed-dim": "#c3c0ff",
+                      "on-primary": "#ffffff",
+                      "surface-container-low": "#eff4ff",
+                      "tertiary": "#4d556b",
+                      "on-tertiary-fixed": "#131b2e"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "lg": "24px",
+                      "xl": "40px",
+                      "xs": "4px",
+                      "xxl": "64px",
+                      "sm": "8px",
+                      "md": "16px",
+                      "gutter": "24px",
+                      "container-max": "1280px"
+              },
+              "fontFamily": {
+                      "headline-md": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "display": ["Inter"],
+                      "label-md": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "body-md": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "display": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                      "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            user-select: none;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9ff;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-sm border-b border-outline-variant/30 h-16 flex items-center justify-between px-gutter">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary cursor-pointer active:scale-95 transition-transform">menu</button>
+<span class="font-headline-md text-headline-md font-bold text-primary">GradeAI</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center gap-6 mr-6">
+<span class="text-primary font-semibold font-label-md cursor-pointer">Dashboard</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer font-label-md">Logs</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer font-label-md">System</span>
+</div>
+<button class="material-symbols-outlined text-primary cursor-pointer active:scale-95 transition-transform">notifications</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-xs">AD</div>
+</div>
+</header>
+<!-- Sidebar (Desktop) -->
+<aside class="fixed left-0 top-0 h-full w-72 z-40 bg-surface border-r border-outline-variant/30 hidden md:flex flex-col py-md pt-20">
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-4 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 mx-2 cursor-pointer transition-all active:scale-98">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md">Dashboard</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant hover:bg-surface-container-high px-4 py-3 mx-2 rounded-lg cursor-pointer transition-all">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+<span class="font-label-md text-label-md">Evaluation</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant hover:bg-surface-container-high px-4 py-3 mx-2 rounded-lg cursor-pointer transition-all">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-md text-label-md">Results</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant hover:bg-surface-container-high px-4 py-3 mx-2 rounded-lg cursor-pointer transition-all">
+<span class="material-symbols-outlined">description</span>
+<span class="font-label-md text-label-md">Reports</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant hover:bg-surface-container-high px-4 py-3 mx-2 rounded-lg cursor-pointer transition-all">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</div>
+</nav>
+<div class="px-6 py-4 mt-auto">
+<div class="flex items-center gap-3 p-3 bg-surface-container-low rounded-xl">
+<div class="w-10 h-10 rounded-full bg-cover bg-center" data-alt="A professional headshot of a senior system administrator in a clean, high-tech office environment. The person has a friendly, authoritative expression, wearing professional attire. The lighting is soft and even, highlighting a modern corporate light-mode aesthetic with a palette of deep blues and crisp whites." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD_XYsHnpb-qO-rL_j136ZdmeT9ukpIzxUazgP6kPuwqoTAWe5mwAcW32REs--9__mB9SbMeDfDku_SyWgDgiQl3tKIcSigfuFTBY3zEM9tFxTqzlJ6bI0KfggJ5tU8hz6bsvCWjjJs3BDPTU9gx5eQAHursn836jZpeZ4aib2VJc-C98Y2SrdCVC0HMOiRpj6X13ki4AKts_rzhm5ZYH09tkabf6AARh8e50aDJFJa3iBbyQ19TGkr')"></div>
+<div class="overflow-hidden">
+<p class="font-label-md text-on-surface truncate">Academic Portal</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Faculty Member</p>
+</div>
+</div>
+<p class="text-[10px] text-outline text-center mt-4">v1.0.2 • GradeAI Admin</p>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-72 pt-20 pb-24 px-gutter max-w-container-max mx-auto">
+<!-- Welcome Header -->
+<div class="mb-xl">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">System Overview</h1>
+<p class="text-body-md text-on-surface-variant">Real-time status and system-wide configurations for GradeAI.</p>
+</div>
+<!-- Stats Grid (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-xl">
+<div class="glass-card p-md rounded-xl shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-2 rounded-lg">group</span>
+<span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">+12%</span>
+</div>
+<h3 class="text-on-surface-variant font-label-md">Total Users</h3>
+<p class="text-display text-primary font-display leading-none mt-1">24,102</p>
+<div class="mt-4 flex gap-4 text-xs">
+<span class="text-on-surface-variant"><b class="text-primary">18.2k</b> Students</span>
+<span class="text-on-surface-variant"><b class="text-primary">5.9k</b> Faculty</span>
+</div>
+</div>
+<div class="glass-card p-md rounded-xl shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-secondary bg-secondary-fixed p-2 rounded-lg">fact_check</span>
+<span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">+5.4k</span>
+</div>
+<h3 class="text-on-surface-variant font-label-md">Total Evaluations</h3>
+<p class="text-display text-secondary font-display leading-none mt-1">1.2M</p>
+<div class="mt-4">
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[85%]"></div>
+</div>
+<p class="text-[10px] mt-1 text-on-surface-variant">85% of monthly quota used</p>
+</div>
+</div>
+<div class="glass-card p-md rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-tertiary bg-tertiary-fixed p-2 rounded-lg">health_and_safety</span>
+<span class="flex items-center gap-1 text-xs font-bold text-green-600">
+<span class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span> Optimal
+                        </span>
+</div>
+<h3 class="text-on-surface-variant font-label-md">System Health</h3>
+<p class="font-headline-md text-headline-md mt-1">99.98% Uptime</p>
+</div>
+<div class="mt-4 grid grid-cols-2 gap-2 text-[10px] font-bold uppercase tracking-tighter">
+<div class="bg-surface-container p-2 rounded border border-outline-variant/20">API: 12ms</div>
+<div class="bg-surface-container p-2 rounded border border-outline-variant/20">DB: 4ms</div>
+</div>
+</div>
+<div class="glass-card p-md rounded-xl shadow-sm bg-primary-container/5 border-primary/20 flex flex-col items-center justify-center text-center">
+<span class="material-symbols-outlined text-primary text-4xl mb-2">monitoring</span>
+<p class="font-label-md text-primary font-bold">View Real-time Logs</p>
+<p class="text-xs text-on-surface-variant px-4 mt-1">Monitor live traffic and error clusters</p>
+<button class="mt-4 bg-primary text-white px-4 py-2 rounded-lg text-xs font-bold active:scale-95 transition-transform">Launch Monitor</button>
+</div>
+</div>
+<!-- Middle Section: Config & AI -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter mb-xl">
+<!-- AI Configuration Section -->
+<div class="lg:col-span-2 glass-card rounded-xl overflow-hidden border border-outline-variant/30">
+<div class="p-lg border-b border-outline-variant/20 bg-surface-container-low flex items-center justify-between">
+<div>
+<h2 class="font-headline-md text-headline-md">AI Intelligence Engine</h2>
+<p class="text-label-md text-on-surface-variant">Configure core evaluation parameters</p>
+</div>
+<span class="material-symbols-outlined text-primary-container">psychology</span>
+</div>
+<div class="p-lg grid grid-cols-1 md:grid-cols-2 gap-xl">
+<!-- OCR Settings -->
+<div class="space-y-4">
+<label class="block">
+<span class="text-label-md text-on-surface font-bold">OCR Engine Status</span>
+<div class="mt-2 flex items-center p-3 bg-green-50 text-green-700 rounded-lg border border-green-200">
+<span class="material-symbols-outlined mr-2">check_circle</span>
+<span class="font-label-md">Vision-X Pro (Active)</span>
+</div>
+</label>
+<label class="block">
+<span class="text-label-md text-on-surface">LLM Provider</span>
+<select class="mt-1 block w-full rounded-lg border-outline-variant focus:ring-primary focus:border-primary">
+<option>GradeAI Custom-v4 (Proprietary)</option>
+<option>GPT-4o-Academic</option>
+<option>Claude-3.5-Edu</option>
+</select>
+</label>
+</div>
+<!-- Threshold Settings -->
+<div class="space-y-4">
+<label class="block">
+<span class="text-label-md text-on-surface flex justify-between">
+                                Similarity Threshold 
+                                <span class="text-primary font-bold">75%</span>
+</span>
+<input class="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-primary mt-4" type="range"/>
+<p class="text-[10px] text-on-surface-variant mt-2 italic">Strictness level for plagiarism and repetitive response detection.</p>
+</label>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/30 mt-4">
+<span class="text-label-md">Handwriting Analysis</span>
+<div class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-lg bg-surface-container-low border-t border-outline-variant/20 flex justify-end gap-3">
+<button class="px-4 py-2 text-label-md font-bold text-on-surface-variant hover:bg-surface-container transition-colors rounded-lg">Discard</button>
+<button class="px-6 py-2 text-label-md font-bold bg-primary text-on-primary rounded-lg shadow-sm active:scale-95 transition-transform">Save Configurations</button>
+</div>
+</div>
+<!-- Security & API Logs Access -->
+<div class="glass-card rounded-xl overflow-hidden border border-outline-variant/30 flex flex-col">
+<div class="p-lg border-b border-outline-variant/20 flex items-center justify-between">
+<h2 class="font-headline-md text-headline-md">Security</h2>
+<span class="material-symbols-outlined text-error">shield</span>
+</div>
+<div class="flex-1 p-lg space-y-4">
+<div class="flex items-start gap-4">
+<div class="w-1 bg-primary self-stretch rounded-full"></div>
+<div>
+<p class="text-label-md font-bold">API Access: Tier 1 Only</p>
+<p class="text-xs text-on-surface-variant">Global restriction enabled for non-validated IP ranges.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="w-1 bg-error self-stretch rounded-full"></div>
+<div>
+<p class="text-label-md font-bold">Failed Logins (24h)</p>
+<p class="text-xs text-on-surface-variant">42 attempts detected from unauthorized locations.</p>
+</div>
+</div>
+<div class="mt-xl pt-xl border-t border-outline-variant/10">
+<p class="text-[10px] uppercase font-bold text-outline tracking-widest mb-4">Quick Access</p>
+<ul class="space-y-3">
+<li class="flex items-center gap-3 text-label-md text-primary cursor-pointer hover:underline">
+<span class="material-symbols-outlined text-sm">key</span> Manage API Tokens
+                            </li>
+<li class="flex items-center gap-3 text-label-md text-primary cursor-pointer hover:underline">
+<span class="material-symbols-outlined text-sm">history</span> Security Audit Log
+                            </li>
+<li class="flex items-center gap-3 text-label-md text-primary cursor-pointer hover:underline">
+<span class="material-symbols-outlined text-sm">policy</span> Privacy Controls
+                            </li>
+</ul>
+</div>
+</div>
+<div class="p-lg">
+<div class="w-full h-32 rounded-lg bg-cover bg-center" data-alt="A high-tech digital security visualization map showing globe-spanning connections and glowing data nodes. The aesthetic is clean, minimalist, and modern with a primary blue and white color scheme. Subtle glassmorphism overlays and soft ambient lighting suggest a sophisticated cybersecurity interface." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuATYT4mKQEUGHqYwS8OgRuW_LYNe4T_Jxk-vxOgwfJn2W3CgfLJOp32saX2R2nOaDLE6iosSUuDel_pqOwddSmimP3K4t0p4p-wnqD_sO3Fw8eTNi52qQRaacr5kB-pYx-LEbSkiKl-Iqpbrqqe3qrnnvzv1RGKk2sLvA8a05VnYYiYM556I9JgbHlWwFLnRZ7j4_XiaZ-ObvZo-58Wury3uiggNCIuJ2TwoWXCZZzKhhAgbQhVmTvA')"></div>
+</div>
+</div>
+</div>
+<!-- User Management Table -->
+<div class="glass-card rounded-xl border border-outline-variant/30 overflow-hidden">
+<div class="p-lg border-b border-outline-variant/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="font-headline-md text-headline-md">User Management</h2>
+<p class="text-label-md text-on-surface-variant">Recent account activity and role assignments</p>
+</div>
+<div class="flex gap-2">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-sm">search</span>
+<input class="pl-10 pr-4 py-2 border-outline-variant bg-surface-container-low rounded-lg text-sm w-full md:w-64 focus:ring-primary focus:border-primary" placeholder="Search users..." type="text"/>
+</div>
+<button class="bg-surface-container-highest p-2 rounded-lg material-symbols-outlined hover:bg-surface-variant transition-colors">filter_list</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low text-on-surface-variant font-label-md text-xs uppercase tracking-wider">
+<tr>
+<th class="px-lg py-4">User</th>
+<th class="px-lg py-4">Role</th>
+<th class="px-lg py-4">Institution</th>
+<th class="px-lg py-4">Last Active</th>
+<th class="px-lg py-4">Status</th>
+<th class="px-lg py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/20">
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-bold text-xs">EL</div>
+<div>
+<p class="font-label-md font-bold">Elena Rodriguez</p>
+<p class="text-xs text-outline">elena.r@edu.tech</p>
+</div>
+</div>
+</td>
+<td class="px-lg py-4"><span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold">FACULTY</span></td>
+<td class="px-lg py-4 text-label-md text-on-surface-variant">Stanford University</td>
+<td class="px-lg py-4 text-label-md text-on-surface-variant">2 mins ago</td>
+<td class="px-lg py-4">
+<span class="flex items-center gap-1 text-[10px] font-bold text-green-600">
+<span class="w-1.5 h-1.5 rounded-full bg-green-600"></span> Online
+                                </span>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center font-bold text-xs">JM</div>
+<div>
+<p class="font-label-md font-bold">James Miller</p>
+<p class="text-xs text-outline">j.miller@edu.tech</p>
+</div>
+</div>
+</td>
+<td class="px-lg py-4"><span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-[10px] font-bold">STUDENT</span></td>
+<td class="px-lg py-4 text-label-md text-on-surface-variant">MIT Academic</td>
+<td class="px-lg py-4 text-label-md text-on-surface-variant">45 mins ago</td>
+<td class="px-lg py-4">
+<span class="flex items-center gap-1 text-[10px] font-bold text-outline">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span> Offline
+                                </span>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-bold text-xs">SK</div>
+<div>
+<p class="font-label-md font-bold">Sarah Kim</p>
+<p class="text-xs text-outline">s.kim@edu.tech</p>
+</div>
+</div>
+</td>
+<td class="px-lg py-4"><span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold">FACULTY</span></td>
+<td class="px-lg py-4 text-label-md text-on-surface-variant">Oxford Learning</td>
+<td class="px-lg py-4 text-label-md text-on-surface-variant">1 hour ago</td>
+<td class="px-lg py-4">
+<span class="flex items-center gap-1 text-[10px] font-bold text-green-600">
+<span class="w-1.5 h-1.5 rounded-full bg-green-600"></span> Online
+                                </span>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-lg bg-surface-container-low border-t border-outline-variant/20 flex items-center justify-between">
+<span class="text-xs text-on-surface-variant">Showing 1 to 10 of 24,102 users</span>
+<div class="flex gap-2">
+<button class="px-3 py-1 border border-outline-variant/30 rounded text-xs hover:bg-surface-container transition-colors disabled:opacity-50">Previous</button>
+<button class="px-3 py-1 border border-outline-variant/30 rounded text-xs bg-primary text-white font-bold">1</button>
+<button class="px-3 py-1 border border-outline-variant/30 rounded text-xs hover:bg-surface-container transition-colors">2</button>
+<button class="px-3 py-1 border border-outline-variant/30 rounded text-xs hover:bg-surface-container transition-colors">Next</button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 w-full z-50 md:hidden bg-surface/90 backdrop-blur-lg border-t border-outline-variant/30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex justify-around items-center h-16 px-4 pb-safe">
+<div class="flex flex-col items-center justify-center text-primary font-bold">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">fact_check</span>
+<span class="font-label-sm text-label-sm">Evaluations</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-label-sm text-label-sm">Reports</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm">Profile</span>
+</div>
+</nav>
+<!-- Footer -->
+<footer class="w-full py-lg bg-surface-container-low mt-auto border-t border-outline-variant/20">
+<div class="flex flex-col md:flex-row justify-between items-center px-gutter max-w-container-max mx-auto gap-4">
+<span class="font-headline-md text-headline-md font-black text-primary">GradeAI</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">© 2024 GradeAI Evaluation Systems. All rights reserved.</p>
+<div class="flex gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-sm" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-sm" href="#">Terms of Service</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-sm" href="#">Help Center</a>
+</div>
+</div>
+</footer>
+<!-- Interactive Layer -->
+<script>
+        // Simple scale interaction for cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousedown', () => card.classList.add('scale-[0.99]'));
+            card.addEventListener('mouseup', () => card.classList.remove('scale-[0.99]'));
+            card.addEventListener('mouseleave', () => card.classList.remove('scale-[0.99]'));
+        });
+
+        // Hover lift effect
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.classList.add('transition-all', 'duration-300');
+            card.addEventListener('mouseenter', () => card.style.transform = 'translateY(-4px)');
+            card.addEventListener('mouseleave', () => card.style.transform = 'translateY(0)');
+        });
+    </script>
+</body></html>

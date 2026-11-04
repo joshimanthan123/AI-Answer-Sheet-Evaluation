@@ -1,0 +1,176 @@
+import os
+import time
+import logging
+import numpy as np
+from app.config import settings
+from app.models.hwr_models import HWRResult
+from app.providers.base_provider import IHWRProvider
+from app.providers.mock_provider import MockProvider
+from app.providers.azure_provider import AzureProvider, AzureProviderError
+from app.providers.google_vision_provider import GoogleVisionProviderError
+from app.providers.textract_provider import TextractProviderError
+from app.utils.image_utils import validate_image
+
+logger = logging.getLogger("app.services.hwr_service")
+
+
+class HWRServiceError(Exception):
+    """Custom exception raised by HandwrittingRecognitionService for service-level errors."""
+    pass
+
+
+class HandwritingRecognitionService:
+    """
+    Stateless high-level service orchestrator for handwriting recognition (HWR).
+    Uses the Factory pattern to initialize concrete providers at runtime
+    and wraps execution block timing stats and logger tracking.
+    """
+
+    @staticmethod
+    def validate_configuration() -> None:
+        """
+        Fail-fast startup validation for the configured HWR provider.
+
+        When HWR_PROVIDER=azure, this instantiates the provider so that a missing
+        endpoint/key (or missing SDK) surfaces immediately as a clear
+        configuration error at boot -- never a silent fallback to MockProvider.
+        The API key itself is never logged.
+
+        Raises:
+            HWRServiceError: If the configured provider cannot be initialized.
+        """
+        name = (settings.HWR_PROVIDER or "textract").lower().strip()
+        logger.info("Validating HWR configuration for provider '%s'...", name)
+        # Instantiating validates config for azure/textract; mock is always valid.
+        provider = HandwritingRecognitionService.get_provider(name)
+        if name == "textract":
+            from app.providers.textract_provider import _build_client
+            _build_client()
+            has_creds = bool(getattr(settings, "AWS_ACCESS_KEY_ID", None) or os.getenv("AWS_ACCESS_KEY_ID"))
+            logger.info("Textract client initialized. Custom AWS credentials provided: %s", has_creds)
+        logger.info("HWR provider '%s' configuration is valid.", name)
+
+    @staticmethod
+    def get_provider(provider_name: str | None = None) -> IHWRProvider:
+        """
+        Factory method to instantiate the requested handwriting recognition provider.
+
+        Args:
+            provider_name: Case-insensitive name of the provider. If None or empty, defaults to settings.HWR_PROVIDER or 'textract'.
+
+        Returns:
+            IHWRProvider: An initialized instance of the selected provider.
+
+        Raises:
+            HWRServiceError: For unsupported or misconfigured providers.
+        """
+        if not provider_name:
+            provider_name = settings.HWR_PROVIDER or "textract"
+        name = provider_name.lower().strip()
+        logger.info("Initializing HWR provider factory. Selected: '%s'", name)
+
+        if name == "mock":
+            return MockProvider()
+        elif name == "easyocr":
+            try:
+                from app.providers.easyocr_provider import EasyOCRHWRProvider, EasyOCRProviderError
+                return EasyOCRHWRProvider()
+            except EasyOCRProviderError as eope:
+                raise HWRServiceError(f"EasyOCR configuration error: {str(eope)}") from eope
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate EasyOCR provider: {str(e)}") from e
+        elif name in ("paddle", "paddleocr"):
+            try:
+                from app.providers.paddle_provider import PaddleHWRProvider, PaddleProviderError
+                return PaddleHWRProvider()
+            except PaddleProviderError as ppe:
+                raise HWRServiceError(f"PaddleOCR configuration error: {str(ppe)}") from ppe
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate PaddleOCR provider: {str(e)}") from e
+        elif name == "azure":
+            try:
+                return AzureProvider()
+            except AzureProviderError as ape:
+                raise HWRServiceError(f"Azure configuration error: {str(ape)}") from ape
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate Azure provider: {str(e)}") from e
+        elif name == "google_vision":
+            try:
+                from app.providers.google_vision_provider import GoogleVisionHWRProvider
+                return GoogleVisionHWRProvider()
+            except GoogleVisionProviderError as gvpe:
+                raise HWRServiceError(f"Google Vision configuration error: {str(gvpe)}") from gvpe
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate Google Vision provider: {str(e)}") from e
+        elif name == "textract":
+            try:
+                from app.providers.textract_provider import TextractHWRProvider, TextractProviderError
+                return TextractHWRProvider()
+            except TextractProviderError as tpe:
+                raise HWRServiceError(f"Textract configuration error: {str(tpe)}") from tpe
+            except Exception as e:
+                raise HWRServiceError(f"Failed to instantiate Textract provider: {str(e)}") from e
+        else:
+            raise HWRServiceError(
+                f"Unsupported HWR provider '{provider_name}'. Supported elements are: 'mock', 'azure', 'paddle', 'google_vision', 'textract'."
+            )
+
+    @classmethod
+    def recognize_handwriting(
+        cls, 
+        image: np.ndarray, 
+        provider_name: str = None,
+        page_num: int = 1,
+        raw_text: str | None = None
+    ) -> HWRResult:
+        """
+        Transcribes handwritten text from an image using the selected provider.
+        Handles timing checks, logger tracking, and provider exception grouping.
+        """
+        # 1. Validate image format
+        try:
+            validate_image(image)
+        except ValueError as ve:
+            raise HWRServiceError(f"Invalid image array input for HWR service: {str(ve)}") from ve
+
+        # 2. Select provider (runtime selection or settings fallback)
+        selected_name = provider_name if provider_name is not None else (settings.HWR_PROVIDER or "textract")
+        provider = cls.get_provider(selected_name)
+
+        # 3. Transcribe and time execution
+        logger.info("Starting handwriting recognition using provider '%s'...", selected_name)
+        start_time = time.time()
+        
+        try:
+            import inspect
+            sig = inspect.signature(provider.recognize)
+            if 'raw_text' in sig.parameters:
+                result = provider.recognize(image, page_num=page_num, raw_text=raw_text)
+            else:
+                result = provider.recognize(image, page_num=page_num)
+        except AzureProviderError as ape:
+            # Map specific provider exceptions to service exceptions
+            raise HWRServiceError(f"Azure HWR Engine failure: {str(ape)}") from ape
+        except GoogleVisionProviderError as gvpe:
+            # Map Google Vision exceptions to service exceptions
+            raise HWRServiceError(f"Google Vision HWR Engine failure: {str(gvpe)}") from gvpe
+        except TextractProviderError as tpe:
+            # Map Amazon Textract exceptions to service exceptions
+            raise HWRServiceError(f"Textract HWR Engine failure: {str(tpe)}") from tpe
+        except Exception as e:
+            # Catch unexpected downstream errors
+            raise HWRServiceError(f"Unexpected error in handwriting recognition provider: {str(e)}") from e
+            
+        total_elapsed = time.time() - start_time
+        
+        # Override execution timer to capture total end-to-end service time if provider didn't
+        # reflect system delays. E.g. we want accurate service timing metrics.
+        result.execution_time = round(total_elapsed, 4)
+        
+        logger.info(
+            "Handwriting recognition completed successfully. "
+            "Provider: '%s', Execution Time: %.4fs, Avg Confidence: %.4f",
+            result.provider, result.execution_time, result.confidence
+        )
+        
+        return result

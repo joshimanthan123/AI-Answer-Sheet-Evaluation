@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Detailed Evaluation Report | GradeAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#bec6e0",
+                    "primary-fixed": "#dbe1ff",
+                    "inverse-primary": "#b4c5ff",
+                    "inverse-on-surface": "#eaf1ff",
+                    "background": "#f8f9ff",
+                    "tertiary-fixed": "#dae2fd",
+                    "surface-container": "#e5eeff",
+                    "on-secondary-fixed-variant": "#3323cc",
+                    "tertiary-container": "#656d84",
+                    "on-tertiary-fixed-variant": "#3f465c",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "on-tertiary-container": "#eef0ff",
+                    "on-primary-fixed": "#00174b",
+                    "on-error": "#ffffff",
+                    "on-secondary-fixed": "#0f0069",
+                    "secondary-container": "#645efb",
+                    "primary": "#004ac6",
+                    "on-error-container": "#93000a",
+                    "on-tertiary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "outline": "#737686",
+                    "secondary-fixed": "#e2dfff",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "surface-tint": "#0053db",
+                    "secondary": "#4b41e1",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-dim": "#cbdbf5",
+                    "on-background": "#0b1c30",
+                    "on-primary-container": "#eeefff",
+                    "inverse-surface": "#213145",
+                    "primary-container": "#2563eb",
+                    "surface-bright": "#f8f9ff",
+                    "on-secondary-container": "#fffbff",
+                    "surface": "#f8f9ff",
+                    "on-surface": "#0b1c30",
+                    "outline-variant": "#c3c6d7",
+                    "error-container": "#ffdad6",
+                    "surface-variant": "#d3e4fe",
+                    "surface-container-high": "#dce9ff",
+                    "surface-container-highest": "#d3e4fe",
+                    "on-surface-variant": "#434655",
+                    "secondary-fixed-dim": "#c3c0ff",
+                    "on-primary": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "tertiary": "#4d556b",
+                    "on-tertiary-fixed": "#131b2e"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "lg": "24px",
+                    "xl": "40px",
+                    "xs": "4px",
+                    "xxl": "64px",
+                    "sm": "8px",
+                    "md": "16px",
+                    "gutter": "24px",
+                    "container-max": "1280px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "display": ["Inter"],
+                    "label-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "display": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.5);
+        }
+        .ai-accent-card {
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-sm border-b border-outline-variant/30 h-16 flex items-center justify-between px-gutter">
+<div class="flex items-center gap-4">
+<button class="cursor-pointer active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">GradeAI</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8">
+<a class="text-primary font-semibold font-label-md text-label-md transition-colors hover:bg-primary/5 px-3 py-2 rounded-lg" href="#">Results</a>
+<a class="text-on-surface-variant hover:text-primary font-label-md text-label-md transition-colors px-3 py-2 rounded-lg" href="#">Evaluations</a>
+<a class="text-on-surface-variant hover:text-primary font-label-md text-label-md transition-colors px-3 py-2 rounded-lg" href="#">Reports</a>
+</nav>
+<div class="flex items-center gap-3">
+<button class="cursor-pointer active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-primary">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a diverse faculty member in a bright academic office, wearing a modern blazer. The lighting is soft and natural, with a clean architectural background. The overall aesthetic is professional, reliable, and sophisticated, matching the GradeAI corporate theme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn9XXiuz4m2LS1a6sCOP0C6s4Nuch4OIarJuLwhg8M19IEfwQlFHKH9EDJ8WpTMRa-svU4ufS20XNFoarldbBdfi1Ofkts_E5ZCQD_ar3LOGbAZj2-EBDm2IZeabyhQqbamcJ4QPcsXcMxDw6Irp-kAkfwgHq1fouIQjkBnH02Wb3Yv3ERj0OkZ9jdqDUDUYO2K7cz5bbbTnuS8a9ZNucWjTobc7nV-98ouXG_Wu4ZhB6HqqSHh7br"/>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-grow pt-24 pb-xxl px-gutter max-w-container-max mx-auto w-full">
+<!-- Header Section -->
+<section class="mb-xl flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<nav class="flex items-center gap-2 text-label-sm font-label-sm text-outline mb-2">
+<span>Evaluations</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span>CS101: Data Structures</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-primary">Alex Johnson</span>
+</nav>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Evaluation Report: Mid-Term Examination</h2>
+<p class="text-on-surface-variant mt-1">Student: Alex Johnson | ID: #88294-B | Submitted: Oct 14, 2024</p>
+</div>
+<div class="flex gap-3">
+<button class="px-md py-sm bg-white border border-outline-variant text-primary rounded-xl font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container transition-all active:scale-95">
+<span class="material-symbols-outlined text-sm">download</span> Download PDF
+                </button>
+<button class="px-md py-sm bg-primary text-on-primary rounded-xl font-label-md text-label-md flex items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95">
+<span class="material-symbols-outlined text-sm">visibility</span> View Original
+                </button>
+</div>
+</section>
+<!-- Bento Layout for Stats -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-xl">
+<!-- Score Card -->
+<div class="md:col-span-1 glass-card p-xl rounded-xl flex flex-col items-center justify-center text-center">
+<span class="text-outline font-label-sm text-label-sm uppercase tracking-wider mb-2">Total Score</span>
+<div class="relative w-32 h-32 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90">
+<circle class="text-surface-variant" cx="64" cy="64" fill="transparent" r="58" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="64" cy="64" fill="transparent" r="58" stroke="currentColor" stroke-dasharray="364.4" stroke-dashoffset="54.6" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-display text-[32px] text-primary">85</span>
+<span class="text-outline text-label-sm font-label-sm">/ 100</span>
+</div>
+</div>
+<div class="mt-4 px-3 py-1 bg-green-100 text-green-700 rounded-full font-label-sm text-label-sm">Grade: A-</div>
+</div>
+<!-- Performance Radar Chart Placeholder -->
+<div class="md:col-span-2 glass-card p-lg rounded-xl relative overflow-hidden flex flex-col">
+<h3 class="font-headline-md text-headline-md mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">insights</span> Performance Metrics
+                </h3>
+<div class="flex-grow flex items-center justify-center relative">
+<!-- Symbolic Chart Representation -->
+<div class="w-full h-48 flex items-end justify-around gap-4 px-md">
+<div class="flex flex-col items-center gap-2 w-full">
+<div class="w-full bg-primary/20 rounded-t-lg relative group h-[80%]">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-lg transition-all duration-1000 h-[92%]"></div>
+</div>
+<span class="text-label-sm font-label-sm text-outline truncate w-full text-center">Accuracy</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full">
+<div class="w-full bg-primary/20 rounded-t-lg relative group h-[80%]">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-lg transition-all duration-1000 h-[75%]"></div>
+</div>
+<span class="text-label-sm font-label-sm text-outline truncate w-full text-center">Depth</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full">
+<div class="w-full bg-primary/20 rounded-t-lg relative group h-[80%]">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-lg transition-all duration-1000 h-[88%]"></div>
+</div>
+<span class="text-label-sm font-label-sm text-outline truncate w-full text-center">Syntax</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full">
+<div class="w-full bg-primary/20 rounded-t-lg relative group h-[80%]">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-lg transition-all duration-1000 h-[60%]"></div>
+</div>
+<span class="text-label-sm font-label-sm text-outline truncate w-full text-center">Creativity</span>
+</div>
+</div>
+</div>
+</div>
+<!-- AI Similarity / Plagiarism -->
+<div class="md:col-span-1 ai-accent-card p-xl rounded-xl flex flex-col items-center justify-center text-center">
+<span class="material-symbols-outlined text-secondary text-4xl mb-4">auto_awesome</span>
+<span class="text-outline font-label-sm text-label-sm mb-1">AI Similarity Index</span>
+<span class="font-display text-display text-secondary">12%</span>
+<p class="text-label-sm text-on-surface-variant px-4 mt-2">Low similarity detected. Content appears authentic and original.</p>
+</div>
+</div>
+<!-- Question Wise Table -->
+<section class="mb-xl">
+<div class="glass-card rounded-xl overflow-hidden shadow-sm">
+<div class="px-lg py-md border-b border-outline-variant/30 bg-surface-container-low flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md">Question-wise Breakdown</h3>
+<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-outline-variant shadow-sm">
+<span class="material-symbols-outlined text-primary text-sm">filter_list</span>
+<span class="text-label-md font-label-md">Sort by Marks</span>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="px-lg py-4 font-semibold">No.</th>
+<th class="px-lg py-4 font-semibold w-1/3">Question</th>
+<th class="px-lg py-4 font-semibold">Expected Answer</th>
+<th class="px-lg py-4 font-semibold">Student Answer</th>
+<th class="px-lg py-4 font-semibold text-center">AI Similarity</th>
+<th class="px-lg py-4 font-semibold text-right">Marks</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/20 font-body-md text-body-md">
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-lg py-6 font-semibold">01</td>
+<td class="px-lg py-6">Define Time Complexity and give an example of O(n log n).</td>
+<td class="px-lg py-6"><p class="line-clamp-2 text-outline">Computational complexity that describes the amount of computer time...</p></td>
+<td class="px-lg py-6"><p class="line-clamp-2 text-on-surface">Time complexity measures how time grows with input. Merge sort is O(n log n)...</p></td>
+<td class="px-lg py-6 text-center">
+<div class="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">check_circle</span> 94%
+                                    </div>
+</td>
+<td class="px-lg py-6 text-right font-bold text-primary">10/10</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-lg py-6 font-semibold">02</td>
+<td class="px-lg py-6">Explain the difference between a Stack and a Queue.</td>
+<td class="px-lg py-6"><p class="line-clamp-2 text-outline">Stack is LIFO (Last-In-First-Out), Queue is FIFO (First-In-First-Out)...</p></td>
+<td class="px-lg py-6"><p class="line-clamp-2 text-on-surface">Stack uses LIFO, while Queue uses FIFO. Stack is like a pile of plates...</p></td>
+<td class="px-lg py-6 text-center">
+<div class="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">check_circle</span> 88%
+                                    </div>
+</td>
+<td class="px-lg py-6 text-right font-bold text-primary">09/10</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-lg py-6 font-semibold">03</td>
+<td class="px-lg py-6">Write a pseudocode for Binary Search on a sorted array.</td>
+<td class="px-lg py-6"><p class="line-clamp-2 text-outline">Initialize low = 0, high = n-1. While low &lt;= high, find mid...</p></td>
+<td class="px-lg py-6"><p class="line-clamp-2 text-error">The student provided an O(n) linear search implementation instead.</p></td>
+<td class="px-lg py-6 text-center">
+<div class="inline-flex items-center gap-1 bg-error-container text-on-error-container px-2 py-1 rounded text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">cancel</span> 32%
+                                    </div>
+</td>
+<td class="px-lg py-6 text-right font-bold text-error">03/15</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- Feedback Section -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Strengths -->
+<div class="bg-green-50/50 border border-green-200/50 p-lg rounded-xl flex flex-col gap-4">
+<div class="flex items-center gap-3 text-green-700">
+<span class="material-symbols-outlined bg-green-100 p-2 rounded-lg">verified</span>
+<h4 class="font-headline-md text-headline-md">Strengths</h4>
+</div>
+<ul class="space-y-3">
+<li class="flex gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="material-symbols-outlined text-green-500 text-sm mt-1">check</span>
+                        Excellent conceptual understanding of foundational data structures (Stacks, Queues).
+                    </li>
+<li class="flex gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="material-symbols-outlined text-green-500 text-sm mt-1">check</span>
+                        Strong terminological accuracy in defining complexity classes.
+                    </li>
+</ul>
+</div>
+<!-- Weaknesses -->
+<div class="bg-error-container/20 border border-error/10 p-lg rounded-xl flex flex-col gap-4">
+<div class="flex items-center gap-3 text-error">
+<span class="material-symbols-outlined bg-error-container/40 p-2 rounded-lg">warning</span>
+<h4 class="font-headline-md text-headline-md">Weaknesses</h4>
+</div>
+<ul class="space-y-3">
+<li class="flex gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="material-symbols-outlined text-error text-sm mt-1">close</span>
+                        Confusion between algorithmic logic (Binary Search vs. Linear Search).
+                    </li>
+<li class="flex gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="material-symbols-outlined text-error text-sm mt-1">close</span>
+                        Pseudocode formatting lacks industry-standard indentation.
+                    </li>
+</ul>
+</div>
+<!-- Suggestions -->
+<div class="bg-primary/5 border border-primary/10 p-lg rounded-xl flex flex-col gap-4">
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined bg-primary/10 p-2 rounded-lg">lightbulb</span>
+<h4 class="font-headline-md text-headline-md">Suggestions</h4>
+</div>
+<ul class="space-y-3">
+<li class="flex gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="material-symbols-outlined text-primary text-sm mt-1">arrow_forward</span>
+                        Review Divide and Conquer algorithms to master Binary Search logic.
+                    </li>
+<li class="flex gap-2 text-on-surface-variant font-body-md text-body-md">
+<span class="material-symbols-outlined text-primary text-sm mt-1">arrow_forward</span>
+                        Practice writing pseudocode for recursive functions specifically.
+                    </li>
+</ul>
+</div>
+</section>
+<!-- Final Action Section -->
+<section class="mt-xl flex flex-col items-center justify-center py-xl bg-surface-container-low rounded-2xl border border-dashed border-outline-variant">
+<h4 class="font-headline-md text-headline-md mb-2">Need a Second Opinion?</h4>
+<p class="text-on-surface-variant mb-6 text-center max-w-lg">If you feel the AI grading was inconsistent with the provided grading rubric, you can request a manual re-evaluation by the faculty head.</p>
+<button class="px-xl py-md bg-white border-2 border-primary text-primary rounded-full font-bold text-label-md flex items-center gap-2 hover:bg-primary hover:text-white transition-all transform active:scale-95 group">
+<span class="material-symbols-outlined group-hover:rotate-180 transition-transform">refresh</span> Re-evaluation Request
+            </button>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-lg mt-auto bg-surface-container-low border-t border-outline-variant/20">
+<div class="flex flex-col md:flex-row justify-between items-center px-gutter max-w-container-max mx-auto gap-4">
+<div class="flex flex-col items-center md:items-start">
+<span class="font-headline-md text-headline-md font-black text-primary">GradeAI</span>
+<p class="text-on-surface-variant font-label-sm text-label-sm mt-1">© 2024 GradeAI Evaluation Systems. All rights reserved.</p>
+</div>
+<div class="flex gap-8">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-sm text-label-sm" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-sm text-label-sm" href="#">Terms of Service</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-sm text-label-sm" href="#">Help Center</a>
+</div>
+</div>
+</footer>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 w-full z-50 md:hidden bg-surface/90 backdrop-blur-lg border-t border-outline-variant/30 h-16 flex justify-around items-center px-4 pb-safe">
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform">
+<span class="material-symbols-outlined">fact_check</span>
+<span class="font-label-sm text-label-sm">Evaluations</span>
+</button>
+<button class="flex flex-col items-center justify-center text-primary font-bold active:scale-90 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bar_chart</span>
+<span class="font-label-sm text-label-sm">Reports</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm">Profile</span>
+</button>
+</nav>
+<script>
+        // Intersection Observer for animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100');
+                    entry.target.classList.remove('translate-y-4');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-4');
+            observer.observe(card);
+        });
+
+        // Micro-interaction for re-evaluation button
+        const reEvalBtn = document.querySelector('button.group');
+        if(reEvalBtn) {
+            reEvalBtn.addEventListener('click', () => {
+                const icon = reEvalBtn.querySelector('.material-symbols-outlined');
+                icon.style.transition = 'transform 1s ease';
+                icon.style.transform = 'rotate(360deg)';
+                setTimeout(() => {
+                    alert('Re-evaluation request submitted to Academic Portal.');
+                    icon.style.transform = 'rotate(0deg)';
+                }, 1000);
+            });
+        }
+    </script>
+</body></html>

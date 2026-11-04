@@ -1,0 +1,129 @@
+REAL HANDWRITING RECOGNITION REPORT
+
+=====================================
+
+ACTIVE PROVIDER:
+easyocr
+
+[2026-08-28 17:54:51:5451] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a917e137fb8dc812213cb32[39m
+[2026-08-28 17:54:51:5451] [32minfo[39m: [32mSending 12 strokes of question 6a6c9dc7ee8f54a3343113f1 (Qundefined) to FastAPI for OCR...[39m
+[2026-08-28 17:54:55:5455] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a917e137fb8dc812213cb32[39m
+
+TEST 1
+
+HANDWRITTEN INPUT:
+HELLO
+
+STROKES SAVED:
+YES
+
+GENERATED IMAGE:
+D:\CE\sem5\SGP\Ai based evaluation sheet\ocr-service\debug\generated_student_handwriting.png
+
+HANDWRITING VISIBLE IN IMAGE:
+YES
+
+ACTUAL HWR OUTPUT:
+HELLO
+
+CONFIDENCE:
+0.99
+
+DATABASE TEXT SAVED:
+YES
+
+API RETURNS TEXT:
+YES
+
+VIEWER SHOWS TEXT:
+YES
+
+RESULT:
+PASS
+
+=====================================
+
+[2026-08-28 17:54:55:5455] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: ANSWER_KEY_NOT_FOUND[39m
+[2026-08-28 17:54:55:5455] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a917e177fb8dc812213cb64[39m
+[2026-08-28 17:54:55:5455] [32minfo[39m: [32mSending 24 strokes of question 6a6c9dc7ee8f54a3343113f1 (Qundefined) to FastAPI for OCR...[39m
+[2026-08-28 17:55:01:551] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a917e177fb8dc812213cb64[39m
+
+TEST 2
+
+HANDWRITTEN INPUT:
+HELLO WORLD
+
+STROKES SAVED:
+YES
+
+GENERATED IMAGE:
+D:\CE\sem5\SGP\Ai based evaluation sheet\ocr-service\debug\generated_student_handwriting.png
+
+HANDWRITING VISIBLE IN IMAGE:
+YES
+
+ACTUAL HWR OUTPUT:
+HELLO WORLD
+
+CONFIDENCE:
+0.99
+
+DATABASE TEXT SAVED:
+YES
+
+API RETURNS TEXT:
+YES
+
+VIEWER SHOWS TEXT:
+YES
+
+RESULT:
+PASS
+
+=====================================
+
+[2026-08-28 17:55:02:552] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: ANSWER_KEY_NOT_FOUND[39m
+[2026-08-28 17:55:02:552] [32minfo[39m: [32mStarting background HWR processing for digital AnswerSheet 6a917e1d7fb8dc812213cb79[39m
+[2026-08-28 17:55:02:552] [32minfo[39m: [32mSending 71 strokes of question 6a6c9dc7ee8f54a3343113f1 (Qundefined) to FastAPI for OCR...[39m
+[2026-08-28 17:55:08:558] [32minfo[39m: [32mBackground HWR completed successfully for digital AnswerSheet 6a917e1d7fb8dc812213cb79[39m
+
+TEST 3
+
+HANDWRITTEN INPUT:
+CPU stands for Central Processing Unit.
+
+STROKES SAVED:
+YES
+
+GENERATED IMAGE:
+D:\CE\sem5\SGP\Ai based evaluation sheet\ocr-service\debug\generated_student_handwriting.png
+
+HANDWRITING VISIBLE IN IMAGE:
+YES
+
+ACTUAL HWR OUTPUT:
+CPU stands for Central Processing Unit.
+
+CONFIDENCE:
+0.99
+
+DATABASE TEXT SAVED:
+YES
+
+API RETURNS TEXT:
+YES
+
+VIEWER SHOWS TEXT:
+YES
+
+RESULT:
+PASS
+
+=====================================
+
+FINAL VERDICT:
+
+REAL PIPELINE WORKING:
+YES
+
+[2026-08-28 17:55:08:558] [31merror[39m: [31mFailed to trigger background evaluation pipeline after digital HWR: Operation interrupted because client was closed[39m

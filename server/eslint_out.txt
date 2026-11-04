@@ -1,0 +1,78 @@
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\routes\subject.routes.js
+  28:7  warning  Unexpected console statement  no-console
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\ai\evaluationPipeline.service.js
+  138:1  error  Expected indentation of 16 spaces but found 18  indent
+  139:1  error  Expected indentation of 18 spaces but found 20  indent
+  141:1  error  Expected indentation of 14 spaces but found 16  indent
+  185:1  error  Expected indentation of 12 spaces but found 14  indent
+  186:1  error  Expected indentation of 14 spaces but found 16  indent
+  188:1  error  Expected indentation of 10 spaces but found 12  indent
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\ai\hwr\providerFactory.js
+   9:1  error  Expected indentation of 4 spaces but found 6  indent
+  10:1  error  Expected indentation of 6 spaces but found 8  indent
+  11:1  error  Expected indentation of 4 spaces but found 6  indent
+  12:1  error  Expected indentation of 4 spaces but found 6  indent
+  13:1  error  Expected indentation of 6 spaces but found 8  indent
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\ai\prompt.service.js
+  13:1  error  Expected indentation of 10 spaces but found 12  indent
+  14:1  error  Expected indentation of 12 spaces but found 14  indent
+  15:1  error  Expected indentation of 14 spaces but found 16  indent
+  16:1  error  Expected indentation of 10 spaces but found 12  indent
+  17:1  error  Expected indentation of 10 spaces but found 12  indent
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\answerSheet.service.js
+  11:8  error  'path' is defined but never used  no-unused-vars
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\results.service.js
+   29:9   error  'exam' is assigned a value but never used  no-unused-vars
+  408:9   error  'exam' is assigned a value but never used  no-unused-vars
+  439:48  error  Strings must use doublequote               quotes
+  440:44  error  Strings must use doublequote               quotes
+  441:48  error  Strings must use doublequote               quotes
+  586:11  error  Strings must use doublequote               quotes
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\services\subject.service.js
+  206:5  warning  Unexpected console statement  no-console
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\tests\test-answer-key.js
+   11:3  warning  Unexpected console statement  no-console
+   12:3  warning  Unexpected console statement  no-console
+   31:5  warning  Unexpected console statement  no-console
+   39:5  warning  Unexpected console statement  no-console
+   50:5  warning  Unexpected console statement  no-console
+   63:5  warning  Unexpected console statement  no-console
+   89:5  warning  Unexpected console statement  no-console
+  101:5  warning  Unexpected console statement  no-console
+  121:7  warning  Unexpected console statement  no-console
+  125:5  warning  Unexpected console statement  no-console
+  143:7  warning  Unexpected console statement  no-console
+  147:5  warning  Unexpected console statement  no-console
+  172:5  warning  Unexpected console statement  no-console
+  173:5  warning  Unexpected console statement  no-console
+  177:5  warning  Unexpected console statement  no-console
+  180:5  warning  Unexpected console statement  no-console
+  182:5  warning  Unexpected console statement  no-console
+  185:5  warning  Unexpected console statement  no-console
+  197:7  warning  Unexpected console statement  no-console
+  200:5  warning  Unexpected console statement  no-console
+  212:7  warning  Unexpected console statement  no-console
+  216:5  warning  Unexpected console statement  no-console
+  218:5  warning  Unexpected console statement  no-console
+  221:5  warning  Unexpected console statement  no-console
+  230:5  warning  Unexpected console statement  no-console
+  235:5  warning  Unexpected console statement  no-console
+  237:5  warning  Unexpected console statement  no-console
+  241:5  warning  Unexpected console statement  no-console
+  258:5  warning  Unexpected console statement  no-console
+
+D:\CE\sem5\SGP\Ai based evaluation sheet\server\src\tests\test-answer-sheet-pipeline.js
+  3:8  error  'User' is defined but never used  no-unused-vars
+  4:8  error  'Exam' is defined but never used  no-unused-vars
+
+Γ£û 56 problems (25 errors, 31 warnings)
+  20 errors and 0 warnings potentially fixable with the `--fix` option.
+

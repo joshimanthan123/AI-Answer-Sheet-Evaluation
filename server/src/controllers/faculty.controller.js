@@ -1,0 +1,362 @@
+import dashboardService from "../services/dashboard.service.js";
+import Evaluation from "../models/Evaluation.js";
+import AnswerSheet from "../models/AnswerSheet.js";
+import Notification from "../models/Notification.js";
+import ApiError from "../utils/ApiError.js";
+import { STATUS_CODES } from "../constants/statusCodes.js";
+import { sendSuccess } from "../helpers/response.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import logger from "../utils/logger.js";
+import facultyReviewService from "../services/facultyReview.service.js";
+
+export const getFacultyDashboard = asyncHandler(async (req, res) => {
+  const result = await dashboardService.getFacultyDashboard(req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Faculty dashboard retrieved successfully", result);
+});
+
+export const getFacultySubmissions = asyncHandler(async (req, res) => {
+  const { exam, subject, student, status, date, page = 1, limit = 10 } = req.query;
+
+  const mongoQuery = { isDeleted: false };
+
+  if (req.user.role === "faculty") {
+    const Exam = (await import("../models/Exam.js")).default;
+    const facultyExams = await Exam.find({ createdBy: req.user._id, isDeleted: false }).select("_id");
+    const facultyExamIds = facultyExams.map((e) => e._id);
+    mongoQuery.$or = [{ facultyId: req.user._id }, { exam: { $in: facultyExamIds } }];
+  }
+
+  if (exam) mongoQuery.exam = exam;
+  if (subject) mongoQuery.subject = subject;
+  if (student) mongoQuery.student = student;
+  if (status) mongoQuery.submissionStatus = status;
+
+  if (date) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    mongoQuery.submittedAt = { $gte: start, $lte: end };
+  }
+
+  const limitNum = Number(limit);
+  const skip = (Number(page) - 1) * limitNum;
+
+  const total = await AnswerSheet.countDocuments(mongoQuery);
+  const data = await AnswerSheet.find(mongoQuery)
+    .sort("-submittedAt")
+    .skip(skip)
+    .limit(limitNum)
+    .populate("student", "name email rollNo department semester")
+    .populate("subject", "name code semester")
+    .populate("exam", "title examType totalMarks duration");
+
+  return sendSuccess(res, STATUS_CODES.OK, "Submissions list retrieved successfully", data, {
+    total,
+    page: Number(page),
+    limit: limitNum,
+    totalPages: Math.ceil(total / limitNum),
+  });
+});
+
+export const getFacultyReviewQueue = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.getReviewQueue(req.query, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation review queue retrieved successfully", result.data, {
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  });
+});
+
+export const publishResults = asyncHandler(async (req, res) => {
+  const { examId, answerSheetId } = req.body;
+
+  if (!examId && !answerSheetId) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Either examId or answerSheetId must be provided");
+  }
+
+  let updatedCount = 0;
+
+  if (examId) {
+    // 1. Publish all evaluations for an entire exam
+    const answerSheets = await AnswerSheet.find({ exam: examId, isDeleted: false });
+    const sheetIds = answerSheets.map((as) => as._id);
+
+    const evaluations = await Evaluation.find({
+      answerSheet: { $in: sheetIds },
+      evaluationStatus: { $in: ["AI_COMPLETED", "FACULTY_REVIEW", "AI_PENDING"] },
+      isDeleted: false,
+    }).populate({
+      path: "answerSheet",
+      populate: { path: "exam", select: "title" },
+    });
+
+    for (const evalItem of evaluations) {
+      evalItem.evaluationStatus = "PUBLISHED";
+      evalItem.updatedBy = req.user._id;
+      await evalItem.save();
+
+      // Update answer sheet status to Published
+      if (evalItem.answerSheet) {
+        const sheet = await AnswerSheet.findById(evalItem.answerSheet._id);
+        if (sheet) {
+          sheet.submissionStatus = "Published";
+          sheet.updatedBy = req.user._id;
+          await sheet.save();
+
+          // Create notification for the student
+          await Notification.create({
+            user: sheet.student,
+            title: "Results Published",
+            message: `Your results for exam "${evalItem.answerSheet.exam?.title || "Exam"}" have been published.`,
+            type: "Results Published",
+            createdBy: req.user._id,
+            updatedBy: req.user._id,
+          });
+        }
+      }
+      updatedCount++;
+    }
+
+    logger.info(`Results published for exam ${examId} by faculty ${req.user._id}`);
+  } else {
+    // 2. Publish single student answer sheet evaluation
+    const evaluation = await Evaluation.findOne({
+      answerSheet: answerSheetId,
+      isDeleted: false,
+    }).populate({
+      path: "answerSheet",
+      populate: { path: "exam", select: "title" },
+    });
+
+    if (!evaluation) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, "Evaluation not found for this answer sheet");
+    }
+
+    evaluation.evaluationStatus = "PUBLISHED";
+    evaluation.updatedBy = req.user._id;
+    await evaluation.save();
+
+    const sheet = await AnswerSheet.findById(answerSheetId);
+    if (sheet) {
+      sheet.submissionStatus = "Published";
+      sheet.updatedBy = req.user._id;
+      await sheet.save();
+
+      // Notify student
+      await Notification.create({
+        user: sheet.student,
+        title: "Results Published",
+        message: `Your results for exam "${evaluation.answerSheet.exam?.title || "Exam"}" have been published.`,
+        type: "Results Published",
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+      });
+    }
+    updatedCount = 1;
+    logger.info(`Results published for AnswerSheet ${answerSheetId} by faculty ${req.user._id}`);
+  }
+
+  return sendSuccess(res, STATUS_CODES.OK, `Published ${updatedCount} evaluations successfully`, {
+    publishedCount: updatedCount,
+  });
+});
+
+export const updateFacultyProfile = asyncHandler(async (req, res) => {
+  const { name, email } = req.body;
+
+  if (!name || name.trim().length < 2) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Name must be at least 2 characters long.");
+  }
+  if (!email) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Email address is required.");
+  }
+
+  const User = (await import("../models/User.js")).default;
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found.");
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Check unique constraints on email
+  if (normalizedEmail !== user.email) {
+    const emailExist = await User.findOne({ email: normalizedEmail });
+    if (emailExist) {
+      throw new ApiError(
+        STATUS_CODES.CONFLICT,
+        "An account has already been registered with this email address."
+      );
+    }
+  }
+
+  user.name = name.trim();
+  user.email = normalizedEmail;
+  await user.save();
+
+  return sendSuccess(res, STATUS_CODES.OK, "Profile updated successfully.", { user });
+});
+
+export const changeFacultyPassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "All fields are required.");
+  }
+  if (newPassword.length < 8) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "New password must be at least 8 characters long."
+    );
+  }
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Passwords do not match.");
+  }
+
+  const User = (await import("../models/User.js")).default;
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found.");
+  }
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    throw new ApiError(STATUS_CODES.UNAUTHORIZED, "The current password you entered is incorrect.");
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return sendSuccess(res, STATUS_CODES.OK, "Password changed successfully.");
+});
+
+export const getFacultyStudents = asyncHandler(async (req, res) => {
+  const User = (await import("../models/User.js")).default;
+  const students = await User.find({ role: "student", isDeleted: false })
+    .select("name email department semester rollNo")
+    .lean();
+  
+  return sendSuccess(
+    res,
+    STATUS_CODES.OK,
+    "Students list retrieved successfully",
+    students || []
+  );
+});
+
+export const getFacultyReviewDetails = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.getReviewDetails(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Faculty review details retrieved successfully", result);
+});
+
+export const startFacultyReview = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.startReview(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Faculty review started successfully", result);
+});
+
+export const reviewQuestion = asyncHandler(async (req, res) => {
+  const { facultyMarks, comment } = req.body;
+  const result = await facultyReviewService.reviewQuestion(
+    req.params.id,
+    req.params.questionNumber,
+    facultyMarks,
+    comment,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Question evaluation review saved", result);
+});
+
+export const addOverallComment = asyncHandler(async (req, res) => {
+  const { comment } = req.body;
+  const result = await facultyReviewService.addOverallComment(req.params.id, comment, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Review comment saved successfully", result);
+});
+
+export const requestReEvaluation = asyncHandler(async (req, res) => {
+  const { scope, questionNumber, reason } = req.body;
+  const result = await facultyReviewService.requestReEvaluation(
+    req.params.id,
+    scope,
+    questionNumber,
+    reason,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "AI recheck requested successfully", result);
+});
+
+export const requestRevision = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  const result = await facultyReviewService.requestRevision(req.params.id, reason, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Revision requested successfully", result);
+});
+
+export const approveReview = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.approveReview(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation progress approved successfully", result);
+});
+
+export const finalizeReview = asyncHandler(async (req, res) => {
+  const result = await facultyReviewService.finalizeReview(req.params.id, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Evaluation score finalized and locked", result);
+});
+
+export const acceptAiQuestion = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const targetQ = req.params.questionId || req.params.questionNumber;
+  const result = await facultyReviewService.acceptAiQuestion(targetId, targetQ, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "AI evaluation accepted successfully", result);
+});
+
+export const overrideQuestion = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const targetQ = req.params.questionId || req.params.questionNumber;
+  const { facultyMarks, overrideReason, comment } = req.body;
+  const result = await facultyReviewService.overrideQuestion(
+    targetId,
+    targetQ,
+    facultyMarks,
+    overrideReason,
+    comment,
+    req.user._id
+  );
+  return sendSuccess(res, STATUS_CODES.OK, "Question mark overridden successfully", result);
+});
+
+export const finalizeSingleQuestion = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const targetQ = req.params.questionId || req.params.questionNumber;
+  const result = await facultyReviewService.finalizeSingleQuestion(targetId, targetQ, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Question evaluation finalized and locked", result);
+});
+
+export const finalizeStudentEvaluation = asyncHandler(async (req, res) => {
+  const targetId = req.params.evaluationId || req.params.id;
+  const result = await facultyReviewService.finalizeStudentEvaluation(targetId, req.user._id);
+  return sendSuccess(res, STATUS_CODES.OK, "Student evaluation finalized and sealed successfully", result);
+});
+
+export default {
+  getFacultyDashboard,
+  getFacultySubmissions,
+  getFacultyReviewQueue,
+  publishResults,
+  updateFacultyProfile,
+  changeFacultyPassword,
+  getFacultyStudents,
+  getFacultyReviewDetails,
+  startFacultyReview,
+  reviewQuestion,
+  addOverallComment,
+  requestReEvaluation,
+  requestRevision,
+  approveReview,
+  finalizeReview,
+  acceptAiQuestion,
+  overrideQuestion,
+  finalizeSingleQuestion,
+  finalizeStudentEvaluation,
+};
+

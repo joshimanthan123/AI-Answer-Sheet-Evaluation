@@ -1,0 +1,168 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/e2e/full-master.spec.ts",
+      "--reporter=json"
+    ],
+    "configFile": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\playwright.config.ts",
+    "rootDir": "D:/CE/sem5/SGP/Ai based evaluation sheet/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/CE/sem5/SGP/Ai based evaluation sheet/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/CE/sem5/SGP/Ai based evaluation sheet/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "e2e\\full-master.spec.ts",
+      "file": "e2e/full-master.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Master End-to-End System Evaluation Pipeline Suite",
+          "file": "e2e/full-master.spec.ts",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Full Life-Cycle Execution: Faculty Reference Upload -> Student Submission -> AI Evaluation -> Faculty Finalization & Reports",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 13558,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n    at D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\tests\\e2e\\full-master.spec.ts:64:26",
+                        "location": {
+                          "file": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\tests\\e2e\\full-master.spec.ts",
+                          "column": 26,
+                          "line": 64
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 62 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForLoadState(\u001b[32m'networkidle'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 63 |\u001b[39m     \u001b[36mconst\u001b[39m tableVisible \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'table'\u001b[39m)\u001b[33m.\u001b[39misVisible()\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 64 |\u001b[39m     expect(tableVisible)\u001b[33m.\u001b[39mtoBeTruthy()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 65 |\u001b[39m\n \u001b[90m 66 |\u001b[39m     \u001b[90m// STEP 4: Student Portal - Submit Answer Sheet\u001b[39m\n \u001b[90m 67 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mcontext()\u001b[33m.\u001b[39mclearCookies()\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\tests\\e2e\\full-master.spec.ts",
+                            "column": 26,
+                            "line": 64
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n\n  62 |     await page.waitForLoadState('networkidle');\n  63 |     const tableVisible = await page.locator('table').isVisible();\n> 64 |     expect(tableVisible).toBeTruthy();\n     |                          ^\n  65 |\n  66 |     // STEP 4: Student Portal - Submit Answer Sheet\n  67 |     await page.context().clearCookies();\n    at D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\tests\\e2e\\full-master.spec.ts:64:26"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-04T12:28:00.144Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\test-results\\e2e-full-master-Master-End-db6af-aculty-Finalization-Reports-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\test-results\\e2e-full-master-Master-End-db6af-aculty-Finalization-Reports-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\test-results\\e2e-full-master-Master-End-db6af-aculty-Finalization-Reports-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\test-results\\e2e-full-master-Master-End-db6af-aculty-Finalization-Reports-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "D:\\CE\\sem5\\SGP\\Ai based evaluation sheet\\tests\\e2e\\full-master.spec.ts",
+                        "column": 26,
+                        "line": 64
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bd220820d005833ce5ea-3523e5233b4970f8284d",
+              "file": "e2e/full-master.spec.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-04T12:27:59.423Z",
+    "duration": 15874.716,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

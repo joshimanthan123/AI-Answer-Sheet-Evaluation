@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Based Automated Answer Sheet Evaluation System — 16:9 Presentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      
+      /* Dark Enterprise Palette (Default) */
+      --bg-dark: #090d16;
+      --bg-card-dark: rgba(17, 24, 39, 0.75);
+      --bg-card-border-dark: rgba(255, 255, 255, 0.08);
+      --text-main-dark: #f8fafc;
+      --text-muted-dark: #94a3b8;
+      
+      /* Accent Colors */
+      --accent-cyan: #06b6d4;
+      --accent-blue: #3b82f6;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --gradient-brand: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #6366f1 100%);
+      --gradient-card: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+      
+      /* Light Enterprise Palette */
+      --bg-light: #f1f5f9;
+      --bg-card-light: rgba(255, 255, 255, 0.9);
+      --bg-card-border-light: rgba(0, 0, 0, 0.08);
+      --text-main-light: #0f172a;
+      --text-muted-light: #64748b;
+    }
+
+    [data-theme="dark"] {
+      --bg-main: var(--bg-dark);
+      --bg-card: var(--bg-card-dark);
+      --border-card: var(--bg-card-border-dark);
+      --text-main: var(--text-main-dark);
+      --text-muted: var(--text-muted-dark);
+      --code-bg: #030712;
+      --shadow-color: rgba(0, 0, 0, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-main: var(--bg-light);
+      --bg-card: var(--bg-card-light);
+      --border-card: var(--bg-card-border-light);
+      --text-main: var(--text-main-light);
+      --text-muted: var(--text-muted-light);
+      --code-bg: #e2e8f0;
+      --shadow-color: rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      user-select: none;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* 16:9 Widescreen Container */
+    .deck-container {
+      width: 100vw;
+      height: 100vh;
+      max-width: 177.78vh; /* 16:9 Aspect Ratio */
+      max-height: 56.25vw;
+      position: relative;
+      background: var(--bg-main);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px var(--shadow-color);
+    }
+
+    /* Slide Engine */
+    .slides-wrapper {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      transform: scale(0.98);
+      padding: 3rem 4rem 4rem 4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+      z-index: 10;
+    }
+
+    /* Slide Header */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    }
+
+    .slide-header-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .slide-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      width: fit-content;
+    }
+
+    .slide-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .slide-subtitle {
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .project-tag {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.05);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-card);
+    }
+
+    /* Main Slide Body */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      justify-content: center;
+    }
+
+    /* Common Card Styles */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-text {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Grids & Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    .grid-6 {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.75rem;
+    }
+
+    /* Control Bar */
+    .controls-bar {
+      position: absolute;
+      bottom: 1rem;
+      right: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      backdrop-filter: blur(16px);
+      z-index: 100;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .control-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .slide-counter {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-cyan);
+      font-weight: 600;
+      padding: 0 0.5rem;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: var(--gradient-brand);
+      transition: width 0.3s ease;
+      z-index: 101;
+    }
+
+    /* Overview Modal */
+    .overview-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.95);
+      backdrop-filter: blur(20px);
+      z-index: 200;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .overview-modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .overview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1rem;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+
+    .thumb-card {
+      aspect-ratio: 16 / 9;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      padding: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+
+    .thumb-card:hover {
+      border-color: var(--accent-cyan);
+      transform: translateY(-2px);
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+    }
+
+    .thumb-number {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    .thumb-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    /* Custom Flowcharts & Diagram Elements */
+    .flow-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.2rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 10px;
+      text-align: center;
+      position: relative;
+    }
+
+    .flow-num {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+
+    .flow-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .flow-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .arrow-icon {
+      color: var(--accent-cyan);
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    /* Hero Slide 1 Specifics */
+    .hero-title {
+      font-size: 3.25rem;
+      font-weight: 900;
+      line-height: 1.1;
+      background: var(--gradient-brand);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-visual-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border-card);
+      padding: 2rem;
+      border-radius: 16px;
+      position: relative;
+    }
+
+    .hero-visual-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .hero-node-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      color: var(--accent-cyan);
+    }
+
+    .hero-node-label {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .hero-node-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Code Block */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      padding: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    /* Image Container */
+    .img-box {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border-card);
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .img-box img {
+      width: 100%;
+      height: auto;
+      max-height: 320px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .quote-box {
+      border-left: 4px solid var(--accent-cyan);
+      padding: 1rem 1.5rem;
+      background: rgba(6, 182, 212, 0.05);
+      border-radius: 0 8px 8px 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    .roadmap-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge-done {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-next {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="deck-container" id="deckContainer">
+    <div class="slides-wrapper" id="slidesWrapper">
+
+      <!-- SLIDE 1: TITLE -->
+      <div class="slide active" data-slide="1">
+        <div class="slide-header">
+          <div class="slide-badge">Milestone 1 — Text Digitization</div>
+          <div class="project-tag">AI Answer Sheet Evaluation</div>
+        </div>
+        <div class="slide-body">
+          <h1 class="hero-title">AI-Based Automated Answer Sheet Evaluation System</h1>
+          <p class="hero-subtitle">Digital Handwriting Capture & Intelligent Text Digitization</p>
+          
+          <div class="hero-visual-box">
+            <div class="hero-visual-node">
+              <div class="hero-node-icon">✍️</div>
+              <div class="hero-node-label">Digital Handwriting</div>
+              <div class="hero-node-sub">HTML5 Canvas Stroke Vectors</div>
+            </div>
+            <div class="arrow-icon">➔</div>
+            <div class="hero-visual-node">
+              <div class="hero-node-icon">⚡</div>
+              <div class="hero-node-label">FastAPI & PaddleOCR</div>
+              <div class="hero-node-sub">PP-OCRv5 Microservice</div>
+            </div>
+            <div class="arrow-icon">➔</div>
+            <div class="hero-visual-node">
+              <div class="hero-node-icon">📄</div>
+              <div class="hero-node-label">Digitized Text</div>
+              <div class="hero-node-sub">Structured Machine-Readable Output</div>
+            </div>
+          </div>
+        </div>
+        <div class="grid-4" style="margin-top: 1.5rem; gap: 1rem;">
+          <div class="card" style="padding: 0.8rem 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">TEAM MEMBERS</div>
+            <div style="font-size: 0.9rem; font-weight: 700;">Student Project Team</div>
+          </div>
+          <div class="card" style="padding: 0.8rem 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">PROJECT GUIDE</div>
+            <div style="font-size: 0.9rem; font-weight: 700;">Faculty Advisor</div>
+          </div>
+          <div class="card" style="padding: 0.8rem 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">DEPARTMENT</div>
+            <div style="font-size: 0.9rem; font-weight: 700;">Computer Engineering</div>
+          </div>
+          <div class="card" style="padding: 0.8rem 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">ACADEMIC YEAR</div>
+            <div style="font-size: 0.9rem; font-weight: 700;">2025 – 2026</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 2: EXECUTIVE SUMMARY -->
+      <div class="slide" data-slide="2">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Executive Summary</div>
+            <h2 class="slide-title">Project Overview</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-3">
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-rose);">⚠️ Problem</div>
+              <p class="card-text">Traditional handwritten answer-sheet processing is manual, labor-intensive, and difficult to digitize automatically for evaluation workflows.</p>
+            </div>
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-cyan);">💡 Solution</div>
+              <p class="card-text">Captures digital handwritten responses from canvas interfaces and processes them through an integrated OpenCV + PaddleOCR neural pipeline.</p>
+            </div>
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-emerald);">🎯 Current Milestone</div>
+              <p class="card-text">Converts handwritten answers into accurate, machine-readable digitized text, laying the foundation for downstream evaluation.</p>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border-card); padding: 1.25rem 2rem; border-radius: 12px; margin-top: 1rem;">
+            <div class="flow-step" style="flex: 1;"><span class="flow-title">PROBLEM</span><span class="flow-desc">Manual Sheet Handling</span></div>
+            <div class="arrow-icon" style="padding: 0 1rem;">➔</div>
+            <div class="flow-step" style="flex: 1;"><span class="flow-title">DIGITAL CAPTURE</span><span class="flow-desc">Stroke Coordinates (x,y)</span></div>
+            <div class="arrow-icon" style="padding: 0 1rem;">➔</div>
+            <div class="flow-step" style="flex: 1;"><span class="flow-title">OCR PIPELINE</span><span class="flow-desc">FastAPI + PP-OCRv5</span></div>
+            <div class="arrow-icon" style="padding: 0 1rem;">➔</div>
+            <div class="flow-step" style="flex: 1; border-color: var(--accent-cyan);"><span class="flow-title" style="color: var(--accent-cyan);">DIGITIZED TEXT</span><span class="flow-desc">MongoDB Document Store</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 3: PROBLEM & BUSINESS NEED -->
+      <div class="slide" data-slide="3">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Market Need</div>
+            <h2 class="slide-title">Why Digitize Handwritten Answers?</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">Conventional Answer-Sheet Challenges</div>
+              <ul style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.8; margin-left: 1.2rem;">
+                <li>Manual handling and sorting of physical answer sheets</li>
+                <li>Time-consuming manual data entry and transcription</li>
+                <li>Unstructured handwriting hinders machine processing</li>
+                <li>Question-wise answer extraction is difficult on physical paper</li>
+                <li>Requires significant human effort prior to evaluation</li>
+              </ul>
+            </div>
+
+            <div class="card" style="border-color: rgba(6, 182, 212, 0.3);">
+              <div class="card-title" style="color: var(--accent-cyan);">Process Comparison</div>
+              <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
+                <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); padding: 0.75rem; border-radius: 8px; font-size: 0.85rem;">
+                  <strong>Traditional:</strong> Physical Sheet ➔ Manual Reading ➔ Manual Entry ➔ Evaluation
+                </div>
+                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.75rem; border-radius: 8px; font-size: 0.85rem;">
+                  <strong>Proposed:</strong> Digital Canvas ➔ Preprocessing ➔ PaddleOCR ➔ Digitized Text
+                </div>
+              </div>
+              <div class="quote-box" style="margin-top: 1rem; font-size: 0.9rem;">
+                Key Benefit: Significantly reduces manual data-entry dependency and creates structured digital records.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 4: PROPOSED SOLUTION -->
+      <div class="slide" data-slide="4">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Solution Overview</div>
+            <h2 class="slide-title">Proposed Digital Pipeline</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-6">
+            <div class="flow-step"><div class="flow-num">01</div><div class="flow-title">Student Writes</div><div class="flow-desc">Digital pen input</div></div>
+            <div class="flow-step"><div class="flow-num">02</div><div class="flow-title">Stroke Capture</div><div class="flow-desc">(x, y, t) vectors</div></div>
+            <div class="flow-step"><div class="flow-num">03</div><div class="flow-title">Answer Image</div><div class="flow-desc">Render PNG</div></div>
+            <div class="flow-step"><div class="flow-num">04</div><div class="flow-title">Preprocessing</div><div class="flow-desc">CLAHE & Threshold</div></div>
+            <div class="flow-step"><div class="flow-num">05</div><div class="flow-title">PaddleOCR</div><div class="flow-desc">PP-OCRv5 HWR</div></div>
+            <div class="flow-step" style="border-color: var(--accent-cyan);"><div class="flow-num">06</div><div class="flow-title" style="color: var(--accent-cyan);">Digitized Text</div><div class="flow-desc">MongoDB Store</div></div>
+          </div>
+
+          <div class="quote-box" style="text-align: center; margin-top: 2rem;">
+            “Transforming handwritten digital responses into structured, machine-readable text.”
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 5: SYSTEM ARCHITECTURE -->
+      <div class="slide" data-slide="5">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Architecture</div>
+            <h2 class="slide-title">System Architecture</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+              <div style="display: flex; flex-direction: column; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.8rem;">
+                <div style="background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; padding: 0.6rem; border-radius: 6px; text-align: center;">
+                  🖥️ Student Canvas (React + Vite Frontend)
+                </div>
+                <div style="text-align: center; color: var(--accent-cyan);">↓ POST /api/v1/student/answer-sheets</div>
+                <div style="background: rgba(99, 102, 241, 0.15); border: 1px solid #6366f1; padding: 0.6rem; border-radius: 6px; text-align: center;">
+                  ⚙️ Node.js + Express Backend Server
+                </div>
+                <div style="text-align: center; color: var(--accent-cyan);">↓ Asynchronous HTTP Payload</div>
+                <div style="background: rgba(6, 182, 212, 0.15); border: 1px solid #06b6d4; padding: 0.6rem; border-radius: 6px; text-align: center;">
+                  🐍 FastAPI Python OCR Service (Port 8000)
+                </div>
+                <div style="text-align: center; color: var(--accent-cyan);">↓ Image Preprocessing & PP-OCRv5</div>
+                <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; padding: 0.6rem; border-radius: 6px; text-align: center;">
+                  💾 MongoDB Persistence (AnswerSheet Collection)
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Component Responsibility</div>
+              <div style="display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted);">
+                <div><strong style="color: var(--text-main);">Frontend:</strong> Captures vector handwriting strokes and question assignments.</div>
+                <div><strong style="color: var(--text-main);">Backend:</strong> Orchestrates API authentication, status management, and job queues.</div>
+                <div><strong style="color: var(--text-main);">OCR Service:</strong> Executes OpenCV preprocessing and PaddleOCR 3.7.0 neural inference.</div>
+                <div><strong style="color: var(--text-main);">Database:</strong> Persists raw strokes, generated images, transcribed text, and confidence levels.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 6: END-TO-END OCR WORKFLOW -->
+      <div class="slide" data-slide="6">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Workflow</div>
+            <h2 class="slide-title">End-to-End Handwriting Recognition Workflow</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-4">
+            <div class="card"><div class="flow-num">STAGE 1</div><div class="card-title">Capture</div><p class="card-text">Collect vector strokes from HTML5 digital answer canvas.</p></div>
+            <div class="card"><div class="flow-num">STAGE 2</div><div class="card-title">Preprocess</div><p class="card-text">Normalize DPI, CLAHE contrast enhancement, and grayscale thresholding.</p></div>
+            <div class="card"><div class="flow-num">STAGE 3</div><div class="card-title">Recognize</div><p class="card-text">PP-OCRv5 neural model predicts handwritten characters.</p></div>
+            <div class="card"><div class="flow-num">STAGE 4</div><div class="card-title">Extract</div><p class="card-text">Generates clean machine-readable text with confidence metrics.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 7: TECHNOLOGY STACK -->
+      <div class="slide" data-slide="7">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Tech Stack</div>
+            <h2 class="slide-title">Technology Stack</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-4">
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-blue);">Frontend</div>
+              <ul style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin-left: 1rem;">
+                <li>React 19</li>
+                <li>Vite</li>
+                <li>Axios Client</li>
+                <li>HTML5 Canvas</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-indigo);">Backend</div>
+              <ul style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin-left: 1rem;">
+                <li>Node.js (ESM)</li>
+                <li>Express.js</li>
+                <li>JWT Security</li>
+                <li>Mongoose ODM</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-cyan);">OCR / AI</div>
+              <ul style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin-left: 1rem;">
+                <li>Python 3.11</li>
+                <li>FastAPI</li>
+                <li>PaddleOCR 3.7.0</li>
+                <li>PP-OCRv5</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="card-title" style="color: var(--accent-emerald);">Database</div>
+              <ul style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin-left: 1rem;">
+                <li>MongoDB</li>
+                <li>REST APIs</li>
+                <li>JSON Protocols</li>
+                <li>Modular Architecture</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 8: DIGITAL ANSWER CAPTURE -->
+      <div class="slide" data-slide="8">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Capture Stage</div>
+            <h2 class="slide-title">Digital Handwritten Answer Capture</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+              <div class="card"><div class="card-title">01 — Write</div><p class="card-text">Student writes answers directly using digital stylus on responsive canvas.</p></div>
+              <div class="card"><div class="card-title">02 — Capture</div><p class="card-text">Real-time stroke capture mapped question-by-question with timestamp vectors.</p></div>
+              <div class="card"><div class="card-title">03 — Prepare</div><p class="card-text">Renders high-contrast PNG bitmap ready for OCR microservice processing.</p></div>
+            </div>
+            <div class="img-box">
+              <img src="assets/student_dash_screen.png" alt="Digital Answer Sheet UI">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 9: IMAGE PREPROCESSING -->
+      <div class="slide" data-slide="9">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">OpenCV Pipeline</div>
+            <h2 class="slide-title">OCR Image Preprocessing Pipeline</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-5" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+            <div class="card" style="padding: 0.5rem; text-align: center;">
+              <div class="img-box" style="height: 140px;"><img src="assets/01_original_canvas_render.png" alt="Raw Render"></div>
+              <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.4rem;">1. Raw Render</div>
+            </div>
+            <div class="card" style="padding: 0.5rem; text-align: center;">
+              <div class="img-box" style="height: 140px;"><img src="assets/02_upscaled.png" alt="Upscaled"></div>
+              <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.4rem;">2. Upscale</div>
+            </div>
+            <div class="card" style="padding: 0.5rem; text-align: center;">
+              <div class="img-box" style="height: 140px;"><img src="assets/03_grayscale.png" alt="Grayscale"></div>
+              <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.4rem;">3. Grayscale</div>
+            </div>
+            <div class="card" style="padding: 0.5rem; text-align: center;">
+              <div class="img-box" style="height: 140px;"><img src="assets/04_contrast_enhanced.png" alt="Contrast"></div>
+              <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.4rem;">4. CLAHE</div>
+            </div>
+            <div class="card" style="padding: 0.5rem; text-align: center;">
+              <div class="img-box" style="height: 140px;"><img src="assets/05_final_ocr_input.png" alt="Final OCR Input"></div>
+              <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.4rem; color: var(--accent-cyan);">5. Thresholded</div>
+            </div>
+          </div>
+          <div class="grid-3" style="margin-top: 0.5rem;">
+            <div class="card" style="padding: 0.8rem;"><strong style="font-size: 0.85rem;">Resize:</strong> <span style="font-size: 0.8rem; color: var(--text-muted);">Standardizes stroke resolution</span></div>
+            <div class="card" style="padding: 0.8rem;"><strong style="font-size: 0.85rem;">CLAHE:</strong> <span style="font-size: 0.8rem; color: var(--text-muted);">Enhances stroke boundary contrast</span></div>
+            <div class="card" style="padding: 0.8rem;"><strong style="font-size: 0.85rem;">Thresholding:</strong> <span style="font-size: 0.8rem; color: var(--text-muted);">Separates character strokes from background</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 10: HANDWRITING RECOGNITION ENGINE -->
+      <div class="slide" data-slide="10">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">HWR Microservice</div>
+            <h2 class="slide-title">PaddleOCR Recognition Engine</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">Technical Flow</div>
+              <pre><code>Processed Answer Image PNG
+           │
+           ▼
+FastAPI POST /api/v1/ocr/recognize-strokes
+           │
+           ▼
+PaddleHWRProvider (PaddleOCR 3.7.0 / PP-OCRv5)
+           │
+           ▼
+Extracted Text String + Confidence Score
+           │
+           ▼
+MongoDB Persistence (AnswerSheet Document)</code></pre>
+            </div>
+            <div class="card">
+              <div class="card-title">Microservice Features</div>
+              <ul style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.8; margin-left: 1rem;">
+                <li>RESTful API-based microservice architecture</li>
+                <li>Python 3.11 FastAPI high-throughput server</li>
+                <li>PaddleOCR PP-OCRv5 mobile recognition neural head</li>
+                <li>Lazy engine loading to preserve system RAM</li>
+                <li>Structured JSON response with confidence scoring</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 11: CORE DEMONSTRATION -->
+      <div class="slide" data-slide="11">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);">Core Demonstration</div>
+            <h2 class="slide-title">Handwritten Answer → Digitized Text</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2" style="align-items: center;">
+            <div class="card" style="text-align: center;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">INPUT: HANDWRITTEN CANVAS STROKES</div>
+              <div class="img-box" style="height: 200px;">
+                <img src="assets/generated_student_handwriting.png" alt="Handwritten Input">
+              </div>
+            </div>
+
+            <div class="card" style="border-color: var(--accent-emerald);">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-emerald); margin-bottom: 0.5rem;">OUTPUT: DIGITIZED TEXT (PADDLEOCR)</div>
+              <div style="background: var(--code-bg); border: 1px solid var(--border-card); padding: 1rem; border-radius: 8px; font-family: var(--font-mono); font-size: 1.1rem; color: #a7f3d0; min-height: 100px;">
+                "ADDLE OLR PERSISTENTE ("
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem;">
+                <span>Provider: PaddleOCR 3.7.0</span>
+                <span>Confidence: 61.37% (MEDIUM)</span>
+              </div>
+            </div>
+          </div>
+          <div class="quote-box" style="text-align: center; margin-top: 1rem; font-size: 1rem;">
+            Digital handwriting successfully transformed into machine-readable text.
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 12: TECHNICAL OUTPUT -->
+      <div class="slide" data-slide="12">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">API Output</div>
+            <h2 class="slide-title">OCR API Response Payload</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <pre><code>{
+  "success": true,
+  "message": "Handwriting recognition completed.",
+  "data": {
+    "answerSheetId": "6a97c197883c3047ee452bed",
+    "provider": "paddle",
+    "executionTimeSec": 82.84,
+    "overallConfidence": 0.6137,
+    "extractedText": "Q1: ADDLE OLR PERSISTENTE (",
+    "answers": [
+      {
+        "questionId": "q1",
+        "recognizedText": "ADDLE OLR PERSISTENTE (",
+        "hwrStatus": "Completed",
+        "confidence": 0.6137
+      }
+    ]
+  }
+}</code></pre>
+            <div class="card">
+              <div class="card-title">API Response Attributes</div>
+              <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem; color: var(--text-muted);">
+                <div><strong style="color: var(--text-main);">extractedText:</strong> Concatenated transcribed text stored in MongoDB.</div>
+                <div><strong style="color: var(--text-main);">confidence:</strong> Neural confidence metric generated by PP-OCRv5 head.</div>
+                <div><strong style="color: var(--text-main);">executionTimeSec:</strong> Total latency for stroke rendering & inference.</div>
+                <div><strong style="color: var(--text-main);">hwrStatus:</strong> Completion flag for background job polling.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 13: SYSTEM VALIDATION -->
+      <div class="slide" data-slide="13">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Validation</div>
+            <h2 class="slide-title">System & Pipeline Validation</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">Verified Acceptance Criteria</div>
+              <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+                <div><span style="color: var(--accent-emerald);">✓</span> Canvas strokes correctly rendered to image files</div>
+                <div><span style="color: var(--accent-emerald);">✓</span> FastAPI OCR microservice returns 200 OK</div>
+                <div><span style="color: var(--accent-emerald);">✓</span> PaddleOCR engine executes real neural inference</div>
+                <div><span style="color: var(--accent-emerald);">✓</span> Transcribed text persisted into MongoDB</div>
+                <div><span style="color: var(--accent-emerald);">✓</span> Digitized text bound to Faculty UI display</div>
+              </div>
+            </div>
+            <div class="img-box">
+              <img src="assets/manual_eval_screen.png" alt="Faculty Viewer Validation">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 14: CURRENT STATUS & ROADMAP -->
+      <div class="slide" data-slide="14">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Roadmap</div>
+            <h2 class="slide-title">Current Status & Next Phase</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div class="card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <div class="card-title">Completed Milestone 1</div>
+                <span class="roadmap-badge badge-done">Achieved</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                <div>✓ Digital Answer Stroke Capture</div>
+                <div>✓ OpenCV Image Preprocessing</div>
+                <div>✓ FastAPI PaddleOCR Integration</div>
+                <div>✓ Neural Handwriting Recognition</div>
+                <div>✓ Machine-Readable Text Digitization</div>
+              </div>
+            </div>
+
+            <div class="card" style="border-color: var(--accent-amber);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <div class="card-title" style="color: var(--accent-amber);">Next Phase (Future Scope)</div>
+                <span class="roadmap-badge badge-next">Next Phase</span>
+              </div>
+              <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-muted); line-height: 1.6;">
+                Digitized Text<br>
+                &nbsp;&nbsp;↓<br>
+                Semantic Answer Understanding (LLM)<br>
+                &nbsp;&nbsp;↓<br>
+                Model Answer Comparison & Rubrics<br>
+                &nbsp;&nbsp;↓<br>
+                Automated Marking & Faculty Review
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 15: CONCLUSION -->
+      <div class="slide" data-slide="15">
+        <div class="slide-header">
+          <div class="slide-header-content">
+            <div class="slide-badge">Conclusion</div>
+            <h2 class="slide-title">From Handwriting to Machine-Readable Text</h2>
+          </div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-3">
+            <div class="card">
+              <div class="card-title">1. Digital First</div>
+              <p class="card-text">Captures handwritten responses directly from digital slates, eliminating physical paper scanning and logistics.</p>
+            </div>
+            <div class="card">
+              <div class="card-title">2. Intelligent Recognition</div>
+              <p class="card-text">Leverages state-of-the-art PaddleOCR PP-OCRv5 neural models for robust handwriting digitization.</p>
+            </div>
+            <div class="card">
+              <div class="card-title">3. AI-Ready Data</div>
+              <p class="card-text">Converts raw student handwriting into structured machine-readable text ready for automated downstream pipelines.</p>
+            </div>
+          </div>
+
+          <div class="quote-box" style="text-align: center; margin-top: 2rem; font-size: 1.25rem;">
+            “From Digital Handwriting to Machine-Readable Knowledge.”
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar" style="width: 6.66%;"></div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <button class="control-btn" id="prevBtn">← Prev</button>
+      <div class="slide-counter" id="slideCounter">01 / 15</div>
+      <button class="control-btn" id="nextBtn">Next →</button>
+      <button class="control-btn" id="overviewBtn">⣿ Grid</button>
+      <button class="control-btn" id="fullscreenBtn">⛶ Full</button>
+      <button class="control-btn" id="themeBtn">☀️ Theme</button>
+    </div>
+  </div>
+
+  <!-- Overview Grid Modal -->
+  <div class="overview-modal" id="overviewModal">
+    <div class="overview-header">
+      <h2 style="color: #fff; font-size: 1.5rem;">Slide Deck Overview</h2>
+      <button class="control-btn" id="closeOverviewBtn" style="font-size: 1.2rem;">✕ Close</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid">
+      <!-- 15 Thumbnails rendered by JS -->
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const TOTAL_SLIDES = 15;
+      let currentSlide = 1;
+
+      const slides = document.querySelectorAll('.slide');
+      const counter = document.getElementById('slideCounter');
+      const progressBar = document.getElementById('progressBar');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const overviewBtn = document.getElementById('overviewBtn');
+      const closeOverviewBtn = document.getElementById('closeOverviewBtn');
+      const overviewModal = document.getElementById('overviewModal');
+      const overviewGrid = document.getElementById('overviewGrid');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+      const themeBtn = document.getElementById('themeBtn');
+
+      function updateSlide(target) {
+        if (target < 1) target = 1;
+        if (target > TOTAL_SLIDES) target = TOTAL_SLIDES;
+        
+        currentSlide = target;
+        
+        slides.forEach(slide => {
+          const slideNum = parseInt(slide.getAttribute('data-slide'));
+          slide.classList.toggle('active', slideNum === currentSlide);
+        });
+
+        // Update counter & progress
+        counter.textContent = `${String(currentSlide).padStart(2, '0')} / ${String(TOTAL_SLIDES).padStart(2, '0')}`;
+        progressBar.style.width = `${(currentSlide / TOTAL_SLIDES) * 100}%`;
+      }
+
+      // Populate Overview Grid
+      function buildOverviewGrid() {
+        overviewGrid.innerHTML = '';
+        slides.forEach(slide => {
+          const slideNum = slide.getAttribute('data-slide');
+          const title = slide.querySelector('.slide-title')?.textContent || slide.querySelector('.hero-title')?.textContent || `Slide ${slideNum}`;
+          
+          const thumb = document.createElement('div');
+          thumb.className = 'thumb-card';
+          thumb.innerHTML = `
+            <div class="thumb-number">SLIDE ${String(slideNum).padStart(2, '0')}</div>
+            <div class="thumb-title">${title}</div>
+          `;
+          thumb.addEventListener('click', () => {
+            updateSlide(parseInt(slideNum));
+            overviewModal.classList.remove('active');
+          });
+          overviewGrid.appendChild(thumb);
+        });
+      }
+
+      // Event Listeners
+      prevBtn.addEventListener('click', () => updateSlide(currentSlide - 1));
+      nextBtn.addEventListener('click', () => updateSlide(currentSlide + 1));
+      overviewBtn.addEventListener('click', () => {
+        buildOverviewGrid();
+        overviewModal.classList.add('active');
+      });
+      closeOverviewBtn.addEventListener('click', () => overviewModal.classList.remove('active'));
+
+      // Keyboard Controls
+      window.addEventListener('keydown', (e) => {
+        if (overviewModal.classList.contains('active')) {
+          if (e.key === 'Escape') overviewModal.classList.remove('active');
+          return;
+        }
+
+        switch(e.key) {
+          case 'ArrowLeft':
+          case 'PageUp':
+            updateSlide(currentSlide - 1);
+            break;
+          case 'ArrowRight':
+          case ' ':
+          case 'PageDown':
+            updateSlide(currentSlide + 1);
+            break;
+          case 'Home':
+            updateSlide(1);
+            break;
+          case 'End':
+            updateSlide(TOTAL_SLIDES);
+            break;
+          case 'Escape':
+            if (document.fullscreenElement) document.exitFullscreen();
+            break;
+        }
+      });
+
+      // Fullscreen Toggle
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.log(err));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      // Theme Toggle
+      themeBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+      });
+
+      // Init
+      updateSlide(1);
+    })();
+  </script>
+</body>
+</html>
